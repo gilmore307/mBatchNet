@@ -1,0 +1,17 @@
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css");
+
+/* Optional: keep icons vertically centered in buttons */
+.be-navbar i { line-height: 1; }
+
+/* Pipeline nav: make 4 buttons equal width */
+.be-pipeline-row .be-nav-btn {
+  width: var(--be-pipeline-btn-width, 200px);
+}
+
+/* Vertically center arrow icons between buttons */
+.be-pipeline-row .be-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  top: -5px; /* slight upward nudge for visual centering */
+}

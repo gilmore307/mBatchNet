@@ -1,0 +1,69 @@
+/* Keep parameter inputs a consistent width, before and after running */
+.be-param-col { flex: 0 0 250px !important; max-width: 250px !important; }
+.be-param-input { width: 100%; }
+
+/* On small screens, let them stack full width */
+@media (max-width: 576px) {
+  .be-param-col { flex: 0 0 100% !important; max-width: 100% !important; }
+}
+
+/* --- Pipeline navbar as full-width tab-like steps with arrows --- */
+.be-pipeline-container {
+  width: 100%;
+  height: 60px;            /* requested fixed height */
+  gap: 40px;               /* larger space between buttons for arrows */
+}
+
+.be-pipeline-step.btn {
+  flex: 1 1 0;
+  min-width: 0;         /* allow text to truncate */
+  border-radius: 0;      /* tab look */
+  margin: 0;             /* no outer margins so arrows connect */
+  position: relative;
+  text-align: center;
+  white-space: nowrap;
+  height: 60px;          /* match container height */
+  display: flex;         /* center text vertically */
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;    /* slightly larger text */
+}
+
+/* Make buttons the same height and vertically centered */
+.be-pipeline-step.btn > * {
+  pointer-events: none; /* keep whole step clickable */
+}
+
+/* Right-pointing arrow using triangle; added to all but last */
+.be-pipeline-step.btn:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -33px;          /* arrow width; sits inside the gap */
+  width: 0;
+  height: 0;
+  border-top: 30px solid transparent;   /* half of 60px height */
+  border-bottom: 30px solid transparent;
+  border-left: 24px solid var(--be-step-bg, var(--bs-light));
+  z-index: 2;
+}
+
+/* With gap reserved for arrows, no extra left padding needed */
+.be-pipeline-step.btn:not(:first-child) { padding-left: 0; }
+
+/* Background color source for the arrow tip per variant */
+.be-pipeline-step.btn-light { --be-step-bg: var(--bs-light); }
+.be-pipeline-step.btn-success { --be-step-bg: var(--bs-success); }
+
+/* Outline variants: give a subtle translucent arrow using the theme color */
+.be-pipeline-step.btn-outline-light { --be-step-bg: rgba(var(--bs-light-rgb, 248,249,250), 0.4); }
+.be-pipeline-step.btn-outline-success { --be-step-bg: rgba(var(--bs-success-rgb, 25,135,84), 0.35); }
+
+/* Disabled state dimming still uses Bootstrap's disabled styles */
+.be-pipeline-step.btn:disabled {
+  cursor: not-allowed;
+  opacity: .65;
+}
+
+/* Allow arrow pseudo-element to render outside button box */
+.be-pipeline-step.btn { overflow: visible; }
