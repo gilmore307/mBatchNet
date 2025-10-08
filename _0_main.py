@@ -485,7 +485,11 @@ def update_runlog_content(n, log_path):
 if __name__ == "__main__":
     # Production-friendly defaults. Override with env: DASH_DEBUG, HOST, PORT
     debug = (os.getenv("DASH_DEBUG", "0") == "1")
-    host = os.getenv("HOST", "0.0.0.0")
+    # On Windows, binding to 0.0.0.0 can be blocked by firewall policies and yield
+    # "以一种访问权限不允许的方式做了一个访问套接字的尝试" (WSAEACCES 10013).
+    # Use 127.0.0.1 by default on Windows; allow override via HOST env.
+    default_host = "127.0.0.1" if os.name == "nt" else "0.0.0.0"
+    host = os.getenv("HOST", default_host)
     try:
         port = int(os.getenv("PORT", "8050"))
     except Exception:

@@ -653,22 +653,47 @@ def register_upload_callbacks(app):
                 with path.open("r", encoding="utf-8", newline="") as fh:
                     reader = _csv.reader(fh)
                     for i, row in enumerate(reader):
-                        if i == 0:
+                        if title == "Metadata" and i == 0:
                             header = row
                             continue
                         row_count += 1
                         if len(rows_preview) < 5:
                             rows_preview.append(row)
-                if header is None:
+                if title == "Metadata" and header is None:
                     return html.Div(f"{title}: empty file", className="text-muted")
-                col_count = len(header)
-                thead = html.Thead(html.Tr([html.Th(c) for c in header]))
-                tbody = html.Tbody([html.Tr([html.Td(c) for c in r]) for r in rows_preview])
+                col_count = (
+                    len(header) if title == "Metadata" else (len(rows_preview[0]) if rows_preview else 0)
+                )
+                thead = (
+                    html.Thead(html.Tr([html.Th(c) for c in header])) if title == "Metadata" else None
+                )
+                def _fmt_cell(val: str) -> str:
+                    if title == "Raw Matrix":
+                        try:
+                            return f"{float(val):.3f}"
+                        except Exception:
+                            return val
+                    return val
+                tbody = html.Tbody([
+                    html.Tr([html.Td(_fmt_cell(c)) for c in r]) for r in rows_preview
+                ])
                 size = path.stat().st_size if path.exists() else 0
                 meta = f"{row_count} rows × {col_count} cols"
                 return dbc.Card([
                     dbc.CardHeader(html.Strong(f"{title} — {meta} ({human_size(size)})")),
-                    dbc.CardBody(dbc.Table([thead, tbody], bordered=True, hover=True, size="sm", className="mb-0")),
+                    dbc.CardBody(
+                        html.Div(
+                            dbc.Table(
+                                [thead, tbody],
+                                bordered=True,
+                                hover=True,
+                                size="sm",
+                                className="mb-0",
+                                style={"whiteSpace": "nowrap"}
+                            ),
+                            style={"overflowX": "auto"}
+                        )
+                    ),
                 ], className="mb-2")
             except Exception:
                 return html.Div(f"{title}: failed to preview", className="text-danger")
