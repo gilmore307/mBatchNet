@@ -15,7 +15,19 @@ output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
 # Your metadata outcome column:
-PHENO_COL <- "phenotype"   # <-- uses numeric 0/1 in your metadata.csv
+PHENO_COL <- "phenotype"
+
+# Optional study settings from session_config.json (in output_folder)
+CONTROL_LABEL <- NA_character_
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- tryCatch(jsonlite::fromJSON(cfg_path), error = function(e) NULL)
+    if (!is.null(cfg) && !is.null(cfg$control_label)) {
+      CONTROL_LABEL <- as.character(cfg$control_label)
+    }
+  }
+}, silent = TRUE)
 
 # ==== Read metadata (metadata.csv) ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
@@ -28,19 +40,21 @@ metadata <- metadata %>% mutate(sample_id = as.character(sample_id))
 if (!PHENO_COL %in% names(metadata))
   stop(sprintf("Phenotype column '%s' not found in metadata.csv", PHENO_COL))
 
-# Prepare .outcome as a two-class factor with the POSITIVE class as the FIRST level
-# If numeric 0/1, treat 1 as "Positive", 0 as "Negative"
-if (is.numeric(metadata[[PHENO_COL]]) && length(unique(metadata[[PHENO_COL]])) == 2) {
+# Prepare .outcome as a two-class factor
+vals <- unique(metadata[[PHENO_COL]])
+if (length(vals) != 2) stop(sprintf("Phenotype column '%s' must have exactly 2 classes.", PHENO_COL))
+if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(vals)) {
+  # Map user-specified control label to Negative; the other is Positive
   metadata <- metadata %>%
-    mutate(.outcome = factor(ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
+    mutate(.outcome = factor(ifelse(as.character(.data[[PHENO_COL]]) == CONTROL_LABEL, "Negative", "Positive"),
                              levels = c("Positive","Negative")))
+} else if (is.numeric(metadata[[PHENO_COL]]) && all(sort(unique(metadata[[PHENO_COL]])) %in% c(0,1))) {
+  metadata <- metadata %>% mutate(.outcome = factor(ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
+                                                   levels = c("Positive","Negative")))
 } else {
-  # If it's character/factor with exactly 2 levels, take the second level as positive and relevel it first
   levs <- levels(factor(metadata[[PHENO_COL]]))
-  if (length(levs) != 2) stop(sprintf("Phenotype column '%s' must have exactly 2 classes.", PHENO_COL))
   pos <- levs[2]
-  metadata <- metadata %>%
-    mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
+  metadata <- metadata %>% mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
 }
 
 # ==== Collect files (e.g., normalized files) ====
