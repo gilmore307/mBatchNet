@@ -241,14 +241,22 @@ def register_upload_callbacks(app):
         State("example-select", "value"),
         prevent_initial_call=True,
     )
-    def handle_upload(matrix_contents, metadata_contents, load_example_clicks, matrix_name, metadata_name, session_id, example_key):
+    def handle_upload(
+        matrix_contents,
+        metadata_contents,
+        load_example_clicks,
+        matrix_name,
+        metadata_name,
+        session_id,
+        example_key,
+    ):
         if not session_id:
             return False, "No file uploaded yet.", "No file uploaded yet.", dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
         saved_items: List[str] = []
-        matrix_info = "No file uploaded yet."
-        metadata_info = "No file uploaded yet."
+        matrix_info = dash.no_update
+        metadata_info = dash.no_update
         example_status = dash.no_update
         example_loaded_out = dash.no_update
 
