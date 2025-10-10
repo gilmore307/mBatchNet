@@ -40,7 +40,6 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("Mosaic plot", "mosaic_plot.png"),
     FigureSpec("PCA", "pca.png"),
     FigureSpec("PCoA (Aitchison)", "pcoa_aitchison.png"),
     FigureSpec("PCoA (Bray-Curtis)", "pcoa_braycurtis.png"),
@@ -67,7 +66,6 @@ POST_FIGURES: Sequence[FigureSpec] = PRE_FIGURES + POST_EXTRA_FIGURES
 
 
 PRE_SCRIPTS: Sequence[str] = (
-    "Mosaic.R",
     "pca.R",
     "pcoa.R",
     "NMDS.R",
@@ -701,8 +699,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["title"] = "pRDA"
         elif key == "pca" and spec.filename.lower() == "pca.png":
             g["single"] = spec.filename; g["title"] = "PCA"
-        elif key == "mosaic" and spec.filename.lower() == "mosaic_plot.png":
-            g["single"] = spec.filename; g["title"] = "Mosaic plot"
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
             g["single"] = spec.filename; g["title"] = "PVCA"
         elif key == "alignment" and spec.filename.lower() == "alignment_score.png":
@@ -758,7 +754,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                     "r2": ["r2", "R2"],
                     "prda": ["prda", "pRDA"],
                     "pca": ["pca"],
-                    "mosaic": ["mosaic_plot", "mosaic"],
                     "pvca": ["pvca", "PVCA"],
                     "alignment": ["alignment_score"],
                     "auc": ["auroc"],
@@ -794,7 +789,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                 "r2": ["r2", "R2"],
                 "prda": ["prda", "pRDA"],
                 "pca": ["pca"],
-                "mosaic": ["mosaic_plot", "mosaic"],
                 "pvca": ["pvca", "PVCA"],
                 "alignment": ["alignment_score"],
                 "auc": ["auroc"],

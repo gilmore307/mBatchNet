@@ -147,7 +147,6 @@ def assessment_layout(active_path: str, stage: str):
 
     # Define groups (key, title, script)
     pre_groups = [
-        ("mosaic", "Mosaic plot", "Mosaic.R"),
         ("pca", "PCA", "pca.R"),
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
@@ -163,9 +162,9 @@ def assessment_layout(active_path: str, stage: str):
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
-    # For post assessment, exclude the Mosaic test
+    # Extend post assessment with additional post-only metrics
     if stage == "post":
-        groups = [g for g in pre_groups if g[0] != "mosaic"] + post_extra
+        groups = pre_groups + post_extra
     else:
         groups = pre_groups
 
@@ -239,7 +238,6 @@ def assessment_layout(active_path: str, stage: str):
 def register_pre_post_callbacks(app):
     # Group definitions for per-tab runs
     pre_groups = [
-        ("mosaic", "Mosaic plot", "Mosaic.R"),
         ("pca", "PCA", "pca.R"),
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
@@ -396,7 +394,7 @@ def register_pre_post_callbacks(app):
     # Register all group callbacks
     for key, _, script in pre_groups:
         _register_group("pre", key, script)
-    # For post assessment, exclude Mosaic from registration
-    for key, _, script in [g for g in pre_groups if g[0] != "mosaic"] + post_extra:
+    # Register post-stage groups (baseline pre groups plus post-only extras)
+    for key, _, script in pre_groups + post_extra:
         _register_group("post", key, script)
 

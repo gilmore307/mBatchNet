@@ -4,6 +4,8 @@
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import shutil
+import json
+import base64
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -15,6 +17,7 @@ from _2_utils import (
     save_uploaded_file,
     human_size,
     run_preprocess,
+    run_r_scripts,
     BASE_DIR,
 )
 
@@ -54,6 +57,59 @@ def _example_pair_for(key: str) -> Optional[Tuple[Path, Path]]:
         if k == key:
             return raw_p, meta_p
     return None
+
+
+def _render_mosaic_card(session_dir: Path) -> html.Div:
+    """Return a card displaying the mosaic plot if it exists."""
+    img_path = session_dir / "mosaic_plot.png"
+    if not img_path.exists():
+        return html.Div("Mosaic plot not generated yet.", className="text-muted")
+    try:
+        encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
+    except Exception:
+        return html.Div("Failed to read mosaic plot image.", className="text-danger")
+    img = html.Img(
+        src=f"data:image/png;base64,{encoded}",
+        alt="Mosaic plot",
+        style={"maxWidth": "100%", "height": "auto"},
+    )
+    return dbc.Card(
+        [
+            dbc.CardHeader(html.Strong("Mosaic plot")),
+            dbc.CardBody(img),
+        ],
+        className="mt-3",
+    )
+
+
+def _persist_study_settings(session_dir: Path, control_label: str, reference_batch: str) -> Tuple[bool, Optional[str]]:
+    """Write the selected study settings into session_config.json."""
+    cfg_path = session_dir / "session_config.json"
+    config: Dict[str, object] = {}
+    if cfg_path.exists():
+        try:
+            config = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            config = {}
+    config["control_label"] = None if control_label is None else str(control_label)
+    config["reference_batch"] = None if reference_batch is None else str(reference_batch)
+    try:
+        cfg_path.write_text(
+            json.dumps(config, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
+    """Run the Mosaic.R script for the current session."""
+    log_path = session_dir / "run.log"
+    ok, log = run_r_scripts(("Mosaic.R",), session_dir, log_path=log_path)
+    if not ok:
+        return False, log
+    return True, None
 
 
 def upload_layout(active_path: str):
@@ -200,6 +256,15 @@ def upload_layout(active_path: str):
                             html.Div(id="process-result", className="mb-2"),
                         ], type="default"),
                     ], id="process-area"),
+                    html.Div(id="study-settings-container", className="mt-4"),
+                    dcc.Loading(
+                        html.Div(
+                            "Mosaic plot not generated yet.",
+                            id="mosaic-preview",
+                            className="mt-3 text-muted",
+                        ),
+                        type="default",
+                    ),
                 ],
                 fluid=True,
             ),
@@ -332,6 +397,165 @@ def register_upload_callbacks(app):
     def toggle_process_button(upload_complete: bool):
         enabled = bool(upload_complete)
         return (not enabled), ("success" if enabled else "secondary")
+
+    @app.callback(
+        Output("study-settings-container", "children"),
+        Input("preprocess-complete", "data"),
+        Input("example-loaded", "data"),
+        State("session-id", "data"),
+        State("page-url", "pathname"),
+        prevent_initial_call=True,
+    )
+    def show_study_settings_card(preprocess_complete, example_loaded, session_id, pathname):
+        if (pathname or "/").split("?", 1)[0] != "/upload":
+            raise dash.exceptions.PreventUpdate
+        if not session_id:
+            return html.Div()
+        if not preprocess_complete:
+            return html.Div()
+        if example_loaded:
+            # Example datasets apply study settings automatically; hide card.
+            return html.Div()
+
+        session_dir = get_session_dir(session_id)
+        meta_path = session_dir / "metadata.csv"
+        if not meta_path.exists():
+            return html.Div("Metadata file not found; preprocess the data first.", className="text-danger")
+
+        import csv  # local import to avoid top-level dependency when unused
+
+        try:
+            with meta_path.open("r", encoding="utf-8", newline="") as fh:
+                reader = csv.DictReader(fh)
+                rows = list(reader)
+        except Exception:
+            return html.Div("Failed to read metadata.csv for study settings.", className="text-danger")
+        if not rows:
+            return html.Div("Metadata file is empty; unable to configure study settings.", className="text-danger")
+
+        def _collect(column: str) -> List[str]:
+            vals = {
+                str(row.get(column)).strip()
+                for row in rows
+                if row.get(column) not in (None, "")
+            }
+            return sorted(v for v in vals if v)
+
+        phenotypes = _collect("phenotype")
+        batches = _collect("batch_id")
+        if not phenotypes or not batches:
+            return html.Div("Metadata must contain non-empty phenotype and batch_id columns.", className="text-danger")
+
+        saved_control = None
+        saved_reference = None
+        cfg_path = session_dir / "session_config.json"
+        if cfg_path.exists():
+            try:
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                saved_control = cfg.get("control_label")
+                saved_reference = cfg.get("reference_batch")
+            except Exception:
+                saved_control = None
+                saved_reference = None
+
+        if saved_control not in phenotypes:
+            saved_control = None
+        if saved_reference not in batches:
+            saved_reference = None
+
+        control_dropdown = dbc.Col(
+            [
+                dbc.Label("Negative / Control label", html_for="study-control-label", className="fw-semibold"),
+                dcc.Dropdown(
+                    id="study-control-label",
+                    options=[{"label": val, "value": val} for val in phenotypes],
+                    value=saved_control,
+                    placeholder="Select control label",
+                    clearable=False,
+                ),
+            ],
+            md=6,
+            className="mb-3",
+        )
+        reference_dropdown = dbc.Col(
+            [
+                dbc.Label("Reference batch", html_for="study-reference-batch", className="fw-semibold"),
+                dcc.Dropdown(
+                    id="study-reference-batch",
+                    options=[{"label": val, "value": val} for val in batches],
+                    value=saved_reference,
+                    placeholder="Select reference batch",
+                    clearable=False,
+                ),
+            ],
+            md=6,
+            className="mb-3",
+        )
+
+        return dbc.Card(
+            [
+                dbc.CardHeader(html.Strong("Study Settings")),
+                dbc.CardBody(
+                    [
+                        html.P(
+                            "Select the control phenotype (will be treated as Negative) and the reference batch before generating the mosaic plot.",
+                            className="text-muted",
+                        ),
+                        dbc.Row([control_dropdown, reference_dropdown], className="g-2"),
+                        dbc.Button(
+                            "Apply Study Settings",
+                            id="apply-study-settings",
+                            color="secondary",
+                            className="mt-2",
+                            disabled=True,
+                            style={"width": "250px"},
+                            size="sm",
+                        ),
+                        html.Div(id="study-settings-status", className="mt-3 text-muted"),
+                    ]
+                ),
+            ],
+            className="mt-3",
+        )
+
+    @app.callback(
+        Output("apply-study-settings", "disabled"),
+        Output("apply-study-settings", "color"),
+        Input("study-control-label", "value"),
+        Input("study-reference-batch", "value"),
+        prevent_initial_call=True,
+    )
+    def toggle_study_settings_button(control_label, reference_batch):
+        ready = bool(control_label) and bool(reference_batch)
+        return (not ready), ("success" if ready else "secondary")
+
+    @app.callback(
+        Output("study-settings-status", "children"),
+        Output("mosaic-preview", "children", allow_duplicate=True),
+        Input("apply-study-settings", "n_clicks"),
+        State("study-control-label", "value"),
+        State("study-reference-batch", "value"),
+        State("session-id", "data"),
+        prevent_initial_call=True,
+    )
+    def apply_study_settings(n_clicks: int, control_label: str, reference_batch: str, session_id: str):
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        if not session_id:
+            return html.Span("Session not initialised.", className="text-danger"), dash.no_update
+        if not control_label or not reference_batch:
+            return html.Span("Select both control label and reference batch.", className="text-danger"), dash.no_update
+
+        session_dir = get_session_dir(session_id)
+        ok_cfg, err = _persist_study_settings(session_dir, control_label, reference_batch)
+        if not ok_cfg:
+            return html.Span(f"Failed to save study settings: {err}", className="text-danger"), dash.no_update
+
+        ok_mosaic, mosaic_err = _generate_mosaic(session_dir)
+        if not ok_mosaic:
+            return html.Span("Failed to generate mosaic plot. Check run log for details.", className="text-danger"), dash.no_update
+
+        return html.Span("Study settings applied. Mosaic generated.", className="text-success"), _render_mosaic_card(session_dir)
 
     @app.callback(
         Output("metadata-columns-display", "children"),
@@ -494,7 +718,7 @@ def register_upload_callbacks(app):
                     for old, new in zip(orig_fieldnames, new_fieldnames):
                         out_row[new] = row.get(old)
                     writer.writerow(out_row)
-        except Exception as exc:
+        except Exception:
             return False, dash.no_update, dash.no_update, dash.no_update
 
         # Run preprocess.R in the session directory
@@ -510,6 +734,7 @@ def register_upload_callbacks(app):
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
+        Output("mosaic-preview", "children", allow_duplicate=True),
         Input("example-loaded", "data"),
         State("session-id", "data"),
         State("page-url", "pathname"),
@@ -526,7 +751,7 @@ def register_upload_callbacks(app):
         session_dir = get_session_dir(session_id)
         meta_path = session_dir / "metadata.csv"
         if not meta_path.exists():
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         # Ensure standard header names if needed (batch_id, phenotype)
         try:
@@ -576,7 +801,14 @@ def register_upload_callbacks(app):
         log_path = session_dir / "run.log"
         ok, _ = run_preprocess(session_dir, log_path=log_path)
         # Do not auto-open logs modal; user can open manually
-        return bool(ok), str(log_path), dash.no_update, dash.no_update
+        mosaic_children = dash.no_update
+        if ok:
+            cfg_ok, _ = _persist_study_settings(session_dir, "0", "A")
+            if cfg_ok:
+                mosaic_ok, _ = _generate_mosaic(session_dir)
+                if mosaic_ok:
+                    mosaic_children = _render_mosaic_card(session_dir)
+        return bool(ok), str(log_path), dash.no_update, dash.no_update, mosaic_children
 
     # Hide the manual Process button when example data is used
     @app.callback(

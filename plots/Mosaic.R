@@ -42,19 +42,31 @@ if (!PHENO_COL %in% names(metadata))
 
 # Prepare .outcome as a two-class factor
 vals <- unique(metadata[[PHENO_COL]])
-if (length(vals) != 2) stop(sprintf("Phenotype column '%s' must have exactly 2 classes.", PHENO_COL))
 if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(vals)) {
-  # Map user-specified control label to Negative; the other is Positive
+  # Map user-specified control label to Negative; all others collapse into Positive
   metadata <- metadata %>%
-    mutate(.outcome = factor(ifelse(as.character(.data[[PHENO_COL]]) == CONTROL_LABEL, "Negative", "Positive"),
-                             levels = c("Positive","Negative")))
+    mutate(.outcome = factor(
+      ifelse(as.character(.data[[PHENO_COL]]) == CONTROL_LABEL, "Negative", "Positive"),
+      levels = c("Positive", "Negative")
+    ))
+} else if (length(vals) == 2) {
+  # Fallback: exactly two classes; use lexical order to determine Positive/Negative
+  if (is.numeric(metadata[[PHENO_COL]]) && all(sort(vals) %in% c(0, 1))) {
+    metadata <- metadata %>%
+      mutate(.outcome = factor(
+        ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
+        levels = c("Positive", "Negative")
+      ))
+  } else {
+    levs <- levels(factor(metadata[[PHENO_COL]]))
+    pos <- levs[2]
+    metadata <- metadata %>% mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
+  }
 } else if (is.numeric(metadata[[PHENO_COL]]) && all(sort(unique(metadata[[PHENO_COL]])) %in% c(0,1))) {
   metadata <- metadata %>% mutate(.outcome = factor(ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
                                                    levels = c("Positive","Negative")))
 } else {
-  levs <- levels(factor(metadata[[PHENO_COL]]))
-  pos <- levs[2]
-  metadata <- metadata %>% mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
+  stop(sprintf("Phenotype column '%s' must have exactly 2 classes unless a control label is specified.", PHENO_COL))
 }
 
 # ==== Collect files (e.g., normalized files) ====
