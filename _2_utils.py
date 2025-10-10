@@ -3,12 +3,16 @@
 # ===============================
 import base64
 import csv
+import json
 import os
 import sys
 import shutil
 import subprocess
 import textwrap
 import time
+import hashlib
+from datetime import datetime
+from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -144,6 +148,10 @@ def method_formal_name(name: str) -> str:
 # Quantile normalization, Batch mean centering, Limma removeBatchEffect,
 # Surrogate variable decomposition, Percentile normalization
 DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "SVD", "PN")
+
+CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_METHODS}
+DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
+DISPLAY_TO_CODE_LOWER: Dict[str, str] = {display.lower(): code for code, display in SUPPORTED_METHODS}
 
 
 # ---- General helpers ----
@@ -1178,4 +1186,244 @@ def build_raw_assessments_tab(session_dir: Path):
         body = dbc.Accordion(items, always_open=False)
 
     return dcc.Tab(label="Raw Assessments", value="tab-raw", children=html.Div(body))
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _example_signatures() -> List[tuple[str, str]]:
+    ex_dir = BASE_DIR / "assets" / "example"
+    if not ex_dir.exists():
+        return []
+    raws: Dict[str, Path] = {}
+    metas: Dict[str, Path] = {}
+    for p in ex_dir.iterdir():
+        if not p.is_file():
+            continue
+        name = p.name
+        if name.lower().startswith("raw_"):
+            key = name.split("_", 1)[1]
+            raws[key] = p
+        elif name.lower().startswith("metadata_"):
+            key = name.split("_", 1)[1]
+            metas[key] = p
+    signatures: List[tuple[str, str]] = []
+    for key in set(raws) & set(metas):
+        try:
+            signatures.append((_file_sha256(raws[key]), _file_sha256(metas[key])))
+        except Exception:
+            continue
+    return signatures
+
+
+def _session_signature(session_dir: Path) -> tuple[str, str] | None:
+    raw_path = session_dir / "raw.csv"
+    meta_path = session_dir / "metadata.csv"
+    if not raw_path.exists() or not meta_path.exists():
+        return None
+    try:
+        return _file_sha256(raw_path), _file_sha256(meta_path)
+    except Exception:
+        return None
+
+
+def _method_code_from_display(display: str) -> Optional[str]:
+    if not display:
+        return None
+    code = DISPLAY_TO_CODE.get(display)
+    if code:
+        return code
+    code = DISPLAY_TO_CODE_LOWER.get(display.lower())
+    if code:
+        return code
+    canonical = display.replace(" ", "").replace("-", "").replace("_", "").lower()
+    for method_code, nice_name in SUPPORTED_METHODS:
+        if canonical == nice_name.replace(" ", "").replace("-", "").replace("_", "").lower():
+            return method_code
+    return None
+
+
+def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
+    summary_path = session_dir / "session_summary.json"
+    if not summary_path.exists():
+        return None
+    try:
+        return json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
+    """Return {method_code: {metric_name: score_delta}} for a session."""
+    ret: Dict[str, Dict[str, float]] = defaultdict(dict)
+    for csv_path in sorted(session_dir.glob("*_ranking.csv")):
+        metric_name = csv_path.stem.replace("_ranking", "").replace("_", " ").strip()
+        try:
+            with csv_path.open("r", encoding="utf-8") as fh:
+                reader = csv.DictReader(fh)
+                header = reader.fieldnames or []
+        except Exception:
+            continue
+        if not header:
+            continue
+        field_map = {h.lower(): h for h in header}
+        method_col = field_map.get("method")
+        score_col = field_map.get("score") or field_map.get("normalized score") or field_map.get("value")
+        if not method_col or not score_col:
+            continue
+        baseline_score: Optional[float] = None
+        cache: List[tuple[str, float]] = []
+        try:
+            with csv_path.open("r", encoding="utf-8") as fh:
+                reader = csv.DictReader(fh)
+                for row in reader:
+                    raw_method = (row.get(method_col) or "").strip()
+                    score_str = (row.get(score_col) or "").strip()
+                    if not raw_method or not score_str:
+                        continue
+                    try:
+                        score_val = float(score_str)
+                    except ValueError:
+                        continue
+                    canonical = method_formal_name(raw_method)
+                    if canonical.lower() == "before correction":
+                        baseline_score = score_val
+                        continue
+                    method_code = _method_code_from_display(canonical)
+                    if not method_code:
+                        continue
+                    cache.append((method_code, score_val))
+        except Exception:
+            continue
+        if baseline_score is None:
+            continue
+        for method_code, score_val in cache:
+            ret[method_code][metric_name] = score_val - baseline_score
+    return ret
+
+
+def compute_integrated_summary() -> Dict[str, object]:
+    """Aggregate cross-session performance statistics and persist the summary."""
+    ensure_output_root()
+    example_signatures = set(_example_signatures())
+    method_stats: Dict[str, Dict[str, object]] = {
+        code: {
+            "code": code,
+            "display": CODE_TO_DISPLAY.get(code, code),
+            "runs": 0,
+            "elapsed": [],
+            "deltas": [],
+            "metric_deltas": defaultdict(list),
+            "sessions": set(),
+        }
+        for code, _ in SUPPORTED_METHODS
+    }
+    included_sessions: List[str] = []
+    for session_dir in sorted(p for p in OUTPUT_ROOT.iterdir() if p.is_dir()):
+        signature = _session_signature(session_dir)
+        if signature and signature in example_signatures:
+            continue
+        summary = _load_session_summary(session_dir)
+        ranking = _load_ranking_deltas(session_dir)
+        if not summary and not ranking:
+            continue
+        session_id = session_dir.name
+        included_sessions.append(session_id)
+        if summary:
+            for entry in summary.get("methods", []):
+                name = entry.get("name")
+                status = (entry.get("status") or "").lower()
+                if status != "success":
+                    continue
+                code = name if name in method_stats else _method_code_from_display(str(name))
+                if not code or code not in method_stats:
+                    continue
+                stat = method_stats[code]
+                stat["runs"] = int(stat["runs"]) + 1
+                stat["sessions"].add(session_id)
+                elapsed_val = entry.get("elapsed_sec")
+                try:
+                    elapsed_float = float(elapsed_val)
+                except (TypeError, ValueError):
+                    elapsed_float = None
+                if elapsed_float is not None:
+                    stat["elapsed"].append(elapsed_float)
+        if ranking:
+            for code, metric_map in ranking.items():
+                if code not in method_stats:
+                    continue
+                stat = method_stats[code]
+                stat["sessions"].add(session_id)
+                for metric_name, delta in metric_map.items():
+                    stat["deltas"].append(delta)
+                    stat["metric_deltas"][metric_name].append(delta)
+
+    rows: List[Dict[str, object]] = []
+    methods_payload: Dict[str, Dict[str, object]] = {}
+    for code, payload in method_stats.items():
+        elapsed_vals: List[float] = payload["elapsed"]  # type: ignore[assignment]
+        delta_vals: List[float] = payload["deltas"]  # type: ignore[assignment]
+        metric_map = payload["metric_deltas"]  # type: ignore[assignment]
+        avg_elapsed = mean(elapsed_vals) if elapsed_vals else None
+        avg_delta = mean(delta_vals) if delta_vals else None
+        metric_avgs = {metric: mean(vals) for metric, vals in metric_map.items() if vals}
+        best_metric = max(metric_avgs, key=metric_avgs.get) if metric_avgs else None
+        worst_metric = min(metric_avgs, key=metric_avgs.get) if metric_avgs else None
+        methods_payload[code] = {
+            "code": code,
+            "display": payload["display"],
+            "runs": int(payload["runs"]),
+            "sessions": sorted(payload["sessions"]),
+            "avg_elapsed_sec": avg_elapsed,
+            "avg_score_delta": avg_delta,
+            "best_metric": best_metric,
+            "worst_metric": worst_metric,
+            "metrics": {
+                metric: {
+                    "avg_delta": metric_avgs[metric],
+                    "count": len(metric_map[metric]),
+                }
+                for metric in metric_avgs
+            },
+        }
+        rows.append(
+            {
+                "code": code,
+                "method": payload["display"],
+                "runs": int(payload["runs"]),
+                "avg_elapsed_sec": round(avg_elapsed, 3) if avg_elapsed is not None else None,
+                "avg_score_delta": round(avg_delta, 3) if avg_delta is not None else None,
+                "best_metric": best_metric or "-",
+                "worst_metric": worst_metric or "-",
+            }
+        )
+    rows.sort(key=lambda item: (-(item["avg_score_delta"] or 0.0), item["method"]))
+    summary = {
+        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "sessions": included_sessions,
+        "methods": methods_payload,
+        "table_rows": rows,
+        "notes": "Score deltas are relative to the uncorrected baseline (Before correction).",
+    }
+    try:
+        integrated_path = OUTPUT_ROOT / "integrated_summary.json"
+        integrated_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return summary
+
+
+def load_integrated_summary() -> Dict[str, object]:
+    integrated_path = OUTPUT_ROOT / "integrated_summary.json"
+    if integrated_path.exists():
+        try:
+            return json.loads(integrated_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return compute_integrated_summary()
 

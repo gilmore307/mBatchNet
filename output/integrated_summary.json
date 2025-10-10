@@ -1,6 +1,309 @@
 {
-  "generated_at": "2025-10-08 03:20:05",
-  "methods": [],
+  "generated_at": "2025-10-10 08:02:13",
   "sessions": [],
-  "scoring": "standardized_from_rank (score = (N+1-rank)/N)"
+  "methods": {
+    "QN": {
+      "code": "QN",
+      "display": "Quantile normalization",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "BMC": {
+      "code": "BMC",
+      "display": "Batch mean centering",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "limma": {
+      "code": "limma",
+      "display": "Limma removeBatchEffect",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "ConQuR": {
+      "code": "ConQuR",
+      "display": "ConQuR",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "PLSDA": {
+      "code": "PLSDA",
+      "display": "PLSDA-batch",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "ComBat": {
+      "code": "ComBat",
+      "display": "ComBat",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "FSQN": {
+      "code": "FSQN",
+      "display": "FSQN",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "MMUPHin": {
+      "code": "MMUPHin",
+      "display": "MMUPHin",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "RUV": {
+      "code": "RUV",
+      "display": "RUV-III-NB",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "MetaDICT": {
+      "code": "MetaDICT",
+      "display": "Meta-DICT",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "SVD": {
+      "code": "SVD",
+      "display": "Surrogate variable decomposition",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "PN": {
+      "code": "PN",
+      "display": "Percentile normalization",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "FAbatch": {
+      "code": "FAbatch",
+      "display": "FAbatch",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "ComBatSeq": {
+      "code": "ComBatSeq",
+      "display": "ComBat-Seq",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    },
+    "DEBIAS": {
+      "code": "DEBIAS",
+      "display": "DEBIAS",
+      "runs": 0,
+      "sessions": [],
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": null,
+      "worst_metric": null,
+      "metrics": {}
+    }
+  },
+  "table_rows": [
+    {
+      "code": "BMC",
+      "method": "Batch mean centering",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "ComBat",
+      "method": "ComBat",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "ComBatSeq",
+      "method": "ComBat-Seq",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "ConQuR",
+      "method": "ConQuR",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "DEBIAS",
+      "method": "DEBIAS",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "FAbatch",
+      "method": "FAbatch",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "FSQN",
+      "method": "FSQN",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "limma",
+      "method": "Limma removeBatchEffect",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "MMUPHin",
+      "method": "MMUPHin",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "MetaDICT",
+      "method": "Meta-DICT",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "PLSDA",
+      "method": "PLSDA-batch",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "PN",
+      "method": "Percentile normalization",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "QN",
+      "method": "Quantile normalization",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "RUV",
+      "method": "RUV-III-NB",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    },
+    {
+      "code": "SVD",
+      "method": "Surrogate variable decomposition",
+      "runs": 0,
+      "avg_elapsed_sec": null,
+      "avg_score_delta": null,
+      "best_metric": "-",
+      "worst_metric": "-"
+    }
+  ],
+  "notes": "Score deltas are relative to the uncorrected baseline (Before correction)."
 }
