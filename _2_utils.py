@@ -16,7 +16,7 @@ from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional
+from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set
 
 from dash import html, dcc, dash_table
 try:
@@ -34,6 +34,7 @@ PLOTS_DIR = BASE_DIR / "plots"
 METHODS_SCRIPT = BASE_DIR / "methods.R"
 PREPROCESS_SCRIPT = BASE_DIR / "preprocess.R"
 CLEANUP_HOURS = 6
+SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
 
 # ---- Dataclasses & config ----
@@ -597,6 +598,36 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                     if found and found.exists():
                         header, data = _read_csv_rows(found)
                         if header:
+                            lower_names = [h.lower() for h in header]
+                            score_idx = None
+                            method_idx = None
+                            for idx, name in enumerate(lower_names):
+                                if score_idx is None and name in ("score", "value"):
+                                    score_idx = idx
+                                if method_idx is None and name == "method":
+                                    method_idx = idx
+                            baseline_score = None
+                            if score_idx is not None and method_idx is not None:
+                                for row in data:
+                                    label = (row[method_idx] or "").strip().lower()
+                                    if label == "before correction":
+                                        try:
+                                            baseline_score = float(row[score_idx])
+                                        except Exception:
+                                            baseline_score = None
+                                        break
+                                header = list(header) + ["Normalized score"]
+                                for row in data:
+                                    normalized_str = "-"
+                                    if baseline_score not in (None, 0):
+                                        try:
+                                            value = float(row[score_idx])
+                                            normalized = value / baseline_score if baseline_score else None
+                                            if normalized is not None:
+                                                normalized_str = f"{normalized:.6f}"
+                                        except Exception:
+                                            normalized_str = "-"
+                                    row.append(normalized_str)
                             # Format numeric cells to 3 decimals for ranking tables
                             def _fmt3(v):
                                 try:
@@ -1258,6 +1289,29 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
+def _load_known_signatures() -> Set[tuple[str, str]]:
+    if not SESSION_SIGNATURES_PATH.exists():
+        return set()
+    try:
+        data = json.loads(SESSION_SIGNATURES_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    signatures: Set[tuple[str, str]] = set()
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                signatures.add((str(item[0]), str(item[1])))
+    return signatures
+
+
+def _store_known_signatures(signatures: Set[tuple[str, str]]) -> None:
+    try:
+        serialisable = sorted([list(sig) for sig in signatures])
+        SESSION_SIGNATURES_PATH.write_text(json.dumps(serialisable, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
     """Return {method_code: {metric_name: score_delta}} for a session."""
     ret: Dict[str, Dict[str, float]] = defaultdict(dict)
@@ -1300,10 +1354,14 @@ def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
                     cache.append((method_code, score_val))
         except Exception:
             continue
-        if baseline_score is None:
+        if baseline_score in (None, 0):
             continue
         for method_code, score_val in cache:
-            ret[method_code][metric_name] = score_val - baseline_score
+            try:
+                normalized = score_val / baseline_score
+            except ZeroDivisionError:
+                continue
+            ret[method_code][metric_name] = normalized - 1
     return ret
 
 
@@ -1311,6 +1369,8 @@ def compute_integrated_summary() -> Dict[str, object]:
     """Aggregate cross-session performance statistics and persist the summary."""
     ensure_output_root()
     example_signatures = set(_example_signatures())
+    known_signatures = _load_known_signatures()
+    seen_signatures: Set[tuple[str, str]] = set()
     method_stats: Dict[str, Dict[str, object]] = {
         code: {
             "code": code,
@@ -1326,12 +1386,18 @@ def compute_integrated_summary() -> Dict[str, object]:
     included_sessions: List[str] = []
     for session_dir in sorted(p for p in OUTPUT_ROOT.iterdir() if p.is_dir()):
         signature = _session_signature(session_dir)
-        if signature and signature in example_signatures:
-            continue
+        if signature:
+            if signature in example_signatures:
+                continue
+            if signature in known_signatures or signature in seen_signatures:
+                continue
         summary = _load_session_summary(session_dir)
         ranking = _load_ranking_deltas(session_dir)
         if not summary and not ranking:
             continue
+        if signature:
+            seen_signatures.add(signature)
+            known_signatures.add(signature)
         session_id = session_dir.name
         included_sessions.append(session_id)
         if summary:
@@ -1408,13 +1474,14 @@ def compute_integrated_summary() -> Dict[str, object]:
         "sessions": included_sessions,
         "methods": methods_payload,
         "table_rows": rows,
-        "notes": "Score deltas are relative to the uncorrected baseline (Before correction).",
+        "notes": "Normalized score ratios use the uncorrected baseline (Before correction) as 1.0.",
     }
     try:
         integrated_path = OUTPUT_ROOT / "integrated_summary.json"
         integrated_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     except Exception:
         pass
+    _store_known_signatures(known_signatures)
     return summary
 
 

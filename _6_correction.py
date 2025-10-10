@@ -52,12 +52,12 @@ METHOD_GRID_COLUMNS = [
         "headerTooltip": "Average runtime in seconds, taken from session logs.",
     },
     {
-        "headerName": "Avg Score Δ",
+        "headerName": "Avg Δ (normalized)",
         "field": "avg_score_delta",
         "type": "numericColumn",
         "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
         "width": 150,
-        "headerTooltip": "Average score improvement relative to the uncorrected baseline (Before correction).",
+        "headerTooltip": "Average normalized score change relative to the uncorrected baseline (1.0).",
     },
     {
         "headerName": "Best Metric",

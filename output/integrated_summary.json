@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-10 08:02:13",
+  "generated_at": "2025-10-10 08:41:59",
   "sessions": [],
   "methods": {
     "QN": {
@@ -305,5 +305,5 @@
       "worst_metric": "-"
     }
   ],
-  "notes": "Score deltas are relative to the uncorrected baseline (Before correction)."
+  "notes": "Normalized score ratios use the uncorrected baseline (Before correction) as 1.0."
 }
