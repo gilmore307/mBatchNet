@@ -506,8 +506,16 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
             return html.Div("Image not found.")
         encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
         src = f"data:image/png;base64,{encoded}"
-        img = html.Img(src=src, style={"maxWidth": "100%", "height": "auto"})
-        return html.Div([img])
+        img = html.Img(
+            src=src,
+            style={
+                "maxWidth": "100%",
+                "height": "auto",
+                "display": "block",
+                "margin": "0 auto",
+            },
+        )
+        return html.Div([img], style={"width": "100%"})
 
     tabs = []
     first_value = None
@@ -591,7 +599,15 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                             data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
                             thead = html.Thead(html.Tr([html.Th(h) for h in header]))
                             tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+                            third_content = dbc.Table(
+                                [thead, tbody],
+                                bordered=True,
+                                hover=True,
+                                size="sm",
+                                responsive=True,
+                                className="w-100",
+                                style={"width": "100%", "tableLayout": "fixed"},
+                            )
                         break
                 if stage == "post" and cand.endswith("_ranking.csv"):
                     found = _find_file_case_insensitive(session_dir, cand)
@@ -637,11 +653,19 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                             data = [[_fmt3(cell) for cell in row] for row in data]
                             thead = html.Thead(html.Tr([html.Th(h) for h in header]))
                             tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+                            third_content = dbc.Table(
+                                [thead, tbody],
+                                bordered=True,
+                                hover=True,
+                                size="sm",
+                                responsive=True,
+                                className="w-100",
+                                style={"width": "100%", "tableLayout": "fixed"},
+                            )
                         break
         # Only include the third tab when a corresponding table exists
         if third_content is not None:
-            sub_defs.append((third_label, f"{key}-third", html.Div(third_content)))
+            sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
 
         # Create sub-tabs with fixed width; allow horizontal scrolling in container
         SUBTAB_STYLE = dict(SUBTAB_STYLE_BASE)
@@ -699,8 +723,16 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             return html.Div("Image not found.")
         encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
         src = f"data:image/png;base64,{encoded}"
-        img = html.Img(src=src, style={"maxWidth": "100%", "height": "auto"})
-        return html.Div([img])
+        img = html.Img(
+            src=src,
+            style={
+                "maxWidth": "100%",
+                "height": "auto",
+                "display": "block",
+                "margin": "0 auto",
+            },
+        )
+        return html.Div([img], style={"width": "100%"})
 
     # Resolve filenames in this group
     g: Dict[str, Optional[str]] = {"ait": None, "bray": None, "single": None, "title": key}
@@ -782,7 +814,15 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                         data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
                         thead = html.Thead(html.Tr([html.Th(h) for h in header]))
                         tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                        third_content = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+                        third_content = dbc.Table(
+                            [thead, tbody],
+                            bordered=True,
+                            hover=True,
+                            size="sm",
+                            responsive=True,
+                            className="w-100",
+                            style={"width": "100%", "tableLayout": "fixed"},
+                        )
                     break
             # Fallback: in post stage, try matching any *_ranking.csv by group key aliases
             if stage == "post" and third_content is None:
@@ -817,7 +857,15 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             data = [[_fmt3(cell) for cell in row] for row in data]
                             thead = html.Thead(html.Tr([html.Th(h) for h in header]))
                             tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+                            third_content = dbc.Table(
+                                [thead, tbody],
+                                bordered=True,
+                                hover=True,
+                                size="sm",
+                                responsive=True,
+                                className="w-100",
+                                style={"width": "100%", "tableLayout": "fixed"},
+                            )
                             break
         # Additional fallback for post stage
         if stage == "post" and third_content is None:
@@ -852,11 +900,19 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                         data = [[_fmt3(cell) for cell in row] for row in data]
                         thead = html.Thead(html.Tr([html.Th(h) for h in header]))
                         tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                        third_content = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+                        third_content = dbc.Table(
+                            [thead, tbody],
+                            bordered=True,
+                            hover=True,
+                            size="sm",
+                            responsive=True,
+                            className="w-100",
+                            style={"width": "100%", "tableLayout": "fixed"},
+                        )
                         break
 
     if third_content is not None:
-        sub_defs.append((third_label, f"{key}-third", html.Div(third_content)))
+        sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
 
     return sub_defs
 
@@ -942,10 +998,8 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
         style={
             "width": "100%",
             "marginTop": "12px",
-            # center whatever appears below (tables/images)
-            "display": "flex",
-            "justifyContent": "center",
         },
+        className="be-subtab-content",
     )
 
     return html.Div([tabs_bar, content_panel], style={"width": "100%"})
@@ -1022,8 +1076,15 @@ def build_ranking_tab(session_dir: Path):
         header = ["Method", "Average rank", "Metrics", *metrics]
         table_header = html.Thead(html.Tr([html.Th(col) for col in header]))
         table_body = html.Tbody([html.Tr([html.Td(row.get(col, "")) for col in header]) for row in rows])
-        content = dbc.Table([table_header, table_body], bordered=True, hover=True, responsive=True, className="text-nowrap")
-    return dcc.Tab(label="Method Ranking", value="tab-ranking", children=html.Div(content))
+        content = dbc.Table(
+            [table_header, table_body],
+            bordered=True,
+            hover=True,
+            responsive=True,
+            className="text-nowrap w-100",
+            style={"width": "100%", "tableLayout": "fixed"},
+        )
+    return dcc.Tab(label="Method Ranking", value="tab-ranking", children=html.Div(content, style={"width": "100%"}))
 
 
 def build_assessment_overview_table(session_dir: Path, stage: str):
@@ -1097,7 +1158,7 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
         sort_action="native",
         filter_action="native",
         page_size=20,
-        style_table={"overflowX": "auto"},
+        style_table={"overflowX": "auto", "width": "100%", "minWidth": "100%"},
         style_cell={"padding": "6px", "textAlign": "left"},
     )
 
@@ -1155,7 +1216,7 @@ def build_overall_div(session_dir: Path, stage: str):
                 sort_by=[{"column_id": "Rank", "direction": "asc"}],
                 filter_action="native",
                 page_size=25,
-                style_table={"overflowX": "auto"},
+                style_table={"overflowX": "auto", "width": "100%", "minWidth": "100%"},
                 style_cell={
                     "padding": "6px",
                     "textAlign": "left",
@@ -1206,7 +1267,15 @@ def build_raw_assessments_tab(session_dir: Path):
         data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
         thead = html.Thead(html.Tr([html.Th(h) for h in header]))
         tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-        table = dbc.Table([thead, tbody], bordered=True, hover=True, size="sm")
+        table = dbc.Table(
+            [thead, tbody],
+            bordered=True,
+            hover=True,
+            size="sm",
+            responsive=True,
+            className="w-100",
+            style={"width": "100%", "tableLayout": "fixed"},
+        )
         items.append(
             dbc.AccordionItem(table, title=metric)
         )

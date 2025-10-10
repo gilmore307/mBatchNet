@@ -67,3 +67,15 @@
 
 /* Allow arrow pseudo-element to render outside button box */
 .be-pipeline-step.btn { overflow: visible; }
+
+/* Assessment subtabs content should fill available width */
+.be-subtab-content {
+  width: 100%;
+}
+.be-subtab-content > * {
+  width: 100%;
+}
+.be-subtab-content .dash-table-container,
+.be-subtab-content .table {
+  width: 100%;
+}
