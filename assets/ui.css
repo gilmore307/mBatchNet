@@ -176,4 +176,30 @@ body {
   flex: 0 0 85vw;
   width: 85vw;
   max-width: 85vw;
+} 
+
+/* AG Grid defaults for table replacements */
+.be-ag-grid.ag-theme-alpine,
+.ag-theme-alpine.be-ag-grid {
+  --ag-font-size: 13px;
+  --ag-row-height: 32px;
+  --ag-header-height: 38px;
+  --ag-grid-size: 4px;
+  --ag-border-color: #dee2e6;
+  border-radius: 0.5rem;
+  border: 1px solid #dee2e6;
+}
+
+.be-ag-grid .ag-root-wrapper {
+  border-radius: 0.5rem;
+}
+
+.be-ag-grid .ag-header-cell-label {
+  justify-content: center;
+}
+
+.be-ag-grid .ag-cell {
+  line-height: 1.3;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
 }

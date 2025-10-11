@@ -19,6 +19,7 @@ from _2_utils import (
     run_preprocess,
     run_r_scripts,
     BASE_DIR,
+    _make_ag_grid,
 )
 
 
@@ -890,9 +891,9 @@ def register_upload_callbacks(app):
 
         def _table_for(path: Path, title: str):
             try:
-                rows_preview = []
+                rows_preview: List[List[str]] = []
                 row_count = 0
-                header = None
+                header: Optional[List[str]] = None
                 with path.open("r", encoding="utf-8", newline="") as fh:
                     reader = _csv.reader(fh)
                     for i, row in enumerate(reader):
@@ -907,33 +908,63 @@ def register_upload_callbacks(app):
                 col_count = (
                     len(header) if title == "Metadata" else (len(rows_preview[0]) if rows_preview else 0)
                 )
-                thead = (
-                    html.Thead(html.Tr([html.Th(c) for c in header])) if title == "Metadata" else None
+                if title == "Metadata":
+                    column_names = header or []
+                else:
+                    column_names = [f"Column {i+1}" for i in range(len(rows_preview[0]))] if rows_preview else []
+                if not column_names:
+                    return html.Div(f"{title}: no preview rows", className="text-muted")
+
+                row_records: List[Dict[str, object]] = []
+                for row_vals in rows_preview:
+                    record: Dict[str, object] = {}
+                    for idx, col_name in enumerate(column_names):
+                        cell = row_vals[idx] if idx < len(row_vals) else ""
+                        if title == "Raw Matrix":
+                            try:
+                                record[col_name] = float(cell)
+                            except Exception:
+                                record[col_name] = cell
+                        else:
+                            record[col_name] = cell
+                    row_records.append(record)
+
+                numeric_columns = {
+                    col for col in column_names
+                    if any(isinstance(row.get(col), (int, float)) for row in row_records)
+                }
+                column_defs: List[Dict[str, object]] = []
+                for col in column_names:
+                    col_def: Dict[str, object] = {"headerName": col, "field": col}
+                    if title == "Metadata" and column_names and col == column_names[0]:
+                        col_def["minWidth"] = 220
+                        col_def["flex"] = 1
+                    else:
+                        col_def["minWidth"] = 140 if title == "Raw Matrix" else 180
+                    if col in numeric_columns:
+                        col_def["type"] = "numericColumn"
+                        col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                    column_defs.append(col_def)
+
+                slug_base = f"{title}-{path.stem}"
+                slug = ''.join(ch.lower() if ch.isalnum() else '-' for ch in slug_base)
+                while '--' in slug:
+                    slug = slug.replace('--', '-')
+                slug = slug.strip('-') or 'preview'
+                grid = _make_ag_grid(
+                    grid_id=f"example-preview-{slug}",
+                    column_defs=column_defs,
+                    row_data=row_records,
+                    default_col_def={"minWidth": 150},
+                    grid_options={"suppressPaginationPanel": True},
                 )
-                def _fmt_cell(val: str) -> str:
-                    if title == "Raw Matrix":
-                        try:
-                            return f"{float(val):.3f}"
-                        except Exception:
-                            return val
-                    return val
-                tbody = html.Tbody([
-                    html.Tr([html.Td(_fmt_cell(c)) for c in r]) for r in rows_preview
-                ])
                 size = path.stat().st_size if path.exists() else 0
                 meta = f"{row_count} rows × {col_count} cols"
                 return dbc.Card([
                     dbc.CardHeader(html.Strong(f"{title} — {meta} ({human_size(size)})")),
                     dbc.CardBody(
                         html.Div(
-                            dbc.Table(
-                                [thead, tbody],
-                                bordered=True,
-                                hover=True,
-                                size="sm",
-                                className="mb-0",
-                                style={"whiteSpace": "nowrap"}
-                            ),
+                            grid,
                             style={"overflowX": "auto"}
                         )
                     ),

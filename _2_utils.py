@@ -18,13 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set, Callable
 
-from dash import html, dcc, dash_table
-try:
-    # For numeric formatting in DataTable
-    from dash.dash_table import Format, Scheme
-except Exception:
-    Format = None
-    Scheme = None
+from dash import html, dcc
+import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 
 # Paths & constants
@@ -375,6 +370,45 @@ def _read_csv_rows(csv_path: Path) -> Tuple[List[str], List[List[str]]]:
     return header, data
 
 
+def _make_ag_grid(
+    grid_id: str,
+    column_defs: Sequence[Dict[str, object]],
+    row_data: Sequence[Dict[str, object]],
+    *,
+    class_name: str = "ag-theme-alpine be-ag-grid",
+    grid_options: Optional[Dict[str, object]] = None,
+    default_col_def: Optional[Dict[str, object]] = None,
+) -> dag.AgGrid:
+    base_options: Dict[str, object] = {
+        "domLayout": "autoHeight",
+        "ensureDomOrder": True,
+        "suppressHorizontalScroll": False,
+        "suppressAggFuncInHeader": True,
+    }
+    if grid_options:
+        base_options.update(grid_options)
+
+    base_default_col_def: Dict[str, object] = {
+        "resizable": True,
+        "sortable": True,
+        "filter": True,
+        "wrapHeaderText": True,
+        "autoHeaderHeight": True,
+    }
+    if default_col_def:
+        base_default_col_def.update(default_col_def)
+
+    return dag.AgGrid(
+        id=grid_id,
+        columnDefs=list(column_defs),
+        rowData=list(row_data),
+        className=class_name,
+        dashGridOptions=base_options,
+        defaultColDef=base_default_col_def,
+        style={"width": "100%"},
+    )
+
+
 def _find_file_case_insensitive(directory: Path, target_name: str) -> Path | None:
     t = target_name.lower()
     for p in directory.iterdir():
@@ -595,34 +629,49 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         third_content = None
         if stage == "pre" and rep:
             for cand in _candidate_csvs_for_image(rep):
-                if cand.endswith("_raw_assessment.csv"):
-                    found = _find_file_case_insensitive(session_dir, cand)
-                    if found and found.exists():
-                        header, data = _read_csv_rows(found)
-                        if header:
-                            # Drop Needs_Correction column from pre assessment tables
-                            lower = [h.lower() for h in header]
-                            keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-                            header = [header[i] for i in keep_idx]
-                            # Format numeric cells to 3 decimals
-                            def _fmt3(v):
-                                try:
-                                    return f"{float(v):.3f}"
-                                except Exception:
-                                    return v
-                            data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
-                            thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-                            tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table(
-                                [thead, tbody],
-                                bordered=True,
-                                hover=True,
-                                size="sm",
-                                responsive=True,
-                                className="w-100",
-                                style={"width": "100%", "tableLayout": "fixed"},
-                            )
-                        break
+                if not cand.endswith("_raw_assessment.csv"):
+                    continue
+                found = _find_file_case_insensitive(session_dir, cand)
+                if not (found and found.exists()):
+                    continue
+                header, data = _read_csv_rows(found)
+                if not header:
+                    break
+                lower = [h.lower() for h in header]
+                keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
+                header = [header[i] for i in keep_idx]
+                formatted_rows: List[Dict[str, object]] = []
+                for raw_row in data:
+                    row_dict: Dict[str, object] = {}
+                    for idx, column_name in enumerate(header):
+                        source_idx = keep_idx[idx]
+                        cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
+                        numeric_value = _safe_float(cell)
+                        row_dict[column_name] = numeric_value if numeric_value is not None else cell
+                    formatted_rows.append(row_dict)
+                numeric_headers = {
+                    col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+                }
+                column_defs: List[Dict[str, object]] = []
+                for col in header:
+                    col_def: Dict[str, object] = {
+                        "headerName": col,
+                        "field": col,
+                        "minWidth": 160 if col.lower() != "method" else 200,
+                    }
+                    if col.lower() == "method":
+                        col_def["pinned"] = "left"
+                    if col in numeric_headers:
+                        col_def["type"] = "numericColumn"
+                        col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                    column_defs.append(col_def)
+                third_content = _make_ag_grid(
+                    grid_id=f"{stage}-{key}-assessment",
+                    column_defs=column_defs,
+                    row_data=formatted_rows,
+                    default_col_def={"flex": 1, "minWidth": 140},
+                )
+                break
         if stage == "post":
             third_content = _load_ranking_table_for_key(session_dir, key)
         # Only include the third tab when a corresponding table exists
@@ -775,16 +824,36 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             except Exception:
                                 return v
                         data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
-                        thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-                        tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                        third_content = dbc.Table(
-                            [thead, tbody],
-                            bordered=True,
-                            hover=True,
-                            size="sm",
-                            responsive=True,
-                            className="w-100",
-                            style={"width": "100%", "tableLayout": "fixed"},
+                        formatted_rows: List[Dict[str, object]] = []
+                        for row in data:
+                            record: Dict[str, object] = {}
+                            for idx, col_name in enumerate(header):
+                                cell = row[idx] if idx < len(row) else ""
+                                numeric_value = _safe_float(cell)
+                                record[col_name] = numeric_value if numeric_value is not None else cell
+                            formatted_rows.append(record)
+                        numeric_headers = {
+                            col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+                        }
+                        column_defs: List[Dict[str, object]] = []
+                        for col in header:
+                            col_def: Dict[str, object] = {
+                                "headerName": col,
+                                "field": col,
+                                "minWidth": 160 if col.lower() != "method" else 200,
+                            }
+                            if col.lower() == "method":
+                                col_def["pinned"] = "left"
+                                col_def["flex"] = 1
+                            if col in numeric_headers:
+                                col_def["type"] = "numericColumn"
+                                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                            column_defs.append(col_def)
+                        third_content = _make_ag_grid(
+                            grid_id=f"{stage}-{key}-assessment",
+                            column_defs=column_defs,
+                            row_data=formatted_rows,
+                            default_col_def={"minWidth": 140},
                         )
                     break
     else:
@@ -1092,7 +1161,7 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
     return RankingData(metric_key, display_name, columns, entries)
 
 
-def _build_ranking_table_component(data: RankingData) -> Optional[dbc.Table]:
+def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     if not data.entries:
         return None
     base_columns = ["Method", "Rank", "Absolute score", "Relative score"]
@@ -1102,45 +1171,64 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dbc.Table]:
     ]
     header = base_columns + extra_cols
 
-    def _rank_str(rank: Optional[float]) -> str:
-        if rank is None:
-            return "-"
-        if abs(rank - round(rank)) < 1e-6:
-            return str(int(round(rank)))
-        return f"{rank:.2f}"
-
-    def _fmt_raw(value: str) -> str:
-        num = _safe_float(value)
-        if num is None:
-            return value
-        return f"{num:.3f}"
-
-    body_rows: List[List[str]] = []
+    row_data: List[Dict[str, object]] = []
+    numeric_candidates: Dict[str, bool] = {col: False for col in base_columns + extra_cols}
     for entry in data.entries:
-        row_values: List[str] = [
-            entry.method,
-            _rank_str(entry.rank),
-            f"{entry.absolute:.3f}" if entry.absolute is not None else "-",
-            f"{entry.relative:.3f}x" if entry.relative is not None else "-",
-        ]
+        row: Dict[str, object] = {
+            "Method": entry.method,
+            "Rank": entry.rank if entry.rank is not None else None,
+            "Absolute score": entry.absolute if entry.absolute is not None else None,
+            "Relative score": entry.relative if entry.relative is not None else None,
+        }
+        if row["Rank"] is not None:
+            numeric_candidates["Rank"] = True
+        if row["Absolute score"] is not None:
+            numeric_candidates["Absolute score"] = True
+        if row["Relative score"] is not None:
+            numeric_candidates["Relative score"] = True
         for col in extra_cols:
-            row_values.append(_fmt_raw(entry.raw.get(col, "")))
-        body_rows.append(row_values)
+            raw_value = entry.raw.get(col, "")
+            numeric_value = _safe_float(raw_value)
+            if numeric_value is not None:
+                row[col] = numeric_value
+                numeric_candidates[col] = True
+            else:
+                row[col] = raw_value
+        row_data.append(row)
 
-    thead = html.Thead(html.Tr([html.Th(col) for col in header]))
-    tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in body_rows])
-    return dbc.Table(
-        [thead, tbody],
-        bordered=True,
-        hover=True,
-        size="sm",
-        responsive=True,
-        className="w-100",
-        style={"width": "100%", "tableLayout": "fixed"},
+    column_defs: List[Dict[str, object]] = []
+    for col in header:
+        col_def: Dict[str, object] = {
+            "headerName": col,
+            "field": col,
+        }
+        if col == "Method":
+            col_def["minWidth"] = 220
+            col_def["flex"] = 1
+        elif col == "Rank":
+            col_def["width"] = 110
+        else:
+            col_def["minWidth"] = 160
+        if numeric_candidates.get(col):
+            col_def["type"] = "numericColumn"
+            if col == "Rank":
+                col_def["valueFormatter"] = "value == null ? '' : (Number.isInteger(value) ? Number(value).toString() : Number(value).toFixed(2))"
+            elif col == "Relative score":
+                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3) + 'x'"
+            else:
+                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+        column_defs.append(col_def)
+
+    return _make_ag_grid(
+        grid_id=f"ranking-grid-{data.metric_key}",
+        column_defs=column_defs,
+        row_data=row_data,
+        default_col_def={"filter": True, "minWidth": 150},
+        grid_options={"suppressPaginationPanel": True},
     )
 
 
-def _load_ranking_table_for_key(session_dir: Path, key: str) -> Optional[dbc.Table]:
+def _load_ranking_table_for_key(session_dir: Path, key: str) -> Optional[dag.AgGrid]:
     aliases = RANKING_FILE_ALIASES.get(key, [key])
     for alias in aliases:
         filename = f"{alias}_ranking.csv"
@@ -1229,16 +1317,60 @@ def build_ranking_tab(session_dir: Path):
     if not metrics:
         content = html.Div("No ranking files found. Run the post-correction assessment first.")
     else:
-        header = ["Method", "Average rank", "Metrics", *metrics]
-        table_header = html.Thead(html.Tr([html.Th(col) for col in header]))
-        table_body = html.Tbody([html.Tr([html.Td(row.get(col, "")) for col in header]) for row in rows])
-        content = dbc.Table(
-            [table_header, table_body],
-            bordered=True,
-            hover=True,
-            responsive=True,
-            className="text-nowrap w-100",
-            style={"width": "100%", "tableLayout": "fixed"},
+        column_defs: List[Dict[str, object]] = [
+            {
+                "headerName": "Method",
+                "field": "Method",
+                "minWidth": 220,
+                "flex": 1,
+                "pinned": "left",
+            },
+            {
+                "headerName": "Average rank",
+                "field": "Average rank",
+                "type": "numericColumn",
+                "width": 150,
+                "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
+            },
+            {
+                "headerName": "Metrics",
+                "field": "Metrics",
+                "type": "numericColumn",
+                "width": 110,
+            },
+        ]
+        for metric in metrics:
+            column_defs.append(
+                {
+                    "headerName": metric,
+                    "field": metric,
+                    "minWidth": 200,
+                    "wrapHeaderText": True,
+                    "autoHeaderHeight": True,
+                }
+            )
+
+        row_data: List[Dict[str, object]] = []
+        for row in rows:
+            record: Dict[str, object] = {
+                "Method": row.get("Method"),
+                "Average rank": _safe_float(row.get("Average rank")),
+            }
+            metrics_count = row.get("Metrics")
+            try:
+                record["Metrics"] = int(metrics_count) if metrics_count is not None else None
+            except Exception:
+                record["Metrics"] = _safe_float(metrics_count)
+            for metric in metrics:
+                record[metric] = row.get(metric, "")
+            row_data.append(record)
+
+        content = _make_ag_grid(
+            grid_id="method-ranking-summary-grid",
+            column_defs=column_defs,
+            row_data=row_data,
+            default_col_def={"minWidth": 160},
+            grid_options={"suppressPaginationPanel": True},
         )
     return dcc.Tab(label="Method Ranking", value="tab-ranking", children=html.Div(content, style={"width": "100%"}))
 
@@ -1302,20 +1434,34 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
             "Comment": comment,
         })
 
-    columns = [
-        {"name": "Test", "id": "Test"},
-        {"name": "Criteria", "id": "Criteria"},
-        {"name": "Test Result", "id": "Test Result"},
-        {"name": "Comment", "id": "Comment"},
+    column_defs = [
+        {
+            "headerName": "Test",
+            "field": "Test",
+            "minWidth": 240,
+            "flex": 1,
+        },
+        {
+            "headerName": "Criteria",
+            "field": "Criteria",
+            "minWidth": 220,
+        },
+        {
+            "headerName": "Test Result",
+            "field": "Test Result",
+            "minWidth": 160,
+        },
+        {
+            "headerName": "Comment",
+            "field": "Comment",
+            "minWidth": 180,
+        },
     ]
-    return dash_table.DataTable(
-        data=rows,
-        columns=columns,
-        sort_action="native",
-        filter_action="native",
-        page_size=20,
-        style_table={"overflowX": "auto", "width": "100%", "minWidth": "100%"},
-        style_cell={"padding": "6px", "textAlign": "left"},
+    return _make_ag_grid(
+        grid_id=f"{stage}-assessment-overview-grid",
+        column_defs=column_defs,
+        row_data=rows,
+        default_col_def={"minWidth": 180},
     )
 
 
@@ -1356,52 +1502,58 @@ def build_overall_div(session_dir: Path, stage: str):
             for idx, row in enumerate(typed_rows, start=1):
                 row["Rank"] = idx
 
-            avg_col = {"name": "Average rank", "id": "Average rank", "type": "numeric"}
-            abs_columns: List[Dict[str, object]] = []
-            rel_columns: List[Dict[str, object]] = []
-            try:
-                if Format and Scheme:
-                    avg_col["format"] = Format(precision=3, scheme=Scheme.fixed)
-            except Exception:
-                pass
+            column_defs: List[Dict[str, object]] = [
+                {
+                    "headerName": "Rank",
+                    "field": "Rank",
+                    "type": "numericColumn",
+                    "width": 90,
+                    "sort": "asc",
+                },
+                {
+                    "headerName": "Method",
+                    "field": "Method",
+                    "minWidth": 220,
+                    "flex": 1,
+                    "pinned": "left",
+                },
+                {
+                    "headerName": "Average rank",
+                    "field": "Average rank",
+                    "type": "numericColumn",
+                    "width": 160,
+                    "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
+                },
+            ]
+
             for metric_name in metrics:
                 abs_id = f"{metric_name} (abs)"
                 rel_id = f"{metric_name} (rel)"
-                abs_col = {"name": abs_id, "id": abs_id, "type": "numeric"}
-                rel_col = {"name": rel_id, "id": rel_id, "type": "numeric"}
-                try:
-                    if Format and Scheme:
-                        abs_col["format"] = Format(precision=3, scheme=Scheme.fixed)
-                        rel_col["format"] = Format(precision=3, scheme=Scheme.fixed)
-                except Exception:
-                    pass
-                abs_columns.append(abs_col)
-                rel_columns.append(rel_col)
+                column_defs.append(
+                    {
+                        "headerName": abs_id,
+                        "field": abs_id,
+                        "type": "numericColumn",
+                        "minWidth": 170,
+                        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
+                    }
+                )
+                column_defs.append(
+                    {
+                        "headerName": rel_id,
+                        "field": rel_id,
+                        "type": "numericColumn",
+                        "minWidth": 170,
+                        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
+                    }
+                )
 
-            columns = [
-                {"name": "Rank", "id": "Rank", "type": "numeric"},
-                {"name": "Method", "id": "Method"},
-                avg_col,
-            ] + abs_columns + rel_columns
-
-            body = dash_table.DataTable(
-                data=typed_rows,
-                columns=columns,
-                sort_action="native",
-                sort_by=[{"column_id": "Rank", "direction": "asc"}],
-                filter_action="native",
-                page_size=25,
-                style_table={"overflowX": "auto", "width": "100%", "minWidth": "100%"},
-                style_cell={
-                    "padding": "6px",
-                    "textAlign": "left",
-                    "minWidth": "80px",
-                    "width": "120px",
-                    "maxWidth": "260px",
-                    "whiteSpace": "normal",
-                },
-                style_header={"fontWeight": "600"},
-                fill_width=True,
+            body = _make_ag_grid(
+                grid_id=f"{stage}-overall-ranking-grid",
+                column_defs=column_defs,
+                row_data=typed_rows,
+                default_col_def={"minWidth": 150},
+                grid_options={"suppressPaginationPanel": True},
             )
 
         return html.Div([
@@ -1433,25 +1585,45 @@ def build_raw_assessments_tab(session_dir: Path):
         lower = [h.lower() for h in header]
         keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
         header = [header[i] for i in keep_idx]
-        def _fmt3(v):
-            try:
-                return f"{float(v):.3f}"
-            except Exception:
-                return v
-        data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
-        thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-        tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-        table = dbc.Table(
-            [thead, tbody],
-            bordered=True,
-            hover=True,
-            size="sm",
-            responsive=True,
-            className="w-100",
-            style={"width": "100%", "tableLayout": "fixed"},
+        formatted_rows: List[Dict[str, object]] = []
+        for raw_row in data:
+            record: Dict[str, object] = {}
+            for idx, column_name in enumerate(header):
+                source_idx = keep_idx[idx]
+                cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
+                numeric_value = _safe_float(cell)
+                record[column_name] = numeric_value if numeric_value is not None else cell
+            formatted_rows.append(record)
+        numeric_headers = {
+            col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+        }
+        column_defs: List[Dict[str, object]] = []
+        for col in header:
+            col_def: Dict[str, object] = {
+                "headerName": col,
+                "field": col,
+                "minWidth": 170 if col.lower() != "method" else 220,
+            }
+            if col.lower() == "method":
+                col_def["flex"] = 1
+                col_def["pinned"] = "left"
+            if col in numeric_headers:
+                col_def["type"] = "numericColumn"
+                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+            column_defs.append(col_def)
+        slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in metric)
+        while "--" in slug:
+            slug = slug.replace("--", "-")
+        slug = slug.strip("-") or "metric"
+        table = _make_ag_grid(
+            grid_id=f"raw-assessment-{slug}-grid",
+            column_defs=column_defs,
+            row_data=formatted_rows,
+            default_col_def={"minWidth": 160},
+            grid_options={"suppressPaginationPanel": True},
         )
         items.append(
-            dbc.AccordionItem(table, title=metric)
+            dbc.AccordionItem(html.Div(table, style={"width": "100%"}), title=metric)
         )
 
     if not items:
