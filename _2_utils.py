@@ -445,11 +445,14 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         "borderBottom": "1px solid #d6d6d6",
         "padding": "1px",
         "fontWeight": "bold",
-        "width": "250px",
+        "width": "12vw",
+        "minWidth": "12vw",
+        "maxWidth": "12vw",
         "height": "60px",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
+        "marginRight": "1vw",
     }
     TOP_TAB_SELECTED_STYLE = {
         "borderTop": "1px solid #d6d6d6",
@@ -457,11 +460,14 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         "backgroundColor": "#f8f9fa",
         "color": "#0d6efd",
         "padding": "1px",
-        "width": "250px",
+        "width": "12vw",
+        "minWidth": "12vw",
+        "maxWidth": "12vw",
         "height": "60px",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
+        "marginRight": "1vw",
     }
     SUBTAB_STYLE_BASE = {
         "borderBottom": "1px solid #d6d6d6",
@@ -869,11 +875,23 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
     )
 
     card = dbc.Card(
-        dbc.CardBody(
-            [tabs_bar, content_panel],
-            style={"width": "100%", "minWidth": "100%"},
-        ),
-        style={"width": "100%", "minWidth": "100%", "marginTop": "5px", "marginLeft": "5px"},
+        [
+            dbc.CardHeader(
+                tabs_bar,
+                className="be-subtab-card-header",
+            ),
+            dbc.CardBody(
+                content_panel,
+                className="be-subtab-card-body",
+            ),
+        ],
+        style={
+            "width": "85vw",
+            "minWidth": "85vw",
+            "maxWidth": "85vw",
+            "marginTop": "8px",
+            "marginLeft": "0",
+        },
         className="be-subtab-card",
     )
 

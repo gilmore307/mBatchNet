@@ -131,11 +131,14 @@ def assessment_layout(active_path: str, stage: str):
         "borderBottom": "1px solid #d6d6d6",
         "padding": "6px",
         "fontWeight": "bold",
-        "width": "250px",
+        "width": "12vw",
+        "minWidth": "12vw",
+        "maxWidth": "12vw",
         "height": "60px",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
+        "marginRight": "1vw",
     }
     TOP_TAB_SELECTED_STYLE = {
         "borderTop": "1px solid #d6d6d6",
@@ -143,11 +146,14 @@ def assessment_layout(active_path: str, stage: str):
         "backgroundColor": "#f8f9fa",
         "color": "#0d6efd",
         "padding": "6px",
-        "width": "250px",
+        "width": "12vw",
+        "minWidth": "12vw",
+        "maxWidth": "12vw",
         "height": "60px",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
+        "marginRight": "1vw",
     }
     header = "Pre-correction Assessment" if stage == "pre" else "Post-correction Assessment"
     gallery_id = "pre-assessment-gallery" if stage == "pre" else "post-assessment-gallery"
@@ -203,13 +209,24 @@ def assessment_layout(active_path: str, stage: str):
                             html.Div(
                                 id=content_id,
                                 children=placeholder,
-                                style={"width": "100%", "minWidth": "100%", "marginLeft": "5px"},
+                                style={
+                                    "width": "85vw",
+                                    "minWidth": "85vw",
+                                    "maxWidth": "85vw",
+                                    "marginLeft": "0",
+                                },
                             ),
                         ], type="default"),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
                     className="w-100",
-                    style={"width": "100%", "display": "block", "marginLeft": "5px"},
+                    style={
+                        "width": "85vw",
+                        "minWidth": "85vw",
+                        "maxWidth": "85vw",
+                        "display": "block",
+                        "marginLeft": "0",
+                    },
                 ),
             )
         )
@@ -226,7 +243,12 @@ def assessment_layout(active_path: str, stage: str):
             )
         )
 
-    tabs = dcc.Tabs(children=tab_items, value=(tab_items[0].value if tab_items else None), vertical=True, className="be-results-tabs")
+    tabs = dcc.Tabs(
+        children=tab_items,
+        value=(tab_items[0].value if tab_items else None),
+        vertical=True,
+        className="be-results-tabs be-stage-tabs",
+    )
 
     return html.Div(
         [
