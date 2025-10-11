@@ -115,7 +115,14 @@ def _param_controls(stage: str, key: str):
     else:
         return []
 
-    return [dbc.Row(controls, className="g-2 align-items-end"), html.Hr(className="my-2")]
+    return [
+        dbc.Row(
+            controls,
+            className="g-2 align-items-end",
+            style={"marginLeft": "5px"},
+        ),
+        html.Hr(className="my-2", style={"marginLeft": "5px"}),
+    ]
 
 
 def assessment_layout(active_path: str, stage: str):
@@ -191,14 +198,18 @@ def assessment_layout(active_path: str, stage: str):
                                 size="sm",
                                 color="success",
                                 className="mb-2",
-                                style={"width": "250px"},
+                                style={"width": "250px", "marginLeft": "5px"},
                             ),
-                            html.Div(id=content_id, children=placeholder),
+                            html.Div(
+                                id=content_id,
+                                children=placeholder,
+                                style={"width": "100%", "minWidth": "100%", "marginLeft": "5px"},
+                            ),
                         ], type="default"),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
                     className="w-100",
-                    style={"width": "100%", "display": "block"},
+                    style={"width": "100%", "display": "block", "marginLeft": "5px"},
                 ),
             )
         )

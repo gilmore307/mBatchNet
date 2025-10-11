@@ -862,12 +862,22 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
         children=initial_content,
         style={
             "width": "100%",
+            "minWidth": "100%",
             "marginTop": "12px",
         },
         className="be-subtab-content",
     )
 
-    return html.Div([tabs_bar, content_panel], style={"width": "100%"})
+    card = dbc.Card(
+        dbc.CardBody(
+            [tabs_bar, content_panel],
+            style={"width": "100%", "minWidth": "100%"},
+        ),
+        style={"width": "100%", "minWidth": "100%", "marginTop": "5px", "marginLeft": "5px"},
+        className="be-subtab-card",
+    )
+
+    return card
 
 
 @dataclass(frozen=True)
