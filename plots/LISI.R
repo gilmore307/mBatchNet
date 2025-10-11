@@ -172,15 +172,12 @@ rank_lisi_methods <- function(summary_df) {
   summary_df %>%
     transmute(
       Method,
-      iLISI = median_iLISI,
-      cLISI = median_cLISI,
-      r_i = rank(-iLISI, ties.method = "average"),  # higher iLISI is better
-      r_c = rank( cLISI, ties.method = "average"),  # lower  cLISI is better
-      Score = (r_i + r_c) / 2
+      iLISI = pmin(pmax(median_iLISI, 0), 1),
+      cLISI = pmin(pmax(median_cLISI, 0), 1),
+      Score = 0.5 * (iLISI + (1 - cLISI))
     ) %>%
-    arrange(Score, Method) %>%
-    mutate(Rank = dplyr::row_number()) %>%
-    select(Method, iLISI, cLISI, Score, Rank)
+    arrange(desc(Score), desc(iLISI), cLISI, Method) %>%
+    mutate(Rank = dplyr::row_number())
 }
 
 ## Auto-select k removed

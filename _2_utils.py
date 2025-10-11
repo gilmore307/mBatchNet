@@ -1,4 +1,4 @@
-﻿# ===============================
+# ===============================
 # File: _2_utils.py
 # ===============================
 import base64
@@ -16,7 +16,7 @@ from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set
+from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set, Callable
 
 from dash import html, dcc, dash_table
 try:
@@ -579,9 +579,9 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         # Third sub-tab: Assessment (pre) or Rank (post)
         third_label = "Assessment" if stage == "pre" else "Rank"
         third_content = None
-        if rep:
+        if stage == "pre" and rep:
             for cand in _candidate_csvs_for_image(rep):
-                if stage == "pre" and cand.endswith("_raw_assessment.csv"):
+                if cand.endswith("_raw_assessment.csv"):
                     found = _find_file_case_insensitive(session_dir, cand)
                     if found and found.exists():
                         header, data = _read_csv_rows(found)
@@ -609,60 +609,8 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                                 style={"width": "100%", "tableLayout": "fixed"},
                             )
                         break
-                if stage == "post" and cand.endswith("_ranking.csv"):
-                    found = _find_file_case_insensitive(session_dir, cand)
-                    if found and found.exists():
-                        header, data = _read_csv_rows(found)
-                        if header:
-                            lower_names = [h.lower() for h in header]
-                            score_idx = None
-                            method_idx = None
-                            for idx, name in enumerate(lower_names):
-                                if score_idx is None and name in ("score", "value"):
-                                    score_idx = idx
-                                if method_idx is None and name == "method":
-                                    method_idx = idx
-                            baseline_score = None
-                            if score_idx is not None and method_idx is not None:
-                                for row in data:
-                                    label = (row[method_idx] or "").strip().lower()
-                                    if label == "before correction":
-                                        try:
-                                            baseline_score = float(row[score_idx])
-                                        except Exception:
-                                            baseline_score = None
-                                        break
-                                header = list(header) + ["Normalized score"]
-                                for row in data:
-                                    normalized_str = "-"
-                                    if baseline_score not in (None, 0):
-                                        try:
-                                            value = float(row[score_idx])
-                                            normalized = value / baseline_score if baseline_score else None
-                                            if normalized is not None:
-                                                normalized_str = f"{normalized:.6f}"
-                                        except Exception:
-                                            normalized_str = "-"
-                                    row.append(normalized_str)
-                            # Format numeric cells to 3 decimals for ranking tables
-                            def _fmt3(v):
-                                try:
-                                    return f"{float(v):.3f}"
-                                except Exception:
-                                    return v
-                            data = [[_fmt3(cell) for cell in row] for row in data]
-                            thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-                            tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table(
-                                [thead, tbody],
-                                bordered=True,
-                                hover=True,
-                                size="sm",
-                                responsive=True,
-                                className="w-100",
-                                style={"width": "100%", "tableLayout": "fixed"},
-                            )
-                        break
+        if stage == "post":
+            third_content = _load_ranking_table_for_key(session_dir, key)
         # Only include the third tab when a corresponding table exists
         if third_content is not None:
             sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
@@ -792,17 +740,18 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
     # Third subtab content (Assessment/Rank)
-    rep = g["ait"] or g["bray"] or g["single"]
     third_label = "Assessment" if stage == "pre" else "Rank"
     third_content = None
-    if rep:
-        for cand in _candidate_csvs_for_image(rep):
-            if stage == "pre" and cand.endswith("_raw_assessment.csv"):
+    if stage == "pre":
+        rep = g["ait"] or g["bray"] or g["single"]
+        if rep:
+            for cand in _candidate_csvs_for_image(rep):
+                if not cand.endswith("_raw_assessment.csv"):
+                    continue
                 found = _find_file_case_insensitive(session_dir, cand)
                 if found and found.exists():
                     header, data = _read_csv_rows(found)
                     if header:
-                        # Drop Needs_Correction if present and format numerics to 3 decimals
                         lower = [h.lower() for h in header]
                         keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
                         header = [header[i] for i in keep_idx]
@@ -824,92 +773,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             style={"width": "100%", "tableLayout": "fixed"},
                         )
                     break
-            # Fallback: in post stage, try matching any *_ranking.csv by group key aliases
-            if stage == "post" and third_content is None:
-                aliases = {
-                    "pcoa": ["pcoa"],
-                    "nmds": ["nmds"],
-                    "dissimilarity": ["dissimilarity"],
-                    "r2": ["r2", "R2"],
-                    "prda": ["prda", "pRDA"],
-                    "pca": ["pca"],
-                    "pvca": ["pvca", "PVCA"],
-                    "alignment": ["alignment_score"],
-                    "auc": ["auroc"],
-                    "lisi": ["lisi", "LISI"],
-                    "ebm": ["ebm"],
-                    "silhouette": ["silhouette"],
-                }
-                prefs = [p.lower() for p in aliases.get(key, [key])]
-                for f in session_dir.iterdir():
-                    name = f.name.lower()
-                    if not (f.is_file() and name.endswith("_ranking.csv")):
-                        continue
-                    base = name[: -len("_ranking.csv")]
-                    if base in prefs:
-                        header, data = _read_csv_rows(f)
-                        if header:
-                            def _fmt3(v):
-                                try:
-                                    return f"{float(v):.3f}"
-                                except Exception:
-                                    return v
-                            data = [[_fmt3(cell) for cell in row] for row in data]
-                            thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-                            tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                            third_content = dbc.Table(
-                                [thead, tbody],
-                                bordered=True,
-                                hover=True,
-                                size="sm",
-                                responsive=True,
-                                className="w-100",
-                                style={"width": "100%", "tableLayout": "fixed"},
-                            )
-                            break
-        # Additional fallback for post stage
-        if stage == "post" and third_content is None:
-            aliases = {
-                "pcoa": ["pcoa"],
-                "nmds": ["nmds"],
-                "dissimilarity": ["dissimilarity"],
-                "r2": ["r2", "R2"],
-                "prda": ["prda", "pRDA"],
-                "pca": ["pca"],
-                "pvca": ["pvca", "PVCA"],
-                "alignment": ["alignment_score"],
-                "auc": ["auroc"],
-                "lisi": ["lisi", "LISI"],
-                "ebm": ["ebm"],
-                "silhouette": ["silhouette"],
-            }
-            prefs = [p.lower() for p in aliases.get(key, [key])]
-            for f in session_dir.iterdir():
-                name = f.name.lower()
-                if not (f.is_file() and name.endswith("_ranking.csv")):
-                    continue
-                base = name[: -len("_ranking.csv")]
-                if base in [p.lower() for p in prefs]:
-                    header, data = _read_csv_rows(f)
-                    if header:
-                        def _fmt3(v):
-                            try:
-                                return f"{float(v):.3f}"
-                            except Exception:
-                                return v
-                        data = [[_fmt3(cell) for cell in row] for row in data]
-                        thead = html.Thead(html.Tr([html.Th(h) for h in header]))
-                        tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in data])
-                        third_content = dbc.Table(
-                            [thead, tbody],
-                            bordered=True,
-                            hover=True,
-                            size="sm",
-                            responsive=True,
-                            className="w-100",
-                            style={"width": "100%", "tableLayout": "fixed"},
-                        )
-                        break
+    else:
+        third_content = _load_ranking_table_for_key(session_dir, key)
 
     if third_content is not None:
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
@@ -1005,71 +870,315 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
     return html.Div([tabs_bar, content_panel], style={"width": "100%"})
 
 
-def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+@dataclass(frozen=True)
+class ScoreSpec:
+    field: Optional[str] = None  # column name containing the absolute score (case-insensitive)
+    transform: Optional[Callable[[Dict[str, str]], Optional[float]]] = None  # fallback extractor
+    baseline_label: str = "Before correction"
+
+
+@dataclass
+class MethodRankingEntry:
+    method: str
+    method_code: Optional[str]
+    rank: Optional[float]
+    absolute: Optional[float]
+    relative: Optional[float]
+    raw: Dict[str, str]
+    is_baseline: bool
+
+
+@dataclass
+class RankingData:
+    metric_key: str
+    display_name: str
+    columns: List[str]
+    entries: List[MethodRankingEntry]
+
+
+def _safe_float(value: Optional[str]) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        stripped = str(value).strip()
+        if stripped == "" or stripped.lower() == "na":
+            return None
+        return float(stripped)
+    except Exception:
+        return None
+
+
+def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]:
+    row_lower = {k.lower(): v for k, v in row.items()}
+    for name in candidates:
+        score = _safe_float(row_lower.get(name.lower()))
+        if score is not None:
+            return score
+    return None
+
+
+def _score_lisi(row_lower: Dict[str, str]) -> Optional[float]:
+    ilisi = _safe_float(row_lower.get("ilisi") or row_lower.get("median_ilisi"))
+    clisi = _safe_float(row_lower.get("clisi") or row_lower.get("median_clisi"))
+    if ilisi is None or clisi is None:
+        return None
+    ilisi = min(max(ilisi, 0.0), 1.0)
+    clisi = min(max(clisi, 0.0), 1.0)
+    return 0.5 * (ilisi + (1.0 - clisi))
+
+
+def _score_pvca(row_lower: Dict[str, str]) -> Optional[float]:
+    treatment = _safe_float(row_lower.get("treatment"))
+    batch = _safe_float(row_lower.get("batch"))
+    if treatment is None:
+        return None
+    batch = batch or 0.0
+    denom = treatment + batch
+    if denom <= 0:
+        return None
+    return min(max(treatment / denom, 0.0), 1.0)
+
+
+RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
+    "alignment_score": ScoreSpec(field="as"),
+    "auroc": ScoreSpec(field="auc"),
+    "dissimilarity": ScoreSpec(field="combined_score"),
+    "ebm": ScoreSpec(field="ebm"),
+    "lisi": ScoreSpec(transform=_score_lisi),
+    "nmds": ScoreSpec(field="combined_score"),
+    "pca": ScoreSpec(field="score"),
+    "pcoa": ScoreSpec(field="combined_score"),
+    "prda": ScoreSpec(field="combined_score"),
+    "pvca": ScoreSpec(transform=_score_pvca),
+    "r2": ScoreSpec(field="combined_score"),
+    "silhouette": ScoreSpec(field="silhouette"),
+}
+
+
+RANKING_FILE_ALIASES: Dict[str, List[str]] = {
+    "alignment": ["alignment_score"],
+    "alignment_score": ["alignment_score"],
+    "auc": ["auroc"],
+    "auroc": ["auroc"],
+    "dissimilarity": ["dissimilarity"],
+    "ebm": ["ebm", "entropy_score"],
+    "lisi": ["lisi"],
+    "nmds": ["nmds"],
+    "pca": ["pca"],
+    "pcoa": ["pcoa"],
+    "prda": ["prda"],
+    "pvca": ["pvca"],
+    "r2": ["r2"],
+    "silhouette": ["silhouette"],
+}
+
+
+def _compute_absolute_score(metric_key: str, row: Dict[str, str]) -> Optional[float]:
+    spec = RANKING_SCORE_SPECS.get(metric_key)
+    row_lower = {k.lower(): v for k, v in row.items()}
+    if spec:
+        if spec.field:
+            return _safe_float(row_lower.get(spec.field.lower()))
+        if spec.transform:
+            try:
+                return spec.transform(row_lower)
+            except Exception:
+                return None
+    return _score_from_fields(row, "Score", "Combined_Score", "Value")
+
+
+def _parse_ranking_file(csv_path: Path) -> RankingData:
+    metric_key = csv_path.stem[:-len("_ranking")] if csv_path.name.lower().endswith("_ranking.csv") else csv_path.stem
+    metric_key = metric_key.lower()
+    display_name = csv_path.stem.replace("_ranking", "").replace("_", " ").title()
+    entries: List[MethodRankingEntry] = []
+    columns: List[str] = []
+
+    with csv_path.open("r", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames:
+            return RankingData(metric_key, display_name, [], [])
+        columns = list(reader.fieldnames)
+        field_map = {name.lower(): name for name in reader.fieldnames}
+        method_col = field_map.get("method")
+        rank_col = field_map.get("rank")
+        spec = RANKING_SCORE_SPECS.get(metric_key)
+        baseline_label = (spec.baseline_label if spec else "Before correction").lower()
+
+        for raw_row in reader:
+            if method_col is None:
+                continue
+            method_raw = (raw_row.get(method_col) or "").strip()
+            if not method_raw:
+                continue
+            method_display = method_formal_name(method_raw)
+            method_code = _method_code_from_display(method_display)
+            rank_value = _safe_float(raw_row.get(rank_col)) if rank_col else None
+            absolute = _compute_absolute_score(metric_key, raw_row)
+            is_baseline = method_display.lower() == baseline_label
+            entries.append(MethodRankingEntry(
+                method=method_display,
+                method_code=method_code,
+                rank=rank_value,
+                absolute=absolute,
+                relative=None,
+                raw={k: raw_row.get(k, "") for k in columns},
+                is_baseline=is_baseline,
+            ))
+
+    baseline_entry = next((e for e in entries if e.is_baseline and e.absolute not in (None, 0)), None)
+    baseline_abs = baseline_entry.absolute if baseline_entry else None
+    if baseline_abs not in (None, 0):
+        for entry in entries:
+            if entry.absolute is not None:
+                entry.relative = entry.absolute / baseline_abs
+    else:
+        for entry in entries:
+            entry.relative = None
+
+    # If the CSV lacks a Rank column, derive ranks from absolute score (higher is better)
+    scored = [e for e in entries if e.absolute is not None]
+    scored.sort(key=lambda item: item.absolute, reverse=True)
+    for idx, entry in enumerate(scored, start=1):
+        entry.rank = float(idx)
+
+    return RankingData(metric_key, display_name, columns, entries)
+
+
+def _build_ranking_table_component(data: RankingData) -> Optional[dbc.Table]:
+    if not data.entries:
+        return None
+    base_columns = ["Method", "Rank", "Absolute score", "Relative score"]
+    extra_cols = [
+        col for col in data.columns
+        if col and col.lower() not in {"method", "rank"}
+    ]
+    header = base_columns + extra_cols
+
+    def _rank_str(rank: Optional[float]) -> str:
+        if rank is None:
+            return "-"
+        if abs(rank - round(rank)) < 1e-6:
+            return str(int(round(rank)))
+        return f"{rank:.2f}"
+
+    def _fmt_raw(value: str) -> str:
+        num = _safe_float(value)
+        if num is None:
+            return value
+        return f"{num:.3f}"
+
+    body_rows: List[List[str]] = []
+    for entry in data.entries:
+        row_values: List[str] = [
+            entry.method,
+            _rank_str(entry.rank),
+            f"{entry.absolute:.3f}" if entry.absolute is not None else "-",
+            f"{entry.relative:.3f}x" if entry.relative is not None else "-",
+        ]
+        for col in extra_cols:
+            row_values.append(_fmt_raw(entry.raw.get(col, "")))
+        body_rows.append(row_values)
+
+    thead = html.Thead(html.Tr([html.Th(col) for col in header]))
+    tbody = html.Tbody([html.Tr([html.Td(cell) for cell in row]) for row in body_rows])
+    return dbc.Table(
+        [thead, tbody],
+        bordered=True,
+        hover=True,
+        size="sm",
+        responsive=True,
+        className="w-100",
+        style={"width": "100%", "tableLayout": "fixed"},
+    )
+
+
+def _load_ranking_table_for_key(session_dir: Path, key: str) -> Optional[dbc.Table]:
+    aliases = RANKING_FILE_ALIASES.get(key, [key])
+    for alias in aliases:
+        filename = f"{alias}_ranking.csv"
+        found = _find_file_case_insensitive(session_dir, filename)
+        if found and found.exists():
+            table = _build_ranking_table_component(_parse_ranking_file(found))
+            if table is not None:
+                return table
+    alias_lower = {alias.lower() for alias in aliases}
+    for candidate in session_dir.glob("*_ranking.csv"):
+        stem = candidate.stem
+        metric_key = stem[:-len("_ranking")] if stem.lower().endswith("_ranking") else stem
+        if metric_key.lower() in alias_lower:
+            table = _build_ranking_table_component(_parse_ranking_file(candidate))
+            if table is not None:
+                return table
+    return None
+
+
+def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str]], Dict[str, List[MethodRankingEntry]]]:
     ranking_files = sorted(session_dir.glob("*_ranking.csv"))
     if not ranking_files:
-        return [], []
+        return [], [], {}
 
-    metric_names: List[str] = []
-    metric_ranks: Dict[str, Dict[str, float]] = {}
-    method_ranks: defaultdict[str, List[float]] = defaultdict(list)
-
+    ranking_data: List[RankingData] = []
     for csv_path in ranking_files:
-        metric_name = csv_path.stem.replace("_ranking", "").replace("_", " ").title()
-        metric_names.append(metric_name)
-        with csv_path.open("r", encoding="utf-8") as handle:
-            reader = csv.DictReader(handle)
-            if not reader.fieldnames:
-                continue
-            field_map = {name.lower(): name for name in reader.fieldnames}
-            method_key = field_map.get("method")
-            rank_key = field_map.get("rank")
-            if not method_key or not rank_key:
-                continue
-            for row in reader:
-                method = (row.get(method_key, "") or "").strip()
-                val = (row.get(rank_key, "") or "").strip()
-                if not method or not val or val.lower() == "na":
-                    continue
-                try:
-                    rank = float(val)
-                except ValueError:
-                    continue
-                disp = method_formal_name(method)
-                metric_ranks.setdefault(metric_name, {})[disp] = rank
-                method_ranks[disp].append(rank)
+        data = _parse_ranking_file(csv_path)
+        if data.entries:
+            ranking_data.append(data)
+    if not ranking_data:
+        return [], [], {}
 
-    if not metric_ranks:
-        return [], []
+    metric_names = [data.display_name for data in ranking_data]
+    metric_entries: Dict[str, List[MethodRankingEntry]] = {
+        data.display_name: data.entries for data in ranking_data
+    }
 
-    unique_metrics = list(metric_ranks.keys())
-    methods = sorted(method_ranks)
+    method_entries: Dict[str, Dict[str, MethodRankingEntry]] = {}
+    method_ranks: defaultdict[str, List[float]] = defaultdict(list)
+    for data in ranking_data:
+        for entry in data.entries:
+            method_entries.setdefault(entry.method, {})[data.display_name] = entry
+            if entry.rank is not None:
+                method_ranks[entry.method].append(entry.rank)
+
+    methods = sorted(method_entries)
     rows: List[Dict[str, str]] = []
     for method in methods:
-        avg_rank = sum(method_ranks[method]) / len(method_ranks[method])
+        ranks = method_ranks.get(method, [])
+        avg_rank = (sum(ranks) / len(ranks)) if ranks else None
         row = {
             "Method": method,
-            "Average rank": f"{avg_rank:.3f}",
-            "Metrics": str(len(method_ranks[method])),
+            "Average rank": f"{avg_rank:.3f}" if avg_rank is not None else "-",
+            "Metrics": str(len(method_entries.get(method, {}))),
         }
-        for metric in unique_metrics:
-            value = metric_ranks.get(metric, {}).get(method)
-            if value is None:
+        for metric in metric_names:
+            entry = method_entries.get(method, {}).get(metric)
+            if not entry:
                 row[metric] = "-"
-            else:
-                # Show integer ranks (no values) in overall table
-                try:
-                    ival = int(round(value))
-                    row[metric] = str(ival)
-                except Exception:
-                    row[metric] = str(value)
+                continue
+            cell_parts: List[str] = []
+            if entry.rank is not None:
+                if abs(entry.rank - round(entry.rank)) < 1e-6:
+                    cell_parts.append(f"#{int(round(entry.rank))}")
+                else:
+                    cell_parts.append(f"#{entry.rank:.2f}")
+            if entry.absolute is not None:
+                cell_parts.append(f"{entry.absolute:.3f}")
+            if entry.relative is not None:
+                cell_parts.append(f"{entry.relative:.2f}x")
+            row[metric] = " | ".join(cell_parts) if cell_parts else "-"
         rows.append(row)
-    rows.sort(key=lambda item: float(item["Average rank"]))
-    return unique_metrics, rows
+
+    def _row_sort_key(item: Dict[str, str]) -> Tuple[float, str]:
+        try:
+            return float(item["Average rank"]), item["Method"]
+        except Exception:
+            return float("inf"), item["Method"]
+
+    rows.sort(key=_row_sort_key)
+    return metric_names, rows, metric_entries
 
 
 def build_ranking_tab(session_dir: Path):
-    metrics, rows = aggregate_rankings(session_dir)
+    metrics, rows, _ = aggregate_rankings(session_dir)
     if not metrics:
         content = html.Div("No ranking files found. Run the post-correction assessment first.")
     else:
@@ -1165,49 +1274,68 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
 
 def build_overall_div(session_dir: Path, stage: str):
     if stage == "post":
-        # Build an interactive ranking table using all *_ranking.csv files
-        metrics, rows = aggregate_rankings(session_dir)
+        metrics, _rows, metric_entries = aggregate_rankings(session_dir)
         if not metrics:
             body = html.Div("No ranking files found. Run post-assessment tabs to generate *_ranking.csv files.")
         else:
-            # Convert to typed values for proper sorting
-            typed_rows: List[Dict[str, object]] = []
-            for idx, r in enumerate(rows, start=1):
-                tr: Dict[str, object] = {"Method": r.get("Method", "")}
-                # Add Rank column (1-based by Average rank order)
-                try:
-                    avg = float(r.get("Average rank", "nan"))
-                except Exception:
-                    avg = float("nan")
-                tr["Rank"] = idx
-                tr["Average rank"] = avg
-                for m in metrics:
-                    val = r.get(m, "-")
-                    if val == "-" or val is None:
-                        tr[m] = None
-                    else:
-                        try:
-                            tr[m] = int(val)
-                        except Exception:
-                            try:
-                                tr[m] = float(val)
-                            except Exception:
-                                tr[m] = val
-                typed_rows.append(tr)
+            method_metric_map: Dict[str, Dict[str, MethodRankingEntry]] = {}
+            for metric_name, entries in metric_entries.items():
+                for entry in entries:
+                    method_metric_map.setdefault(entry.method, {})[metric_name] = entry
 
-            # Apply 3-decimal display for Average rank
+            typed_rows: List[Dict[str, object]] = []
+            for method, per_metric in method_metric_map.items():
+                ranks = [entry.rank for entry in per_metric.values() if entry.rank is not None]
+                avg_rank = (sum(ranks) / len(ranks)) if ranks else None
+                row: Dict[str, object] = {
+                    "Method": method,
+                    "Average rank": avg_rank,
+                }
+                for metric_name in metrics:
+                    entry = per_metric.get(metric_name)
+                    abs_id = f"{metric_name} (abs)"
+                    rel_id = f"{metric_name} (rel)"
+                    row[abs_id] = entry.absolute if entry and entry.absolute is not None else None
+                    row[rel_id] = entry.relative if entry and entry.relative is not None else None
+                typed_rows.append(row)
+
+            def _sort_key(item: Dict[str, object]) -> Tuple[float, str]:
+                avg = item.get("Average rank")
+                if isinstance(avg, (int, float)) and avg == avg:
+                    return float(avg), str(item.get("Method", ""))
+                return float("inf"), str(item.get("Method", ""))
+
+            typed_rows.sort(key=_sort_key)
+            for idx, row in enumerate(typed_rows, start=1):
+                row["Rank"] = idx
+
             avg_col = {"name": "Average rank", "id": "Average rank", "type": "numeric"}
+            abs_columns: List[Dict[str, object]] = []
+            rel_columns: List[Dict[str, object]] = []
             try:
                 if Format and Scheme:
                     avg_col["format"] = Format(precision=3, scheme=Scheme.fixed)
             except Exception:
                 pass
-            columns = (
-                [{"name": "Rank", "id": "Rank", "type": "numeric"},
-                 {"name": "Method", "id": "Method"},
-                 avg_col]
-                + [{"name": m, "id": m, "type": "numeric"} for m in metrics]
-            )
+            for metric_name in metrics:
+                abs_id = f"{metric_name} (abs)"
+                rel_id = f"{metric_name} (rel)"
+                abs_col = {"name": abs_id, "id": abs_id, "type": "numeric"}
+                rel_col = {"name": rel_id, "id": rel_id, "type": "numeric"}
+                try:
+                    if Format and Scheme:
+                        abs_col["format"] = Format(precision=3, scheme=Scheme.fixed)
+                        rel_col["format"] = Format(precision=3, scheme=Scheme.fixed)
+                except Exception:
+                    pass
+                abs_columns.append(abs_col)
+                rel_columns.append(rel_col)
+
+            columns = [
+                {"name": "Rank", "id": "Rank", "type": "numeric"},
+                {"name": "Method", "id": "Method"},
+                avg_col,
+            ] + abs_columns + rel_columns
 
             body = dash_table.DataTable(
                 data=typed_rows,
@@ -1233,7 +1361,6 @@ def build_overall_div(session_dir: Path, stage: str):
             html.H6("Overall Ranking"),
             body,
         ])
-    # Pre: show overall summary of raw assessment values
     return html.Div([
         html.H6("Overall Summary"),
         build_assessment_overview_table(session_dir, stage),
@@ -1385,52 +1512,29 @@ def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
     """Return {method_code: {metric_name: score_delta}} for a session."""
     ret: Dict[str, Dict[str, float]] = defaultdict(dict)
     for csv_path in sorted(session_dir.glob("*_ranking.csv")):
-        metric_name = csv_path.stem.replace("_ranking", "").replace("_", " ").strip()
-        try:
-            with csv_path.open("r", encoding="utf-8") as fh:
-                reader = csv.DictReader(fh)
-                header = reader.fieldnames or []
-        except Exception:
+        data = _parse_ranking_file(csv_path)
+        if not data.entries:
             continue
-        if not header:
-            continue
-        field_map = {h.lower(): h for h in header}
-        method_col = field_map.get("method")
-        score_col = field_map.get("score") or field_map.get("normalized score") or field_map.get("value")
-        if not method_col or not score_col:
-            continue
-        baseline_score: Optional[float] = None
-        cache: List[tuple[str, float]] = []
-        try:
-            with csv_path.open("r", encoding="utf-8") as fh:
-                reader = csv.DictReader(fh)
-                for row in reader:
-                    raw_method = (row.get(method_col) or "").strip()
-                    score_str = (row.get(score_col) or "").strip()
-                    if not raw_method or not score_str:
-                        continue
-                    try:
-                        score_val = float(score_str)
-                    except ValueError:
-                        continue
-                    canonical = method_formal_name(raw_method)
-                    if canonical.lower() == "before correction":
-                        baseline_score = score_val
-                        continue
-                    method_code = _method_code_from_display(canonical)
-                    if not method_code:
-                        continue
-                    cache.append((method_code, score_val))
-        except Exception:
-            continue
-        if baseline_score in (None, 0):
-            continue
-        for method_code, score_val in cache:
-            try:
-                normalized = score_val / baseline_score
-            except ZeroDivisionError:
+        baseline_entry = next((e for e in data.entries if e.is_baseline and e.absolute not in (None, 0)), None)
+        baseline_abs = baseline_entry.absolute if baseline_entry else None
+        for entry in data.entries:
+            if entry.is_baseline:
                 continue
-            ret[method_code][metric_name] = normalized - 1
+            method_code = entry.method_code
+            if not method_code:
+                continue
+            absolute = entry.absolute
+            if absolute is None:
+                continue
+            if entry.relative is not None:
+                ratio = entry.relative
+            elif baseline_abs not in (None, 0):
+                ratio = absolute / baseline_abs
+            else:
+                continue
+            if ratio is None:
+                continue
+            ret[method_code][data.display_name] = ratio - 1.0
     return ret
 
 

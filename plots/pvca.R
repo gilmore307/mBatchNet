@@ -370,7 +370,14 @@ rank_pvca_methods <- function(df_long) {
       Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
       .groups = "drop"
     ) %>%
-    arrange(desc(Treatment), Batch) %>%
+    mutate(
+      Score = dplyr::if_else(
+        (Treatment + Batch) > 0,
+        pmin(pmax(Treatment / (Treatment + Batch), 0), 1),
+        NA_real_
+      )
+    ) %>%
+    arrange(desc(Score), desc(Treatment), Batch, Method) %>%
     mutate(Rank = row_number())
 }
 

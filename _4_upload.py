@@ -475,7 +475,6 @@ def register_upload_callbacks(app):
                 ),
             ],
             md=6,
-            className="mb-3",
         )
         reference_dropdown = dbc.Col(
             [
@@ -489,24 +488,23 @@ def register_upload_callbacks(app):
                 ),
             ],
             md=6,
-            className="mb-3",
         )
 
         return dbc.Card(
             [
-                dbc.CardHeader(html.Strong("Study Settings")),
+                dbc.CardHeader(html.Strong("Map Metadata Columns")),
                 dbc.CardBody(
                     [
                         html.P(
                             "Select the control phenotype (will be treated as Negative) and the reference batch before generating the mosaic plot.",
                             className="text-muted",
                         ),
-                        dbc.Row([control_dropdown, reference_dropdown], className="g-2"),
+                        dbc.Row([control_dropdown, reference_dropdown], className="gy-2"),
                         dbc.Button(
                             "Apply Study Settings",
                             id="apply-study-settings",
                             color="secondary",
-                            className="mt-2",
+                            className="mt-3",
                             disabled=True,
                             style={"width": "250px"},
                             size="sm",
@@ -531,6 +529,7 @@ def register_upload_callbacks(app):
 
     @app.callback(
         Output("study-settings-status", "children"),
+        Output("preprocess-complete", "data", allow_duplicate=True),
         Output("mosaic-preview", "children", allow_duplicate=True),
         Input("apply-study-settings", "n_clicks"),
         State("study-control-label", "value"),
@@ -542,20 +541,24 @@ def register_upload_callbacks(app):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return html.Span("Session not initialised.", className="text-danger"), dash.no_update
+            return html.Span("Session not initialised.", className="text-danger"), dash.no_update, dash.no_update
         if not control_label or not reference_batch:
-            return html.Span("Select both control label and reference batch.", className="text-danger"), dash.no_update
+            return html.Span("Select both control label and reference batch.", className="text-danger"), dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
         ok_cfg, err = _persist_study_settings(session_dir, control_label, reference_batch)
         if not ok_cfg:
-            return html.Span(f"Failed to save study settings: {err}", className="text-danger"), dash.no_update
+            return html.Span(f"Failed to save study settings: {err}", className="text-danger"), dash.no_update, dash.no_update
 
         ok_mosaic, mosaic_err = _generate_mosaic(session_dir)
         if not ok_mosaic:
-            return html.Span("Failed to generate mosaic plot. Check run log for details.", className="text-danger"), dash.no_update
+            return html.Span("Failed to generate mosaic plot. Check run log for details.", className="text-danger"), dash.no_update, dash.no_update
 
-        return html.Span("Study settings applied. Mosaic generated.", className="text-success"), _render_mosaic_card(session_dir)
+        return (
+            html.Span("Study settings applied. Mosaic generated.", className="text-success"),
+            True,
+            _render_mosaic_card(session_dir),
+        )
 
     @app.callback(
         Output("metadata-columns-display", "children"),
@@ -623,7 +626,7 @@ def register_upload_callbacks(app):
             # Manual flow: require explicit user selection (no defaults)
             opts = [{"label": name, "value": name} for name in col_names]
             mapping_ui = dbc.Card([
-                dbc.CardHeader(html.Strong("Map metadata columns")),
+                dbc.CardHeader(html.Strong("Map Metadata Columns")),
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
