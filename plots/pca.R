@@ -430,10 +430,12 @@ if (only_baseline) {
   
 } else {
   # ---- Rank multiple matrices (as before) ----
-  rank_tbl <- dplyr::tibble(Method = character(),
-                            Batch_Distance = numeric(),
-                            Coverage = numeric(),
-                            Score = numeric())
+  rank_tbl <- dplyr::tibble(
+    Method = character(),
+    Batch_Distance = numeric(),
+    Coverage = numeric(),
+    `Absolute score` = numeric()
+  )
   
   for (m in names(frames_cache)) {
     fr <- frames_cache[[m]]
@@ -447,18 +449,28 @@ if (only_baseline) {
     ve <- fr$metric.df$var.explained
     cov2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
     
+    abs_score <- pca_metric_score(D, cov2)
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
       Batch_Distance = D,
       Coverage = cov2,
-      Score = pca_metric_score(D, cov2)
+      `Absolute score` = abs_score
     ))
   }
-  
+
+  baseline_abs <- rank_tbl$`Absolute score`[rank_tbl$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
   ranked_pca <- rank_tbl %>%
-    dplyr::arrange(dplyr::desc(Score)) %>%
-    dplyr::mutate(Rank = dplyr::row_number())
-  
+    dplyr::mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
+    dplyr::mutate(Rank = dplyr::row_number()) %>%
+    dplyr::relocate(`Absolute score`, .after = Method) %>%
+    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
+    dplyr::relocate(Rank, .after = `Relative score`)
+
   print(ranked_pca, n = nrow(ranked_pca))
   readr::write_csv(ranked_pca, file.path(output_folder, "pca_ranking.csv"))
 }

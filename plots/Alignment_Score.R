@@ -102,10 +102,21 @@ compute_alignment_score <- function(X, batch, k = 10, var_prop = 0.95, max_pcs =
 
 # Simple ranking (for CSV only; plotting keeps original order)
 rank_alignment_methods <- function(as_table) {
-  as_table %>%
+  scored <- as_table %>%
     filter(is.finite(AS)) %>%
-    arrange(desc(AS), Method) %>%
-    mutate(Rank = row_number())
+    transmute(Method, `Absolute score` = AS)
+
+  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  scored %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    arrange(desc(`Absolute score`), Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
 }
 
 # --------- Compute AS per method ---------

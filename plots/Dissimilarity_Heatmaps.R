@@ -439,21 +439,32 @@ if (only_baseline) {
       NA_real_
     }
     data.frame(
-      Method                   = m,
-      MeanUpper_Aitchison_RMSE = m_ait,
-      MeanUpper_Bray           = m_bc,
-      Score_Aitchison          = S_ait,
-      Score_Bray               = S_bc,
-      Combined_Score           = S_comb,
+      Method                = m,
+      MeanUpper_CLR_RMSE    = m_ait,
+      MeanUpper_TSS_RMSE    = m_bc,
+      Score_CLR             = S_ait,
+      Score_TSS             = S_bc,
+      `Absolute score`      = S_comb,
       stringsAsFactors = FALSE
     )
   })
-  
+
   ranking_unified <- dplyr::bind_rows(unified_rows) %>%
-    dplyr::filter(!is.na(Combined_Score)) %>%
-    dplyr::arrange(dplyr::desc(Combined_Score)) %>%
-    dplyr::mutate(Rank = dplyr::row_number())
-  
+    dplyr::filter(!is.na(`Absolute score`))
+
+  baseline_abs <- ranking_unified$`Absolute score`[ranking_unified$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  ranking_unified <- ranking_unified %>%
+    dplyr::mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
+    dplyr::mutate(Rank = dplyr::row_number()) %>%
+    dplyr::relocate(`Absolute score`, .after = Method) %>%
+    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
+    dplyr::relocate(Rank, .after = `Relative score`)
+
   print(as.data.frame(ranking_unified), row.names = FALSE)
   readr::write_csv(ranking_unified, file.path(output_folder, "dissimilarity_ranking.csv"))
 }

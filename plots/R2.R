@@ -302,16 +302,27 @@ readr::write_csv(assess_df, file.path(output_folder, "R2_raw_assessment.csv"))
 } else {
   ranking_unified <- full_join(score_clr, score_tss, by = "Method") %>%
     mutate(
-      Combined_Score = dplyr::case_when(
+      `Absolute score` = dplyr::case_when(
         !is.na(Score_CLR) & !is.na(Score_TSS) ~ sqrt(Score_CLR * Score_TSS),
         is.na(Score_TSS)                       ~ Score_CLR,
         is.na(Score_CLR)                       ~ Score_TSS,
         TRUE                                   ~ NA_real_
       )
+    )
+
+  baseline_abs <- ranking_unified$`Absolute score`[ranking_unified$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  ranking_unified <- ranking_unified %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
     ) %>%
-    arrange(desc(Combined_Score)) %>%
-    mutate(Rank = row_number())
-  
+    arrange(desc(`Absolute score`), Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
+
 readr::write_csv(ranking_unified, file.path(output_folder, "R2_ranking.csv"))
   print(ranking_unified, n = nrow(ranking_unified))
 }

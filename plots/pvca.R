@@ -361,7 +361,7 @@ ggsave(file.path(output_folder, "PVCA.tif"),
 
 # --------- Rank the methods (or baseline-only assessment) ----------
 rank_pvca_methods <- function(df_long) {
-  df_long %>%
+  scored <- df_long %>%
     group_by(Method) %>%
     summarise(
       Treatment = sum(Fraction[Component == "Treatment"], na.rm = TRUE),
@@ -371,14 +371,25 @@ rank_pvca_methods <- function(df_long) {
       .groups = "drop"
     ) %>%
     mutate(
-      Score = dplyr::if_else(
+      `Absolute score` = dplyr::if_else(
         (Treatment + Batch) > 0,
         pmin(pmax(Treatment / (Treatment + Batch), 0), 1),
         NA_real_
       )
+    )
+
+  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  scored %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
     ) %>%
-    arrange(desc(Score), desc(Treatment), Batch, Method) %>%
-    mutate(Rank = row_number())
+    arrange(desc(`Absolute score`), desc(Treatment), Batch, Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
 }
 
 methods_present <- levels(pvca_plot_df$Method)

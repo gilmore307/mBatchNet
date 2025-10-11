@@ -392,14 +392,18 @@ score_tb <- function(tb) {
 }
 
 tb_ait <- if (exists("parts_df_aitch")) score_tb(extract_TB(parts_df_aitch)) %>%
-  rename(Treatment_Aitchison = Treatment,
-         Batch_Aitchison     = Batch,
-         Score_Aitchison     = Score) else NULL
+  rename(
+    Treatment_CLR = Treatment,
+    Batch_CLR     = Batch,
+    Score_CLR     = Score
+  ) else NULL
 
 tb_bra <- if (exists("parts_df_bray")) score_tb(extract_TB(parts_df_bray)) %>%
-  rename(Treatment_Bray = Treatment,
-         Batch_Bray     = Batch,
-         Score_Bray     = Score) else NULL
+  rename(
+    Treatment_TSS = Treatment,
+    Batch_TSS     = Batch,
+    Score_TSS     = Score
+  ) else NULL
 
 # Determine if we only have the baseline ("Before correction")
 avail_methods <- unique(c(
@@ -457,17 +461,28 @@ if (only_baseline) {
 } else {
   # ---- Normal multi-method ranking ----
   unified <- dplyr::full_join(tb_ait, tb_bra, by = "Method") %>%
-    rowwise() %>%
-    mutate(
-      Combined_Score = {
-        s <- c(Score_Aitchison, Score_Bray)
+    dplyr::rowwise() %>%
+    dplyr::mutate(
+      `Absolute score` = {
+        s <- c(Score_CLR, Score_TSS)
         s <- s[is.finite(s)]
         if (!length(s)) NA_real_ else exp(mean(log(s)))
       }
     ) %>%
-    ungroup() %>%
-    arrange(desc(Combined_Score)) %>%
-    mutate(Rank = row_number())
+    dplyr::ungroup()
+
+  baseline_abs <- unified$`Absolute score`[unified$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  unified <- unified %>%
+    dplyr::mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
+    dplyr::mutate(Rank = dplyr::row_number()) %>%
+    dplyr::relocate(`Absolute score`, .after = Method) %>%
+    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
+    dplyr::relocate(Rank, .after = `Relative score`)
   
   print(unified, n = nrow(unified))
   readr::write_csv(unified, file.path(output_folder, "pRDA_ranking.csv"))

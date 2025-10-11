@@ -187,7 +187,22 @@ batch_entropy_mixing_knn <- function(
 }
 
 rank_methods_ebm <- function(ebm_table) {
-  ebm_table %>% filter(is.finite(EBM)) %>% arrange(desc(EBM), Method) %>% mutate(Rank = row_number())
+  scored <- ebm_table %>%
+    filter(is.finite(EBM)) %>%
+    mutate(`Absolute score` = EBM)
+
+  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  scored %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    arrange(desc(`Absolute score`), Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
 }
 
 pretty_metric <- function(m) {

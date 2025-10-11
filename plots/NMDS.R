@@ -487,17 +487,17 @@ if (only_baseline) {
   # ===== Multi-method ranking =====
   rank_tbl <- dplyr::tibble(
     Method = character(),
-    Batch_Distance_Aitchison = numeric(),
-    Batch_Distance_Bray      = numeric(),
-    NMDS_Stress_Aitchison    = numeric(),
-    NMDS_Stress_Bray         = numeric(),
-    Score_Aitchison          = numeric(),
-    Score_Bray               = numeric(),
-    Combined_Score           = numeric()
+    Batch_Distance_CLR = numeric(),
+    Batch_Distance_TSS = numeric(),
+    NMDS_Stress_CLR    = numeric(),
+    NMDS_Stress_TSS    = numeric(),
+    Score_CLR          = numeric(),
+    Score_TSS          = numeric(),
+    `Absolute score`   = numeric()
   )
   
   for (m in all_methods) {
-    # Aitchison (CLR NMDS)
+    # CLR NMDS
     D_a <- NA_real_; S_a <- NA_real_; stress_a <- NA_real_
     if (m %in% methods_clr) {
       fr_a <- frames_cache_clr[[m]]
@@ -511,7 +511,7 @@ if (only_baseline) {
       S_a <- nmds_metric_score(D_a, stress_a)
     }
     
-    # Bray-Curtis (TSS NMDS)
+    # TSS NMDS
     D_b <- NA_real_; S_b <- NA_real_; stress_b <- NA_real_
     if (m %in% methods_tss) {
       fr_b <- frames_cache_tss[[m]]
@@ -535,20 +535,29 @@ if (only_baseline) {
     
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
-      Batch_Distance_Aitchison = D_a,
-      Batch_Distance_Bray      = D_b,
-      NMDS_Stress_Aitchison    = stress_a,
-      NMDS_Stress_Bray         = stress_b,
-      Score_Aitchison          = S_a,
-      Score_Bray               = S_b,
-      Combined_Score           = Combined
+      Batch_Distance_CLR = D_a,
+      Batch_Distance_TSS = D_b,
+      NMDS_Stress_CLR    = stress_a,
+      NMDS_Stress_TSS    = stress_b,
+      Score_CLR          = S_a,
+      Score_TSS          = S_b,
+      `Absolute score`   = Combined
     ))
   }
-  
+
+  baseline_abs <- rank_tbl$`Absolute score`[rank_tbl$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
   ranked_nmds_only <- rank_tbl %>%
-    dplyr::arrange(dplyr::desc(Combined_Score)) %>%
-    dplyr::mutate(Rank = dplyr::row_number())
-  
+    dplyr::mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
+    dplyr::mutate(Rank = dplyr::row_number()) %>%
+    dplyr::relocate(`Absolute score`, .after = Method) %>%
+    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
+    dplyr::relocate(Rank, .after = `Relative score`)
+
   print(ranked_nmds_only, n = nrow(ranked_nmds_only))
   readr::write_csv(ranked_nmds_only, file.path(output_folder, "nmds_ranking.csv"))
 }

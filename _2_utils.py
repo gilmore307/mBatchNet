@@ -940,18 +940,18 @@ def _score_pvca(row_lower: Dict[str, str]) -> Optional[float]:
 
 
 RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
-    "alignment_score": ScoreSpec(field="as"),
-    "auroc": ScoreSpec(field="auc"),
-    "dissimilarity": ScoreSpec(field="combined_score"),
-    "ebm": ScoreSpec(field="ebm"),
-    "lisi": ScoreSpec(transform=_score_lisi),
-    "nmds": ScoreSpec(field="combined_score"),
-    "pca": ScoreSpec(field="score"),
-    "pcoa": ScoreSpec(field="combined_score"),
-    "prda": ScoreSpec(field="combined_score"),
-    "pvca": ScoreSpec(transform=_score_pvca),
-    "r2": ScoreSpec(field="combined_score"),
-    "silhouette": ScoreSpec(field="silhouette"),
+    "alignment_score": ScoreSpec(field="absolute score"),
+    "auroc": ScoreSpec(field="absolute score"),
+    "dissimilarity": ScoreSpec(field="absolute score"),
+    "ebm": ScoreSpec(field="absolute score"),
+    "lisi": ScoreSpec(field="absolute score", transform=_score_lisi),
+    "nmds": ScoreSpec(field="absolute score"),
+    "pca": ScoreSpec(field="absolute score"),
+    "pcoa": ScoreSpec(field="absolute score"),
+    "prda": ScoreSpec(field="absolute score"),
+    "pvca": ScoreSpec(field="absolute score", transform=_score_pvca),
+    "r2": ScoreSpec(field="absolute score"),
+    "silhouette": ScoreSpec(field="absolute score"),
 }
 
 
@@ -1002,6 +1002,8 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
         field_map = {name.lower(): name for name in reader.fieldnames}
         method_col = field_map.get("method")
         rank_col = field_map.get("rank")
+        absolute_col = field_map.get("absolute score")
+        relative_col = field_map.get("relative score")
         spec = RANKING_SCORE_SPECS.get(metric_key)
         baseline_label = (spec.baseline_label if spec else "Before correction").lower()
 
@@ -1014,23 +1016,28 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
             method_display = method_formal_name(method_raw)
             method_code = _method_code_from_display(method_display)
             rank_value = _safe_float(raw_row.get(rank_col)) if rank_col else None
-            absolute = _compute_absolute_score(metric_key, raw_row)
+            absolute = _safe_float(raw_row.get(absolute_col)) if absolute_col else None
+            if absolute is None:
+                absolute = _compute_absolute_score(metric_key, raw_row)
+            relative_value = _safe_float(raw_row.get(relative_col)) if relative_col else None
             is_baseline = method_display.lower() == baseline_label
             entries.append(MethodRankingEntry(
                 method=method_display,
                 method_code=method_code,
                 rank=rank_value,
                 absolute=absolute,
-                relative=None,
+                relative=relative_value,
                 raw={k: raw_row.get(k, "") for k in columns},
                 is_baseline=is_baseline,
             ))
 
     baseline_entry = next((e for e in entries if e.is_baseline and e.absolute not in (None, 0)), None)
     baseline_abs = baseline_entry.absolute if baseline_entry else None
+    if baseline_entry and baseline_entry.relative is None:
+        baseline_entry.relative = 1.0
     if baseline_abs not in (None, 0):
         for entry in entries:
-            if entry.absolute is not None:
+            if entry.relative is None and entry.absolute is not None:
                 entry.relative = entry.absolute / baseline_abs
     else:
         for entry in entries:
@@ -1051,7 +1058,7 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dbc.Table]:
     base_columns = ["Method", "Rank", "Absolute score", "Relative score"]
     extra_cols = [
         col for col in data.columns
-        if col and col.lower() not in {"method", "rank"}
+        if col and col.lower() not in {"method", "rank", "absolute score", "relative score"}
     ]
     header = base_columns + extra_cols
 

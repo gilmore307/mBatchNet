@@ -205,8 +205,20 @@ if (only_baseline) {
   # Multiple methods - write a ranking CSV but KEEP ORIGINAL ORDER IN THE PLOT
   sil_ranked <- sil_tbl %>%
     filter(is.finite(Silhouette)) %>%
-    arrange(desc(Silhouette), Method) %>%
-    mutate(Rank = row_number())
+    mutate(`Absolute score` = Silhouette)
+
+  baseline_abs <- sil_ranked$`Absolute score`[sil_ranked$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  sil_ranked <- sil_ranked %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    arrange(desc(`Absolute score`), Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
   
   readr::write_csv(sil_ranked, file.path(output_folder, "silhouette_ranking.csv"))
   print(sil_ranked, n = nrow(sil_ranked))

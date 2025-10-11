@@ -169,15 +169,26 @@ global_lisi_norm <- function(lbl) {
 # -------- Your ranking function (unchanged): higher iLISI, lower cLISI ----------
 rank_lisi_methods <- function(summary_df) {
   stopifnot(all(c("Method","median_iLISI","median_cLISI") %in% names(summary_df)))
-  summary_df %>%
+  scored <- summary_df %>%
     transmute(
       Method,
       iLISI = pmin(pmax(median_iLISI, 0), 1),
       cLISI = pmin(pmax(median_cLISI, 0), 1),
-      Score = 0.5 * (iLISI + (1 - cLISI))
+      `Absolute score` = 0.5 * (iLISI + (1 - cLISI))
+    )
+
+  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  scored %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
     ) %>%
-    arrange(desc(Score), desc(iLISI), cLISI, Method) %>%
-    mutate(Rank = dplyr::row_number())
+    arrange(desc(`Absolute score`), desc(iLISI), cLISI, Method) %>%
+    mutate(Rank = dplyr::row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
 }
 
 ## Auto-select k removed

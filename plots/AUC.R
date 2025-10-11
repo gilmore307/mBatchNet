@@ -232,7 +232,21 @@ if (only_baseline) {
 } else {
   # --------- Multi-method: keep legend order as file_list (no re-ranking in plot) ---------
   # Save AUC ranking CSV, but DO NOT reorder legend/lines in the plot
-  auc_ranked <- auc_tbl %>% arrange(desc(AUC)) %>% mutate(Rank = row_number())
+  auc_ranked <- auc_tbl %>%
+    mutate(`Absolute score` = AUC)
+
+  baseline_abs <- auc_ranked$`Absolute score`[auc_ranked$Method == "Before correction"][1]
+  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+  auc_ranked <- auc_ranked %>%
+    mutate(
+      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+    ) %>%
+    arrange(desc(`Absolute score`), Method) %>%
+    mutate(Rank = row_number()) %>%
+    relocate(`Absolute score`, .after = Method) %>%
+    relocate(`Relative score`, .after = `Absolute score`) %>%
+    relocate(Rank, .after = `Relative score`)
   readr::write_csv(auc_ranked, file.path(output_folder, "auroc_ranking.csv"))
   print(auc_ranked)
   
