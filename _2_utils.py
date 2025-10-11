@@ -435,6 +435,7 @@ def _make_ag_grid(
         "autoHeaderHeight": True,
         "flex": 1,
         "minWidth": 120,
+        "cellStyle": {"textAlign": "center"},
     }
     if default_col_def:
         base_default_col_def.update(default_col_def)
