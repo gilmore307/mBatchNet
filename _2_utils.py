@@ -647,7 +647,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                         source_idx = keep_idx[idx]
                         cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
                         numeric_value = _safe_float(cell)
-                        row_dict[column_name] = numeric_value if numeric_value is not None else cell
+                        row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
                     formatted_rows.append(row_dict)
                 numeric_headers = {
                     col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -663,7 +663,6 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                         col_def["pinned"] = "left"
                     if col in numeric_headers:
                         col_def["type"] = "numericColumn"
-                        col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
                     column_defs.append(col_def)
                 third_content = _make_ag_grid(
                     grid_id=f"{stage}-{key}-assessment",
@@ -847,7 +846,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                                 col_def["flex"] = 1
                             if col in numeric_headers:
                                 col_def["type"] = "numericColumn"
-                                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                                col_def["type"] = "numericColumn"
                             column_defs.append(col_def)
                         third_content = _make_ag_grid(
                             grid_id=f"{stage}-{key}-assessment",
@@ -1017,6 +1016,15 @@ def _safe_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _rounded(value: Optional[float], digits: int = 3) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return round(float(value), digits)
+    except Exception:
+        return value
+
+
 def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]:
     row_lower = {k.lower(): v for k, v in row.items()}
     for name in candidates:
@@ -1174,23 +1182,26 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     row_data: List[Dict[str, object]] = []
     numeric_candidates: Dict[str, bool] = {col: False for col in base_columns + extra_cols}
     for entry in data.entries:
+        rank_val = _rounded(entry.rank)
+        absolute_val = _rounded(entry.absolute)
+        relative_val = _rounded(entry.relative)
         row: Dict[str, object] = {
             "Method": entry.method,
-            "Rank": entry.rank if entry.rank is not None else None,
-            "Absolute score": entry.absolute if entry.absolute is not None else None,
-            "Relative score": entry.relative if entry.relative is not None else None,
+            "Rank": rank_val,
+            "Absolute score": absolute_val,
+            "Relative score": relative_val,
         }
-        if row["Rank"] is not None:
+        if rank_val is not None:
             numeric_candidates["Rank"] = True
-        if row["Absolute score"] is not None:
+        if absolute_val is not None:
             numeric_candidates["Absolute score"] = True
-        if row["Relative score"] is not None:
+        if relative_val is not None:
             numeric_candidates["Relative score"] = True
         for col in extra_cols:
             raw_value = entry.raw.get(col, "")
             numeric_value = _safe_float(raw_value)
             if numeric_value is not None:
-                row[col] = numeric_value
+                row[col] = _rounded(numeric_value)
                 numeric_candidates[col] = True
             else:
                 row[col] = raw_value
@@ -1212,11 +1223,11 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         if numeric_candidates.get(col):
             col_def["type"] = "numericColumn"
             if col == "Rank":
-                col_def["valueFormatter"] = "value == null ? '' : (Number.isInteger(value) ? Number(value).toString() : Number(value).toFixed(2))"
+                col_def["type"] = "numericColumn"
             elif col == "Relative score":
-                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3) + 'x'"
+                col_def["type"] = "numericColumn"
             else:
-                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                col_def["type"] = "numericColumn"
         column_defs.append(col_def)
 
     return _make_ag_grid(
@@ -1281,7 +1292,7 @@ def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str
         avg_rank = (sum(ranks) / len(ranks)) if ranks else None
         row = {
             "Method": method,
-            "Average rank": f"{avg_rank:.3f}" if avg_rank is not None else "-",
+            "Average rank": f"{_rounded(avg_rank):.3f}" if avg_rank is not None else "-",
             "Metrics": str(len(method_entries.get(method, {}))),
         }
         for metric in metric_names:
@@ -1291,14 +1302,15 @@ def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str
                 continue
             cell_parts: List[str] = []
             if entry.rank is not None:
-                if abs(entry.rank - round(entry.rank)) < 1e-6:
-                    cell_parts.append(f"#{int(round(entry.rank))}")
+                rounded_rank = _rounded(entry.rank)
+                if rounded_rank is not None and abs(rounded_rank - round(rounded_rank)) < 1e-6:
+                    cell_parts.append(f"#{int(round(rounded_rank))}")
                 else:
-                    cell_parts.append(f"#{entry.rank:.2f}")
+                    cell_parts.append(f"#{rounded_rank:.3f}" if rounded_rank is not None else "-")
             if entry.absolute is not None:
-                cell_parts.append(f"{entry.absolute:.3f}")
+                cell_parts.append(f"{_rounded(entry.absolute):.3f}")
             if entry.relative is not None:
-                cell_parts.append(f"{entry.relative:.2f}x")
+                cell_parts.append(f"{_rounded(entry.relative):.3f}x")
             row[metric] = " | ".join(cell_parts) if cell_parts else "-"
         rows.append(row)
 
@@ -1330,7 +1342,6 @@ def build_ranking_tab(session_dir: Path):
                 "field": "Average rank",
                 "type": "numericColumn",
                 "width": 150,
-                "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
             },
             {
                 "headerName": "Metrics",
@@ -1354,7 +1365,7 @@ def build_ranking_tab(session_dir: Path):
         for row in rows:
             record: Dict[str, object] = {
                 "Method": row.get("Method"),
-                "Average rank": _safe_float(row.get("Average rank")),
+                "Average rank": _rounded(_safe_float(row.get("Average rank"))),
             }
             metrics_count = row.get("Metrics")
             try:
@@ -1480,16 +1491,17 @@ def build_overall_div(session_dir: Path, stage: str):
             for method, per_metric in method_metric_map.items():
                 ranks = [entry.rank for entry in per_metric.values() if entry.rank is not None]
                 avg_rank = (sum(ranks) / len(ranks)) if ranks else None
+                rounded_avg = _rounded(avg_rank)
                 row: Dict[str, object] = {
                     "Method": method,
-                    "Average rank": avg_rank,
+                    "Average rank": rounded_avg,
                 }
                 for metric_name in metrics:
                     entry = per_metric.get(metric_name)
                     abs_id = f"{metric_name} (abs)"
                     rel_id = f"{metric_name} (rel)"
-                    row[abs_id] = entry.absolute if entry and entry.absolute is not None else None
-                    row[rel_id] = entry.relative if entry and entry.relative is not None else None
+                    row[abs_id] = _rounded(entry.absolute) if entry and entry.absolute is not None else None
+                    row[rel_id] = _rounded(entry.relative) if entry and entry.relative is not None else None
                 typed_rows.append(row)
 
             def _sort_key(item: Dict[str, object]) -> Tuple[float, str]:
@@ -1522,7 +1534,6 @@ def build_overall_div(session_dir: Path, stage: str):
                     "field": "Average rank",
                     "type": "numericColumn",
                     "width": 160,
-                    "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
                 },
             ]
 
@@ -1535,7 +1546,6 @@ def build_overall_div(session_dir: Path, stage: str):
                         "field": abs_id,
                         "type": "numericColumn",
                         "minWidth": 170,
-                        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
                     }
                 )
                 column_defs.append(
@@ -1544,7 +1554,6 @@ def build_overall_div(session_dir: Path, stage: str):
                         "field": rel_id,
                         "type": "numericColumn",
                         "minWidth": 170,
-                        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
                     }
                 )
 
@@ -1609,7 +1618,7 @@ def build_raw_assessments_tab(session_dir: Path):
                 col_def["pinned"] = "left"
             if col in numeric_headers:
                 col_def["type"] = "numericColumn"
-                col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
+                col_def["type"] = "numericColumn"
             column_defs.append(col_def)
         slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in metric)
         while "--" in slug:

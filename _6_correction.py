@@ -47,7 +47,6 @@ METHOD_GRID_COLUMNS = [
         "headerName": "Avg Time (s)",
         "field": "avg_elapsed_sec",
         "type": "numericColumn",
-        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
         "width": 140,
         "headerTooltip": "Average runtime in seconds, taken from session logs.",
     },
@@ -55,7 +54,6 @@ METHOD_GRID_COLUMNS = [
         "headerName": "Avg Δ (normalized)",
         "field": "avg_score_delta",
         "type": "numericColumn",
-        "valueFormatter": "value == null ? '' : Number(value).toFixed(3)",
         "width": 150,
         "headerTooltip": "Average normalized score change relative to the uncorrected baseline (1.0).",
     },
@@ -167,6 +165,11 @@ def register_correction_callbacks(app):
         rows: List[Dict[str, object]] = []
         if summary and isinstance(summary, dict):
             rows = list(summary.get("table_rows", []))  # type: ignore[arg-type]
+        for row in rows:
+            for key in ("avg_elapsed_sec", "avg_score_delta"):
+                val = row.get(key)
+                if isinstance(val, (int, float)):
+                    row[key] = round(val, 3)
         if not rows:
             rows = [
                 {

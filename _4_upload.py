@@ -922,7 +922,7 @@ def register_upload_callbacks(app):
                         cell = row_vals[idx] if idx < len(row_vals) else ""
                         if title == "Raw Matrix":
                             try:
-                                record[col_name] = float(cell)
+                                record[col_name] = round(float(cell), 3)
                             except Exception:
                                 record[col_name] = cell
                         else:
@@ -943,7 +943,6 @@ def register_upload_callbacks(app):
                         col_def["minWidth"] = 140 if title == "Raw Matrix" else 180
                     if col in numeric_columns:
                         col_def["type"] = "numericColumn"
-                        col_def["valueFormatter"] = "value == null ? '' : Number(value).toFixed(3)"
                     column_defs.append(col_def)
 
                 slug_base = f"{title}-{path.stem}"
