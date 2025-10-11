@@ -394,6 +394,8 @@ def _make_ag_grid(
         "filter": True,
         "wrapHeaderText": True,
         "autoHeaderHeight": True,
+        "flex": 1,
+        "minWidth": 120,
     }
     if default_col_def:
         base_default_col_def.update(default_col_def)
@@ -668,7 +670,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                     grid_id=f"{stage}-{key}-assessment",
                     column_defs=column_defs,
                     row_data=formatted_rows,
-                    default_col_def={"flex": 1, "minWidth": 140},
+                    default_col_def={"minWidth": 140},
                 )
                 break
         if stage == "post":
@@ -843,7 +845,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             }
                             if col.lower() == "method":
                                 col_def["pinned"] = "left"
-                                col_def["flex"] = 1
+                                col_def["flex"] = 0
                             if col in numeric_headers:
                                 col_def["type"] = "numericColumn"
                                 col_def["type"] = "numericColumn"
@@ -1090,6 +1092,30 @@ RANKING_FILE_ALIASES: Dict[str, List[str]] = {
 }
 
 
+REQUIRED_METHOD_CODES: Set[str] = {code.lower() for code, _ in SUPPORTED_METHODS}
+
+REQUIRED_RANKING_KEYS: Set[str] = {
+    "pca",
+    "pcoa",
+    "nmds",
+    "dissimilarity",
+    "r2",
+    "prda",
+    "pvca",
+    "alignment",
+    "auc",
+    "lisi",
+    "ebm",
+    "silhouette",
+}
+
+RANKING_KEY_LOOKUP: Dict[str, str] = {
+    alias.lower(): canonical
+    for canonical, aliases in RANKING_FILE_ALIASES.items()
+    for alias in [canonical, *aliases]
+}
+
+
 def _compute_absolute_score(metric_key: str, row: Dict[str, str]) -> Optional[float]:
     spec = RANKING_SCORE_SPECS.get(metric_key)
     row_lower = {k.lower(): v for k, v in row.items()}
@@ -1215,7 +1241,7 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         }
         if col == "Method":
             col_def["minWidth"] = 220
-            col_def["flex"] = 1
+            col_def["flex"] = 0
         elif col == "Rank":
             col_def["width"] = 110
         else:
@@ -1334,7 +1360,7 @@ def build_ranking_tab(session_dir: Path):
                 "headerName": "Method",
                 "field": "Method",
                 "minWidth": 220,
-                "flex": 1,
+                "flex": 0,
                 "pinned": "left",
             },
             {
@@ -1450,7 +1476,6 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
             "headerName": "Test",
             "field": "Test",
             "minWidth": 240,
-            "flex": 1,
         },
         {
             "headerName": "Criteria",
@@ -1523,7 +1548,7 @@ def build_overall_div(session_dir: Path, stage: str):
                     "headerName": "Method",
                     "field": "Method",
                     "minWidth": 220,
-                    "flex": 1,
+                    "flex": 0,
                     "pinned": "left",
                 },
                 {
@@ -1608,7 +1633,7 @@ def build_raw_assessments_tab(session_dir: Path):
                 "minWidth": 170 if col.lower() != "method" else 220,
             }
             if col.lower() == "method":
-                col_def["flex"] = 1
+                col_def["flex"] = 0
                 col_def["pinned"] = "left"
             if col in numeric_headers:
                 col_def["type"] = "numericColumn"
@@ -1760,6 +1785,39 @@ def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
     return ret
 
 
+def _collect_ranking_metric_keys(session_dir: Path) -> Set[str]:
+    metrics: Set[str] = set()
+    for csv_path in session_dir.glob("*_ranking.csv"):
+        stem = csv_path.stem
+        if stem.lower().endswith("_ranking"):
+            stem = stem[:-len("_ranking")]
+        canonical = RANKING_KEY_LOOKUP.get(stem.lower())
+        if canonical:
+            metrics.add(canonical)
+    return metrics
+
+
+def _all_methods_selected(summary: Dict[str, object]) -> bool:
+    methods = summary.get("methods")
+    if not isinstance(methods, list):
+        return False
+    codes: Set[str] = set()
+    for entry in methods:
+        if not isinstance(entry, dict):
+            continue
+        raw_name = (entry.get("name") or "").strip()
+        if not raw_name:
+            continue
+        lowered = raw_name.lower()
+        if lowered in REQUIRED_METHOD_CODES:
+            codes.add(lowered)
+            continue
+        code = _method_code_from_display(raw_name)
+        if code:
+            codes.add(code.lower())
+    return REQUIRED_METHOD_CODES.issubset(codes)
+
+
 def compute_integrated_summary() -> Dict[str, object]:
     """Aggregate cross-session performance statistics and persist the summary."""
     ensure_output_root()
@@ -1788,32 +1846,36 @@ def compute_integrated_summary() -> Dict[str, object]:
                 continue
         summary = _load_session_summary(session_dir)
         ranking = _load_ranking_deltas(session_dir)
-        if not summary and not ranking:
+        metrics_seen = _collect_ranking_metric_keys(session_dir)
+        if not summary or not ranking:
+            continue
+        if not _all_methods_selected(summary):
+            continue
+        if not REQUIRED_RANKING_KEYS.issubset(metrics_seen):
             continue
         if signature:
             seen_signatures.add(signature)
             known_signatures.add(signature)
         session_id = session_dir.name
         included_sessions.append(session_id)
-        if summary:
-            for entry in summary.get("methods", []):
-                name = entry.get("name")
-                status = (entry.get("status") or "").lower()
-                if status != "success":
-                    continue
-                code = name if name in method_stats else _method_code_from_display(str(name))
-                if not code or code not in method_stats:
-                    continue
-                stat = method_stats[code]
-                stat["runs"] = int(stat["runs"]) + 1
-                stat["sessions"].add(session_id)
-                elapsed_val = entry.get("elapsed_sec")
-                try:
-                    elapsed_float = float(elapsed_val)
-                except (TypeError, ValueError):
-                    elapsed_float = None
-                if elapsed_float is not None:
-                    stat["elapsed"].append(elapsed_float)
+        for entry in summary.get("methods", []):
+            name = entry.get("name")
+            status = (entry.get("status") or "").lower()
+            if status != "success":
+                continue
+            code = name if name in method_stats else _method_code_from_display(str(name))
+            if not code or code not in method_stats:
+                continue
+            stat = method_stats[code]
+            stat["runs"] = int(stat["runs"]) + 1
+            stat["sessions"].add(session_id)
+            elapsed_val = entry.get("elapsed_sec")
+            try:
+                elapsed_float = float(elapsed_val)
+            except (TypeError, ValueError):
+                elapsed_float = None
+            if elapsed_float is not None:
+                stat["elapsed"].append(elapsed_float)
         if ranking:
             for code, metric_map in ranking.items():
                 if code not in method_stats:

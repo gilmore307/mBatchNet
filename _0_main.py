@@ -161,6 +161,7 @@ def serve_layout() -> html.Div:
                                     [
                                         html.Li("Declining will not limit any functionality."),
                                         html.Li("Shared results never include raw uploads or personal identifiers."),
+                                        html.Li("Only sessions where every correction method and assessment test has been completed are eligible for sharing."),
                                         html.Li("You can change your decision at any time by refreshing your browser session."),
                                     ]
                                 ),
