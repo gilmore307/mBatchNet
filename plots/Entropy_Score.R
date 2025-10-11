@@ -213,7 +213,7 @@ pretty_metric <- function(m) {
 }
 
 # --------- Compute EBM per CLR matrix ---------
-ebm_tbl <- tibble(Method = character(), EBM = numeric(), CI95_lo = numeric(), CI95_hi = numeric())
+ebm_tbl <- tibble(Method = character(), EBM = numeric())
 
 for (nm in names(file_list)) {
   cat("Processing:", nm, "\n")
@@ -257,13 +257,7 @@ for (nm in names(file_list)) {
   if (is.null(out)) { warning(sprintf("Skipping %s: EBM failed.", nm)); next }
   
   m  <- out$mean_entropy
-  pm <- out$pool_means
-  n  <- length(pm)
-  se <- if (n > 1) stats::sd(pm, na.rm = TRUE) / sqrt(n) else 0
-  ci_lo <- max(0, m - 1.96 * se)
-  ci_hi <- min(1, m + 1.96 * se)
-  
-  ebm_tbl <- bind_rows(ebm_tbl, tibble(Method = nm, EBM = m, CI95_lo = ci_lo, CI95_hi = ci_hi))
+  ebm_tbl <- bind_rows(ebm_tbl, tibble(Method = nm, EBM = m))
 }
 
 # --------- Save/plot with special handling for baseline-only ---------

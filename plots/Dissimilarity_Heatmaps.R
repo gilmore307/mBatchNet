@@ -445,7 +445,8 @@ if (only_baseline) {
       Score_CLR             = S_ait,
       Score_TSS             = S_bc,
       `Absolute score`      = S_comb,
-      stringsAsFactors = FALSE
+      stringsAsFactors      = FALSE,
+      check.names           = FALSE
     )
   })
 
