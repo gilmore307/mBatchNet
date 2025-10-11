@@ -1,0 +1,30 @@
+name: batch-effect-correction
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - dash>=2.14.0
+      - dash-bootstrap-components>=1.6.0
+      - dash-ag-grid>=2.4.0
+      - gunicorn>=21.2.0
+      - numpy>=1.23
+      - DEBIAS-M>=0.1.6
+      - pandas>=1.5
+  - r-base>=4.2
+  - r-essentials
+  - r-biocmanager
+  - r-remotes
+  - r-jsonlite
+  - r-doParallel
+  - r-pamr
+  - r-vegan
+  - r-reticulate
+  - bioconductor-preprocesscore
+  - bioconductor-limma
+  - bioconductor-sva
+  - bioconductor-mmuphin
+# GitHub-only packages (ConQuR, FSQN, ruvIIInb, PLSDAbatch, MetaDICT) are
+# installed by env/r-packages.R after the environment is created.

@@ -1,0 +1,17 @@
+# Core Dash app dependencies
+# Dash pins plotly/dash-core-components/dash-html-components internally.
+dash>=2.14.0
+# Bootstrap styling + layout helpers
+dash-bootstrap-components>=1.6.0
+# Enterprise-ready hosting entrypoint
+# (gunicorn optional on Windows; retained for Heroku/Render compatibility)
+gunicorn>=21.2.0
+# Rich grid used on the correction results page
+dash-ag-grid>=2.4.0
+
+# Python helpers required by R (reticulate) integration
+numpy>=1.23
+# DebiasM algorithm executed via reticulate in methods.R
+DEBIAS-M>=0.1.6
+# Convenience data tooling used by a few log helpers and notebooks
+pandas>=1.5
