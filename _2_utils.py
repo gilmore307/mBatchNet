@@ -1498,10 +1498,7 @@ def build_overall_div(session_dir: Path, stage: str):
                 }
                 for metric_name in metrics:
                     entry = per_metric.get(metric_name)
-                    abs_id = f"{metric_name} (abs)"
-                    rel_id = f"{metric_name} (rel)"
-                    row[abs_id] = _rounded(entry.absolute) if entry and entry.absolute is not None else None
-                    row[rel_id] = _rounded(entry.relative) if entry and entry.relative is not None else None
+                    row[metric_name] = _rounded(entry.relative) if entry and entry.relative is not None else None
                 typed_rows.append(row)
 
             def _sort_key(item: Dict[str, object]) -> Tuple[float, str]:
@@ -1538,41 +1535,38 @@ def build_overall_div(session_dir: Path, stage: str):
             ]
 
             for metric_name in metrics:
-                abs_id = f"{metric_name} (abs)"
-                rel_id = f"{metric_name} (rel)"
                 column_defs.append(
                     {
-                        "headerName": abs_id,
-                        "field": abs_id,
-                        "type": "numericColumn",
-                        "minWidth": 170,
-                    }
-                )
-                column_defs.append(
-                    {
-                        "headerName": rel_id,
-                        "field": rel_id,
+                        "headerName": metric_name,
+                        "field": metric_name,
                         "type": "numericColumn",
                         "minWidth": 170,
                     }
                 )
 
             body = _make_ag_grid(
-                grid_id=f"{stage}-overall-ranking-grid",
+                f"{stage}-overall-ranking-grid",
                 column_defs=column_defs,
                 row_data=typed_rows,
                 default_col_def={"minWidth": 150},
                 grid_options={"suppressPaginationPanel": True},
             )
 
-        return html.Div([
-            html.H6("Overall Ranking"),
-            body,
-        ])
-    return html.Div([
-        html.H6("Overall Summary"),
-        build_assessment_overview_table(session_dir, stage),
-    ])
+        return dbc.Card(
+            [
+                dbc.CardHeader(html.H6("Overall Ranking", className="mb-0")),
+                dbc.CardBody(body),
+            ],
+            className="be-subtab-card",
+        )
+    summary_grid = build_assessment_overview_table(session_dir, stage)
+    return dbc.Card(
+        [
+            dbc.CardHeader(html.H6("Overall Summary", className="mb-0")),
+            dbc.CardBody(summary_grid),
+        ],
+        className="be-subtab-card",
+    )
 
 
 def build_raw_assessments_tab(session_dir: Path):
