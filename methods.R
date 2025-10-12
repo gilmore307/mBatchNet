@@ -367,86 +367,102 @@ if ("MMUPHin" %in% method_list) {
   })
 }
 
-run_method("fastRUV-III-NB", {
-  suppressPackageStartupMessages(library(ruvIIInb))
-  
-  # === Build genes x samples and sanitize ===
-  Y <- t(get_input_for("RUV", base_M, base_form))           # genes x samples
-  storage.mode(Y) <- "double"
-  Y[!is.finite(Y) | Y < 0] <- 0                              # kill NA/NaN/Inf/neg
-  
-  # Sample IDs
-  if (is.null(colnames(Y))) colnames(Y) <- rownames(metadata)
-  samp_ids <- colnames(Y)
-  
-  # === Strict metadata alignment ===
-  if (is.null(rownames(metadata)))
-    fail_step("RUV", "metadata rownames must match colnames (currently NULL).")
-  
-  in_meta <- !is.na(samp_ids) & (samp_ids %in% rownames(metadata))
-  if (!isTRUE(all(in_meta))) {
-    dropped <- samp_ids[!in_meta]
-    message("Dropping samples missing in metadata: ", paste(dropped, collapse = ", "))
-    Y <- Y[, in_meta, drop = FALSE]
-    samp_ids <- samp_ids[in_meta]
-  }
-  
-  # === Require non-missing batch and drop NA batch samples ===
-  if (!("batch_id" %in% colnames(metadata)))
-    fail_step("RUV", "metadata must contain 'batch_id' column.")
-  
-  batch_vec <- metadata[samp_ids, "batch_id"]
-  if (anyNA(batch_vec)) {
-    bad <- samp_ids[is.na(batch_vec)]
-    message("Dropping samples with NA batch_id: ", paste(bad, collapse = ", "))
-    keep <- !is.na(batch_vec)
-    Y <- Y[, keep, drop = FALSE]
-    samp_ids <- samp_ids[keep]
-    batch_vec <- batch_vec[keep]
-  }
-  
-  batch_factor <- droplevels(factor(batch_vec))
-  if (nlevels(batch_factor) < 1L)
-    fail_step("RUV", "No valid batch levels after cleaning.")
-  # Optional: insist on >=2 levels
-  # if (nlevels(batch_factor) < 2L)
-  #   fail_step("RUV", "Only one batch level present after cleaning.")
-  
-  # === Drop all-zero genes (NA-safe) ===
-  keep_rows <- rowSums(Y, na.rm = TRUE) > 0
-  if (!isTRUE(any(keep_rows)))
-    fail_step("RUV", "All genes have zero or non-finite counts after cleaning.")
-  Y <- Y[keep_rows, samp_ids, drop = FALSE]
-  
-  # Design + controls
-  M <- model.matrix(~ 0 + batch_factor); rownames(M) <- samp_ids
-  ctl_names <- rownames(Y)
-  
-  # === Force single-core to avoid detectCores() -> NA on servers ===
-  print(list(
-    ruvIIInb_version = as.character(utils::packageVersion("ruvIIInb")),
-    anyNA_Y = anyNA(Y),
-    anyNA_M = anyNA(M),
-    anyNA_ctl = anyNA(ctl_names),
-    anyNA_batch_vec = anyNA(batch_vec),
-    anyNA_batch_num = anyNA(as.numeric(batch_factor)),
-    batch_levels = levels(batch_factor),
-    n_batches = nlevels(batch_factor),
-    n_samples = length(samp_ids),
-    n_genes = nrow(Y)
-  ))
-  
-  fit <- ruvIIInb::fastruvIII.nb(
-    Y = as.matrix(Y), M = M, ctl = ctl_names,
-    batch = as.numeric(batch_factor), k = 2,
-    pCells.touse = 0.05, use.pseudosample = FALSE,
-    ncores = 1L
-  )
-  
-  out_counts <- t(SummarizedExperiment::assay(fit, "counts"))  # samples x genes
-  write_tss_clr("RUV-III-NB", out_counts, "counts", "normalized_ruv.csv")
-})
-
+# RUV (fastRUV-III-NB) — expects counts; use the *counts* assay for outputs
+if ("RUV" %in% method_list) {
+  run_method("fastRUV-III-NB", {
+    suppressPackageStartupMessages(library(ruvIIInb))
+    
+    # Safer, deterministic linear algebra on headless/cloud boxes
+    Sys.setenv(OMP_NUM_THREADS = "1", MKL_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1")
+    
+    # 1) Build genes x samples matrix and sanitize to integer counts
+    Y <- t(get_input_for("RUV", base_M, base_form))           # genes x samples
+    if (is.null(colnames(Y))) colnames(Y) <- rownames(metadata)
+    storage.mode(Y) <- "double"
+    Y[!is.finite(Y) | Y < 0] <- 0
+    Y <- round(Y)
+    storage.mode(Y) <- "integer"
+    say("RUV: Y prepared")
+    
+    samp_ids <- colnames(Y)
+    
+    # 2) Strict metadata alignment + batch checks
+    if (is.null(rownames(metadata)))
+      fail_step("RUV", "metadata rownames must match colnames (currently NULL).")
+    
+    in_meta <- !is.na(samp_ids) & (samp_ids %in% rownames(metadata))
+    if (!isTRUE(all(in_meta))) {
+      dropped <- samp_ids[!in_meta]
+      if (length(dropped)) message("Dropping samples missing in metadata: ", paste(dropped, collapse = ", "))
+      Y <- Y[, in_meta, drop = FALSE]
+      samp_ids <- samp_ids[in_meta]
+    }
+    
+    if (!("batch_id" %in% colnames(metadata)))
+      fail_step("RUV", "metadata must contain 'batch_id' column.")
+    
+    batch_vec <- metadata[samp_ids, "batch_id"]
+    if (anyNA(batch_vec)) {
+      bad <- samp_ids[is.na(batch_vec)]
+      message("Dropping samples with NA batch_id: ", paste(bad, collapse = ", "))
+      keep_s <- !is.na(batch_vec)
+      Y <- Y[, keep_s, drop = FALSE]
+      samp_ids <- samp_ids[keep_s]
+      batch_vec <- batch_vec[keep_s]
+    }
+    
+    batch_factor <- droplevels(factor(batch_vec))
+    if (nlevels(batch_factor) < 1L)
+      fail_step("RUV", "No valid batch levels after cleaning.")
+    
+    # 3) Drop all-zero genes (NA-safe) and zero-library samples
+    keep_rows <- rowSums(Y, na.rm = TRUE) > 0L
+    if (!isTRUE(any(keep_rows)))
+      fail_step("RUV", "All genes have zero or non-finite counts after cleaning.")
+    Y <- Y[keep_rows, , drop = FALSE]
+    
+    lib <- colSums(Y, na.rm = TRUE)
+    if (any(lib <= 0L | is.na(lib))) {
+      drop <- which(lib <= 0L | is.na(lib))
+      message("Dropping zero-library samples: ", paste(colnames(Y)[drop], collapse = ", "))
+      Y <- Y[, lib > 0L & !is.na(lib), drop = FALSE]
+      samp_ids <- colnames(Y)
+      batch_factor <- droplevels(factor(metadata[samp_ids, "batch_id"]))
+      if (nlevels(batch_factor) < 1L)
+        fail_step("RUV", "No valid batch levels after zero-library drop.")
+    }
+    
+    # 4) Design matrix + control set
+    M <- model.matrix(~ 0 + batch_factor); rownames(M) <- samp_ids
+    ctl_names <- rownames(Y)
+    say("RUV: design ready")
+    
+    # 5) Fit: stable fast path (single-core, pseudosample) → fallback to slow ruvIII.nb if needed
+    fit <- NULL
+    fit <- tryCatch({
+      ruvIIInb::fastruvIII.nb(
+        Y = as.matrix(Y), M = M, ctl = ctl_names,
+        batch = as.numeric(batch_factor), k = 2,
+        pCells.touse = 1,               # avoid subset corner-cases
+        use.pseudosample = TRUE,        # more numerically stable on some BLAS builds
+        ncores = 1L,                    # avoid detectCores() NA / fork quirks
+        batch.disp = FALSE
+      )
+    }, error = function(e) {
+      message("fast path failed: ", conditionMessage(e), " — trying ruvIII.nb fallback")
+      ruvIIInb::ruvIII.nb(
+        Y = as.matrix(Y), M = M, ctl = ctl_names,
+        batch = as.numeric(batch_factor), k = 2
+      )
+    })
+    
+    say("RUV: fit complete")
+    
+    # 6) Emit counts assay for downstream TSS/CLR
+    out_counts <- t(SummarizedExperiment::assay(fit, "counts"))   # samples x genes/features
+    write_tss_clr("RUV-III-NB", out_counts, "counts", "normalized_ruv.csv")
+  })
+}
 
 # MetaDICT — expects TSS
 if ("MetaDICT" %in% method_list) {
