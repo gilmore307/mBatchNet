@@ -33,6 +33,7 @@ opt_fig_width_px  <- NA_real_
 opt_fig_height_px <- NA_real_
 opt_fig_dpi       <- NA_real_
 opt_fig_ncol      <- NA_integer_
+opt_fig_per_panel <- FALSE
 
 for (a in args[-1]) {
   if (grepl("^--fig-width-px=", a)) {
@@ -51,17 +52,34 @@ for (a in args[-1]) {
     opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
     if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
   }
+  if (grepl("^--fig-per-panel=", a)) {
+    val <- tolower(sub("^--fig-per-panel=", "", a))
+    opt_fig_per_panel <- val %in% c("1", "true", "yes", "y")
+  }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
+                               panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
+  panel_cols <- max(1, as.integer(panel_cols))
+  panel_rows <- max(1, as.integer(panel_rows))
   if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
+    per_panel <- opt_fig_width_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      w <- per_panel * panel_cols
+    } else {
+      w <- per_panel
+    }
   }
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
+    per_panel <- opt_fig_height_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      h <- per_panel * panel_rows
+    } else {
+      h <- per_panel
+    }
   }
   list(width = w, height = h, dpi = dpi)
 }
@@ -320,18 +338,22 @@ for (nm in names(mat_list_ait)) {
 
 # ---- Combine & save (Aitchison) ----
 n_panels_ait <- length(plots_ait)
+panel_cols_ait <- 1L
+panel_rows_ait <- 1L
 if (n_panels_ait == 1L) {
   combined_ait <- plots_ait[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
   w_ait <- 8.5; h_ait <- 6
 } else {
+  panel_cols_ait <- min(ncol_grid, n_panels_ait)
+  panel_rows_ait <- ceiling(n_panels_ait / ncol_grid)
   combined_ait <- wrap_plots(plots_ait, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_ait <- 8.5 * min(ncol_grid, n_panels_ait)
-  h_ait <- 6   * ceiling(n_panels_ait / ncol_grid)
+  w_ait <- 8.5 * panel_cols_ait
+  h_ait <- 6   * panel_rows_ait
 }
-fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300)
+fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
@@ -367,18 +389,22 @@ for (nm in names(mat_list_bc)) {
 
 # ---- Combine & save (Bray-Curtis) ----
 n_panels_bc <- length(plots_bc)
+panel_cols_bc <- 1L
+panel_rows_bc <- 1L
 if (n_panels_bc == 1L) {
   combined_bc <- plots_bc[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
   w_bc <- 8.5; h_bc <- 6
 } else {
+  panel_cols_bc <- min(ncol_grid, n_panels_bc)
+  panel_rows_bc <- ceiling(n_panels_bc / ncol_grid)
   combined_bc <- wrap_plots(plots_bc, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_bc <- 8.5 * min(ncol_grid, n_panels_bc)
-  h_bc <- 6   * ceiling(n_panels_bc / ncol_grid)
+  w_bc <- 8.5 * panel_cols_bc
+  h_bc <- 6   * panel_rows_bc
 }
-fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300)
+fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),

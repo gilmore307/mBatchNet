@@ -88,6 +88,7 @@ opt_fig_width_px  <- NA_real_
 opt_fig_height_px <- NA_real_
 opt_fig_dpi       <- NA_real_
 opt_fig_ncol      <- NA_integer_
+opt_fig_per_panel <- FALSE
 
 for (a in args[-1]) {
   if (grepl("^--fig-width-px=", a)) {
@@ -106,17 +107,34 @@ for (a in args[-1]) {
     opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
     if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
   }
+  if (grepl("^--fig-per-panel=", a)) {
+    val <- tolower(sub("^--fig-per-panel=", "", a))
+    opt_fig_per_panel <- val %in% c("1", "true", "yes", "y")
+  }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
+                               panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
+  panel_cols <- max(1, as.integer(panel_cols))
+  panel_rows <- max(1, as.integer(panel_rows))
   if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
+    per_panel <- opt_fig_width_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      w <- per_panel * panel_cols
+    } else {
+      w <- per_panel
+    }
   }
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
+    per_panel <- opt_fig_height_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      h <- per_panel * panel_rows
+    } else {
+      h <- per_panel
+    }
   }
   list(width = w, height = h, dpi = dpi)
 }
@@ -326,21 +344,25 @@ names(plots_clr) <- names(file_list_clr)
 
 # ---- Combine & save (CLR) ----
 n_panels_clr <- length(plots_clr)
+panel_cols_clr <- 1L
+panel_rows_clr <- 1L
 if (n_panels_clr == 1L) {
   combined_clr <- plots_clr[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
   w_clr <- 9.5; h_clr <- 6
 } else {
+  panel_cols_clr <- min(ncol_grid, n_panels_clr)
+  panel_rows_clr <- ceiling(n_panels_clr / ncol_grid)
   combined_clr <- wrap_plots(plots_clr, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_clr <- 9.5 * min(ncol_grid, n_panels_clr)
-  h_clr <- 6   * ceiling(n_panels_clr / ncol_grid)
+  w_clr <- 9.5 * panel_cols_clr
+  h_clr <- 6   * panel_rows_clr
 }
 
-fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300)
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
 ggsave(file.path(output_folder, "nmds_aitchison.png"),
        plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "nmds_aitchison.tif"),
@@ -383,21 +405,25 @@ names(plots_tss) <- names(file_list_tss)
 
 # ---- Combine & save (TSS) ----
 n_panels_tss <- length(plots_tss)
+panel_cols_tss <- 1L
+panel_rows_tss <- 1L
 if (n_panels_tss == 1L) {
   combined_tss <- plots_tss[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
   w_tss <- 9.5; h_tss <- 6
 } else {
+  panel_cols_tss <- min(ncol_grid, n_panels_tss)
+  panel_rows_tss <- ceiling(n_panels_tss / ncol_grid)
   combined_tss <- wrap_plots(plots_tss, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_tss <- 9.5 * min(ncol_grid, n_panels_tss)
-  h_tss <- 6   * ceiling(n_panels_tss / ncol_grid)
+  w_tss <- 9.5 * panel_cols_tss
+  h_tss <- 6   * panel_rows_tss
 }
 
-fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300)
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
 ggsave(file.path(output_folder, "nmds_braycurtis.png"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "nmds_braycurtis.tif"),
@@ -433,10 +459,22 @@ compute_within_dispersion_nmds <- function(scores, batch_var = "batch_id") {
 }
 
 # then combine via geometric mean (higher = better).
-nmds_metric_score <- function(batch_distance, stress, stress_cap = 0.30) {
+nmds_metric_score <- function(batch_distance, stress, within_dispersion = NA_real_, stress_cap = 0.30) {
   if (is.na(batch_distance) || is.na(stress)) return(NA_real_)
-  S_batch  <- 1 / (1 + batch_distance)                           
-  S_stress <- pmax(0, 1 - pmin(stress, stress_cap) / stress_cap) 
+  S_batch <- NA_real_
+  if (!is.na(within_dispersion) && within_dispersion >= 0) {
+    if (batch_distance == 0 && within_dispersion == 0) {
+      S_batch <- 1
+    } else if (!is.finite(batch_distance)) {
+      S_batch <- NA_real_
+    } else {
+      S_batch <- within_dispersion / (within_dispersion + batch_distance)
+    }
+  } else if (!is.na(batch_distance)) {
+    S_batch <- 1 / (1 + batch_distance)
+  }
+  if (is.na(S_batch)) return(NA_real_)
+  S_stress <- pmax(0, 1 - pmin(stress, stress_cap) / stress_cap)
   sqrt(S_batch * S_stress)
 }
 
@@ -460,7 +498,7 @@ if (only_baseline) {
     D_between <- compute_centroid_distances(cents)
     W_within  <- compute_within_dispersion_nmds(scores, "batch_id")
     stress    <- fr$stress
-    score     <- nmds_metric_score(D_between, stress)
+    score     <- nmds_metric_score(D_between, stress, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["CLR"]] <- tibble::tibble(
@@ -484,7 +522,7 @@ if (only_baseline) {
     D_between <- compute_centroid_distances(cents)
     W_within  <- compute_within_dispersion_nmds(scores, "batch_id")
     stress    <- fr$stress
-    score     <- nmds_metric_score(D_between, stress)
+    score     <- nmds_metric_score(D_between, stress, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["TSS"]] <- tibble::tibble(
@@ -530,7 +568,9 @@ if (only_baseline) {
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance_CLR = numeric(),
+    Within_Dispersion_CLR = numeric(),
     Batch_Distance_TSS = numeric(),
+    Within_Dispersion_TSS = numeric(),
     NMDS_Stress_CLR    = numeric(),
     NMDS_Stress_TSS    = numeric(),
     Score_CLR          = numeric(),
@@ -540,7 +580,7 @@ if (only_baseline) {
   
   for (m in all_methods) {
     # CLR NMDS
-    D_a <- NA_real_; S_a <- NA_real_; stress_a <- NA_real_
+    D_a <- NA_real_; W_a <- NA_real_; S_a <- NA_real_; stress_a <- NA_real_
     if (m %in% methods_clr) {
       fr_a <- frames_cache_clr[[m]]
       md_a <- metadata[match(fr_a$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -549,12 +589,13 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_a$batch_id))
       cents_a <- compute_centroids_nmds(scores_a, "batch_id")
       D_a <- compute_centroid_distances(cents_a)
+      W_a <- compute_within_dispersion_nmds(scores_a, "batch_id")
       stress_a <- fr_a$stress
-      S_a <- nmds_metric_score(D_a, stress_a)
+      S_a <- nmds_metric_score(D_a, stress_a, W_a)
     }
-    
+
     # TSS NMDS
-    D_b <- NA_real_; S_b <- NA_real_; stress_b <- NA_real_
+    D_b <- NA_real_; W_b <- NA_real_; S_b <- NA_real_; stress_b <- NA_real_
     if (m %in% methods_tss) {
       fr_b <- frames_cache_tss[[m]]
       md_b <- metadata[match(fr_b$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -563,8 +604,9 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_b$batch_id))
       cents_b <- compute_centroids_nmds(scores_b, "batch_id")
       D_b <- compute_centroid_distances(cents_b)
+      W_b <- compute_within_dispersion_nmds(scores_b, "batch_id")
       stress_b <- fr_b$stress
-      S_b <- nmds_metric_score(D_b, stress_b)
+      S_b <- nmds_metric_score(D_b, stress_b, W_b)
     }
     
     # Combine available NMDS metric scores (geometric mean; higher = better)
@@ -578,7 +620,9 @@ if (only_baseline) {
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
       Batch_Distance_CLR = D_a,
+      Within_Dispersion_CLR = W_a,
       Batch_Distance_TSS = D_b,
+      Within_Dispersion_TSS = W_b,
       NMDS_Stress_CLR    = stress_a,
       NMDS_Stress_TSS    = stress_b,
       Score_CLR          = S_a,

@@ -106,6 +106,7 @@ opt_fig_width_px  <- NA_real_
 opt_fig_height_px <- NA_real_
 opt_fig_dpi       <- NA_real_
 opt_fig_ncol      <- NA_integer_
+opt_fig_per_panel <- FALSE
 
 for (a in args[-1]) {
   if (grepl("^--fig-width-px=", a)) {
@@ -124,17 +125,34 @@ for (a in args[-1]) {
     opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
     if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
   }
+  if (grepl("^--fig-per-panel=", a)) {
+    val <- tolower(sub("^--fig-per-panel=", "", a))
+    opt_fig_per_panel <- val %in% c("1", "true", "yes", "y")
+  }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
+                               panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
+  panel_cols <- max(1, as.integer(panel_cols))
+  panel_rows <- max(1, as.integer(panel_rows))
   if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
+    per_panel <- opt_fig_width_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      w <- per_panel * panel_cols
+    } else {
+      w <- per_panel
+    }
   }
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
+    per_panel <- opt_fig_height_px / dpi
+    if (isTRUE(opt_fig_per_panel)) {
+      h <- per_panel * panel_rows
+    } else {
+      h <- per_panel
+    }
   }
   list(width = w, height = h, dpi = dpi)
 }
@@ -467,6 +485,8 @@ names(plots_clr) <- names(file_list_clr)
 
 # ---- Combine & save (CLR) ----
 n_panels_clr <- length(plots_clr)
+panel_cols_clr <- 1L
+panel_rows_clr <- 1L
 if (n_panels_clr == 1L) {
   combined_clr <- plots_clr[[1]] +
     theme(
@@ -477,6 +497,8 @@ if (n_panels_clr == 1L) {
     )
   w_clr <- 9.5; h_clr <- 6
 } else {
+  panel_cols_clr <- min(ncol_grid, n_panels_clr)
+  panel_rows_clr <- ceiling(n_panels_clr / ncol_grid)
   combined_clr <- wrap_plots(plots_clr, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(
@@ -485,10 +507,10 @@ if (n_panels_clr == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_clr <- 9.5 * min(ncol_grid, n_panels_clr)
-  h_clr <- 6   * ceiling(n_panels_clr / ncol_grid)
+  w_clr <- 9.5 * panel_cols_clr
+  h_clr <- 6   * panel_rows_clr
 }
-fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300)
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
        plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
@@ -543,6 +565,8 @@ names(plots_tss) <- names(file_list_tss)
 
 # ---- Combine & save (TSS) ----
 n_panels_tss <- length(plots_tss)
+panel_cols_tss <- 1L
+panel_rows_tss <- 1L
 if (n_panels_tss == 1L) {
   combined_tss <- plots_tss[[1]] +
     theme(
@@ -553,6 +577,8 @@ if (n_panels_tss == 1L) {
     )
   w_tss <- 9.5; h_tss <- 6
 } else {
+  panel_cols_tss <- min(ncol_grid, n_panels_tss)
+  panel_rows_tss <- ceiling(n_panels_tss / ncol_grid)
   combined_tss <- wrap_plots(plots_tss, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(
@@ -561,10 +587,10 @@ if (n_panels_tss == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_tss <- 9.5 * min(ncol_grid, n_panels_tss)
-  h_tss <- 6   * ceiling(n_panels_tss / ncol_grid)
+  w_tss <- 9.5 * panel_cols_tss
+  h_tss <- 6   * panel_rows_tss
 }
-fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300)
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
@@ -600,10 +626,23 @@ compute_within_dispersion_pcoa <- function(scores, batch_var = "batch_id") {
   if (!length(ws)) return(NA_real_)
   stats::weighted.mean(ws, w = ns)
 }
-pcoa_metric_score <- function(batch_distance, coverage) {
+pcoa_metric_score <- function(batch_distance, coverage, within_dispersion = NA_real_) {
   if (is.na(batch_distance) || is.na(coverage)) return(NA_real_)
   coverage <- max(0, min(1, coverage))  # clamp [0,1]
-  (1 / (1 + batch_distance)) * coverage  # higher = better
+  mix_term <- NA_real_
+  if (!is.na(within_dispersion) && within_dispersion >= 0) {
+    if (batch_distance == 0 && within_dispersion == 0) {
+      mix_term <- 1
+    } else if (!is.finite(batch_distance)) {
+      mix_term <- NA_real_
+    } else {
+      mix_term <- within_dispersion / (within_dispersion + batch_distance)
+    }
+  } else if (!is.na(batch_distance)) {
+    mix_term <- 1 / (1 + batch_distance)
+  }
+  if (is.na(mix_term)) return(NA_real_)
+  coverage * mix_term  # higher = better
 }
 
 methods_clr <- names(frames_cache_clr)
@@ -627,7 +666,7 @@ if (only_baseline) {
     W_within  <- compute_within_dispersion_pcoa(scores, "batch_id")
     ve <- fr$metric.df$var.explained
     coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-    score <- pcoa_metric_score(D_between, coverage2)
+    score <- pcoa_metric_score(D_between, coverage2, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["CLR"]] <- tibble::tibble(
@@ -652,7 +691,7 @@ if (only_baseline) {
     W_within  <- compute_within_dispersion_pcoa(scores, "batch_id")
     ve <- fr$metric.df$var.explained
     coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-    score <- pcoa_metric_score(D_between, coverage2)
+    score <- pcoa_metric_score(D_between, coverage2, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["TSS"]] <- tibble::tibble(
@@ -698,9 +737,11 @@ if (only_baseline) {
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance_CLR = numeric(),
+    Within_Dispersion_CLR = numeric(),
     Coverage_CLR       = numeric(),
     Score_CLR          = numeric(),
     Batch_Distance_TSS = numeric(),
+    Within_Dispersion_TSS = numeric(),
     Coverage_TSS       = numeric(),
     Score_TSS          = numeric(),
     `Absolute score`   = numeric()
@@ -708,7 +749,7 @@ if (only_baseline) {
   
   for (m in union(names(frames_cache_clr), names(frames_cache_tss))) {
     # ----- CLR -----
-    D_a <- NA_real_; Cov_a <- NA_real_; S_a <- NA_real_
+    D_a <- NA_real_; W_a <- NA_real_; Cov_a <- NA_real_; S_a <- NA_real_
     if (m %in% names(frames_cache_clr)) {
       fr_a <- frames_cache_clr[[m]]
       md_a <- metadata[match(fr_a$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -717,13 +758,14 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_a$batch_id))
       cents_a <- compute_centroids_pcoa(scores_a, "batch_id")
       D_a <- compute_centroid_distances(cents_a)
+      W_a <- compute_within_dispersion_pcoa(scores_a, "batch_id")
       ve_a <- fr_a$metric.df$var.explained
       Cov_a <- sum(ve_a[1:min(2, length(ve_a))], na.rm = TRUE) / 100
-      S_a <- pcoa_metric_score(D_a, Cov_a)
+      S_a <- pcoa_metric_score(D_a, Cov_a, W_a)
     }
-    
+
     # ----- TSS -----
-    D_b <- NA_real_; Cov_b <- NA_real_; S_b <- NA_real_
+    D_b <- NA_real_; W_b <- NA_real_; Cov_b <- NA_real_; S_b <- NA_real_
     if (m %in% names(frames_cache_tss)) {
       fr_b <- frames_cache_tss[[m]]
       md_b <- metadata[match(fr_b$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -732,9 +774,10 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_b$batch_id))
       cents_b <- compute_centroids_pcoa(scores_b, "batch_id")
       D_b <- compute_centroid_distances(cents_b)
+      W_b <- compute_within_dispersion_pcoa(scores_b, "batch_id")
       ve_b <- fr_b$metric.df$var.explained
       Cov_b <- sum(ve_b[1:min(2, length(ve_b))], na.rm = TRUE) / 100
-      S_b <- pcoa_metric_score(D_b, Cov_b)
+      S_b <- pcoa_metric_score(D_b, Cov_b, W_b)
     }
     
     Combined <- dplyr::case_when(
@@ -747,9 +790,11 @@ if (only_baseline) {
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
       Batch_Distance_CLR = D_a,
+      Within_Dispersion_CLR = W_a,
       Coverage_CLR       = Cov_a,
       Score_CLR          = S_a,
       Batch_Distance_TSS = D_b,
+      Within_Dispersion_TSS = W_b,
       Coverage_TSS       = Cov_b,
       Score_TSS          = S_b,
       `Absolute score`   = Combined
