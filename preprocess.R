@@ -17,7 +17,7 @@ if (exists("PREPROC_MATRIX_PATH", inherits = TRUE)) {
   matrix_path <- if (length(args) >= 2) args[2] else file.path(output_folder, "raw.csv")
 }
 if (!file.exists(matrix_path)) {
-  alt <- file.path("assets", "example", "raw_1.csv")
+  alt <- file.path("assets", "raw.csv")
   if (file.exists(alt)) {
     message("No uploaded file found at ", matrix_path, "; using ", alt)
     matrix_path <- alt

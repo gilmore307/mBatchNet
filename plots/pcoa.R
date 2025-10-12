@@ -102,27 +102,6 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
-PLOT_DPI <- 300
-IMG_WIDTH_PX <- NA_real_
-IMG_HEIGHT_PX <- NA_real_
-SUBPLOTS_PER_ROW <- NA_integer_
-if (length(args) > 1) {
-  for (a in args[grepl("^--", args)]) {
-    if (grepl("^--width_px=", a)) {
-      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
-      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
-    }
-    if (grepl("^--height_px=", a)) {
-      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
-      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
-    }
-    if (grepl("^--subplots_per_row=", a)) {
-      v <- suppressWarnings(as.integer(sub("^--subplots_per_row=", "", a)))
-      if (is.finite(v) && v >= 1) SUBPLOTS_PER_ROW <- v
-    }
-  }
-}
-
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -397,9 +376,6 @@ shape_var  <- "phenotype"
 model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 2
-if (!is.na(SUBPLOTS_PER_ROW)) {
-  ncol_grid <- max(1L, as.integer(SUBPLOTS_PER_ROW))
-}
 SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 
 # =========================
@@ -472,17 +448,10 @@ if (n_panels_clr == 1L) {
   w_clr <- 9.5 * min(ncol_grid, n_panels_clr)
   h_clr <- 6   * ceiling(n_panels_clr / ncol_grid)
 }
-if (!is.na(IMG_WIDTH_PX)) {
-  w_clr <- IMG_WIDTH_PX / PLOT_DPI
-}
-if (!is.na(IMG_HEIGHT_PX)) {
-  h_clr <- IMG_HEIGHT_PX / PLOT_DPI
-}
-
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = PLOT_DPI)
+       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300)
 ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = PLOT_DPI, compression = "lzw")
+       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300, compression = "lzw")
 
 # =========================
 # Set 2: Bray–Curtis (TSS)
@@ -554,17 +523,10 @@ if (n_panels_tss == 1L) {
   w_tss <- 9.5 * min(ncol_grid, n_panels_tss)
   h_tss <- 6   * ceiling(n_panels_tss / ncol_grid)
 }
-if (!is.na(IMG_WIDTH_PX)) {
-  w_tss <- IMG_WIDTH_PX / PLOT_DPI
-}
-if (!is.na(IMG_HEIGHT_PX)) {
-  h_tss <- IMG_HEIGHT_PX / PLOT_DPI
-}
-
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = PLOT_DPI)
+       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300)
 ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = PLOT_DPI, compression = "lzw")
+       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300, compression = "lzw")
 
 # =========================
 # Unified PCoA ranking (Aitchison + Bray combined)
