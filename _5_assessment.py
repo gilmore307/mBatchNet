@@ -133,7 +133,8 @@ def _param_controls(stage: str, key: str):
                      tooltip="UMAP distance metric (CLR uses Euclidean)."),
         ]
     figure_controls: list = []
-    if stage == "post":
+    include_fig_controls = stage in {"pre", "post"}
+    if include_fig_controls:
         fig_tooltip_base = (
             "Override exported figure dimensions (pixels converted using DPI). "
             "Leave blank to keep script defaults."
@@ -164,7 +165,7 @@ def _param_controls(stage: str, key: str):
                 tooltip="Dots per inch used when saving figures.",
             ),
         ])
-        if key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
             figure_controls.append(
                 num_input(
                     f"{sid}-param-fig-ncol",
@@ -360,6 +361,7 @@ def register_pre_post_callbacks(app):
     ]
 
     def _register_group(stage: str, key: str, script_name: str):
+        sid = f"{stage}-{key}"
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
 
@@ -381,7 +383,6 @@ def register_pre_post_callbacks(app):
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
 
         # Parameter States by group
-        sid = f"{stage}-{key}"
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
         if key == "auc":
@@ -445,7 +446,7 @@ def register_pre_post_callbacks(app):
             ]
 
         has_ncol_param = False
-        if stage == "post":
+        if stage in {"pre", "post"}:
             param_state_ids.extend([
                 f"{sid}-param-fig-width",
                 f"{sid}-param-fig-height",
@@ -456,7 +457,7 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-fig-height", "value"),
                 State(f"{sid}-param-fig-dpi", "value"),
             ]
-            if key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+            if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
                 param_state_ids.append(f"{sid}-param-fig-ncol")
                 states.append(State(f"{sid}-param-fig-ncol", "value"))
                 has_ncol_param = True
@@ -590,7 +591,7 @@ def register_pre_post_callbacks(app):
                 _add("umap_metric", pv[idx], str)
                 idx += 1
 
-            if _stage == "post":
+            if _stage in {"pre", "post"}:
                 fig_width = pv[idx] if idx < len(pv) else None
                 idx += 1
                 fig_height = pv[idx] if idx < len(pv) else None
@@ -603,7 +604,7 @@ def register_pre_post_callbacks(app):
                 _add("fig-width-px", fig_width, int)
                 _add("fig-height-px", fig_height, int)
                 _add("fig-dpi", fig_dpi, int)
-                if fig_ncol is not None:
+                if _has_ncol and fig_ncol is not None:
                     _add("fig-ncol", fig_ncol, int)
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
