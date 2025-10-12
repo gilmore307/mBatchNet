@@ -161,8 +161,8 @@ get_input_for <- function(method, base_M, base_form) {
 # ---------------------------
 custom_matrix_path    <- file.path(output_folder, "raw.csv")
 custom_metadata_path  <- file.path(output_folder, "metadata.csv")
-default_matrix_path   <- file.path("assets", "raw.csv")
-default_metadata_path <- file.path("assets", "metadata.csv")
+default_matrix_path   <- file.path("assets/example", "raw_1.csv")
+default_metadata_path <- file.path("assets/example", "metadata_1.csv")
 
 if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   say("✅ Using uploaded user files")

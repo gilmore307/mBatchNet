@@ -61,6 +61,8 @@ def serve_layout() -> html.Div:
             dcc.Store(id="upload-last-session", storage_type="session", data=""),
             dcc.Store(id="help-shown", storage_type="session", data=False),
             dcc.Store(id="runlog-path", storage_type="session", data=""),
+            dcc.Store(id="runlog-file-meta", storage_type="memory", data=None),
+            dcc.Store(id="runlog-scroll-trigger", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
             # User consent for optional data collection
@@ -480,6 +482,7 @@ def highlight_next(pathname, upload_done, pre_started, pre_done, correction_done
 @app.callback(
     Output("runlog-modal", "is_open", allow_duplicate=True),
     Output("runlog-interval", "disabled", allow_duplicate=True),
+    Output("runlog-file-meta", "data", allow_duplicate=True),
     Input("log-open", "n_clicks"),
     Input("runlog-close", "n_clicks"),
     State("runlog-modal", "is_open"),
@@ -492,33 +495,89 @@ def toggle_runlog_modal(open_clicks, close_clicks, is_open):
         raise dash.exceptions.PreventUpdate
     trig = ctx.triggered[0]["prop_id"].split(".")[0]
     if trig == "log-open" and open_clicks:
-        return True, False
+        return True, False, None
     if trig == "runlog-close" and close_clicks:
-        return False, True
-    return is_open, dash.no_update
+        return False, True, dash.no_update
+    return is_open, dash.no_update, dash.no_update
 
 
 @app.callback(
     Output("runlog-content", "children"),
+    Output("runlog-file-meta", "data"),
     Input("runlog-interval", "n_intervals"),
     State("runlog-path", "data"),
+    State("runlog-file-meta", "data"),
+    State("runlog-content", "children"),
 )
-def update_runlog_content(n, log_path):
+def update_runlog_content(n, log_path, file_meta, previous_content):
     if not log_path:
         raise dash.exceptions.PreventUpdate
     try:
         p = Path(log_path)
         if not p.exists():
-            return "Waiting for log file..."
+            return "Waiting for log file...", file_meta
+        stat = p.stat()
+        current_meta = {
+            "path": str(p.resolve()),
+            "mtime": stat.st_mtime,
+            "size": stat.st_size,
+        }
+        if isinstance(file_meta, dict) and file_meta == current_meta and n:
+            raise dash.exceptions.PreventUpdate
         text = p.read_text(encoding="utf-8", errors="replace")
-        # limit to last 10000 chars to avoid huge payloads
-        return text[-10000:]
+        return text, current_meta
     except Exception:
-        return "(Failed to read log)"
+        if previous_content is not None:
+            return previous_content, file_meta
+        return dash.no_update, file_meta
 
 
 # (Removed init_runlog_on_actions to avoid referencing page-specific IDs
 #  that are not present in the current layout.)
+
+
+app.clientside_callback(
+    """
+    function(content, isOpen) {
+        var ctx = window.dash_clientside.callback_context;
+        var el = document.getElementById('runlog-content');
+        if (!el) {
+            return window.dash_clientside.no_update;
+        }
+        var TOLERANCE = 40;
+        if (!el.dataset.listenerAttached) {
+            el.addEventListener('scroll', function() {
+                var atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) <= TOLERANCE;
+                el.dataset.autoScroll = atBottom ? "1" : "0";
+            });
+            el.dataset.listenerAttached = "1";
+        }
+        if (typeof el.dataset.autoScroll === "undefined") {
+            el.dataset.autoScroll = "1";
+        }
+        if (!isOpen) {
+            return null;
+        }
+        var triggered = (ctx.triggered && ctx.triggered[0]) ? ctx.triggered[0].prop_id : "";
+        if (triggered === "runlog-modal.is_open") {
+            el.dataset.autoScroll = "1";
+            window.requestAnimationFrame(function() {
+                el.scrollTop = el.scrollHeight;
+            });
+            return null;
+        }
+        if (el.dataset.autoScroll !== "0") {
+            window.requestAnimationFrame(function() {
+                el.scrollTop = el.scrollHeight;
+            });
+        }
+        return null;
+    }
+    """,
+    Output("runlog-scroll-trigger", "data"),
+    Input("runlog-content", "children"),
+    Input("runlog-modal", "is_open"),
+)
 
 
 @app.callback(

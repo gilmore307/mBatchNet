@@ -202,6 +202,7 @@ def register_correction_callbacks(app):
         Output("correction-status", "children"),
         Output("correction-complete", "data"),
         Output("runlog-path", "data", allow_duplicate=True),
+        Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
         Input("run-correction", "n_clicks"),
@@ -213,17 +214,17 @@ def register_correction_callbacks(app):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update
+            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update
+            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         methods = methods or []
         if not methods:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update
+            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         # Append all correction logs to a single session-wide log file
         log_path = session_dir / "run.log"
         success, log = run_methods(session_dir, methods, log_path=log_path)
         # Do not auto-open logs modal; user can open manually
         status_msg = "Correction complete." if success else "Correction failed. Check Logs."
-        return status_msg, bool(success), str(log_path), dash.no_update, dash.no_update
+        return status_msg, bool(success), str(log_path), None, dash.no_update, dash.no_update

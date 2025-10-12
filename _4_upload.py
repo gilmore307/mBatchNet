@@ -672,6 +672,7 @@ def register_upload_callbacks(app):
     @app.callback(
         Output("preprocess-complete", "data", allow_duplicate=True),
         Output("runlog-path", "data", allow_duplicate=True),
+        Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
         Input("apply-mapping", "n_clicks"),
@@ -688,14 +689,14 @@ def register_upload_callbacks(app):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         if not batch_col or not pheno_col:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
         meta_path = session_dir / "metadata.csv"
         if not meta_path.exists():
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         # Rename columns by rewriting CSV
         try:
@@ -723,19 +724,20 @@ def register_upload_callbacks(app):
                         out_row[new] = row.get(old)
                     writer.writerow(out_row)
         except Exception:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         # Run preprocess.R in the session directory
         # Use a single session-wide log file and append to it
         log_path = session_dir / "run.log"
         ok, log = run_preprocess(session_dir, log_path=log_path)
         # Do not auto-open logs modal; user can open manually
-        return bool(ok), str(log_path), dash.no_update, dash.no_update
+        return bool(ok), str(log_path), None, dash.no_update, dash.no_update
 
     # Auto-preprocess when example data is loaded (no button press needed)
     @app.callback(
         Output("preprocess-complete", "data", allow_duplicate=True),
         Output("runlog-path", "data", allow_duplicate=True),
+        Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
         Output("mosaic-preview", "children", allow_duplicate=True),
@@ -751,11 +753,11 @@ def register_upload_callbacks(app):
         if not example_loaded:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
         meta_path = session_dir / "metadata.csv"
         if not meta_path.exists():
-            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         # Ensure standard header names if needed (batch_id, phenotype)
         try:
@@ -812,7 +814,7 @@ def register_upload_callbacks(app):
                 mosaic_ok, _ = _generate_mosaic(session_dir)
                 if mosaic_ok:
                     mosaic_children = _render_mosaic_card(session_dir)
-        return bool(ok), str(log_path), dash.no_update, dash.no_update, mosaic_children
+        return bool(ok), str(log_path), None, dash.no_update, dash.no_update, mosaic_children
 
     # Hide the manual Process button when example data is used
     @app.callback(

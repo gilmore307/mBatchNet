@@ -303,6 +303,7 @@ def register_pre_post_callbacks(app):
         # Common runlog outputs
         outputs.extend([
             Output("runlog-path", "data", allow_duplicate=True),
+            Output("runlog-file-meta", "data", allow_duplicate=True),
             Output("runlog-modal", "is_open", allow_duplicate=True),
             Output("runlog-interval", "disabled", allow_duplicate=True),
         ])
@@ -359,13 +360,13 @@ def register_pre_post_callbacks(app):
                 if _stage == "pre":
                     return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 else:
-                    return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 if _stage == "pre":
                     return html.Div("Upload both raw.csv and metadata.csv first."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 else:
-                    return html.Div("Upload both raw.csv and metadata.csv first."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return html.Div("Upload both raw.csv and metadata.csv first."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
             # Append all analysis logs into a single session-wide log file
             log_path = session_dir / "run.log"
@@ -409,11 +410,11 @@ def register_pre_post_callbacks(app):
             content = render_group_tabset(session_dir, _stage, _key)
             if _stage == "pre":
                 # pre: no Overall tab to update
-                return content, True, str(log_path), dash.no_update, dash.no_update
+                return content, True, str(log_path), None, dash.no_update, dash.no_update
             else:
                 # post: update Overall
                 overall = build_overall_div(session_dir, _stage)
-                return content, True, str(log_path), dash.no_update, dash.no_update, overall
+                return content, True, str(log_path), None, dash.no_update, dash.no_update, overall
 
         # Update subtab content when user clicks a subtab (after results are rendered)
         @app.callback(
