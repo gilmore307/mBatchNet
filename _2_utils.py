@@ -1003,9 +1003,9 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
             ),
         ],
         style={
-            "width": "85vw",
-            "minWidth": "85vw",
-            "maxWidth": "85vw",
+            "width": "83vw",
+            "minWidth": "83vw",
+            "maxWidth": "83vw",
             "marginTop": "8px",
             "marginLeft": "0",
         },

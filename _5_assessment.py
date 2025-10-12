@@ -406,9 +406,9 @@ def assessment_layout(active_path: str, stage: str):
                                 id=content_id,
                                 children=placeholder,
                                 style={
-                                    "width": "85vw",
-                                    "minWidth": "85vw",
-                                    "maxWidth": "85vw",
+                                    "width": "83vw",
+                                    "minWidth": "83vw",
+                                    "maxWidth": "83vw",
                                     "marginLeft": "0",
                                 },
                             ),
@@ -417,9 +417,9 @@ def assessment_layout(active_path: str, stage: str):
                     # Ensure the tab pane provides full width so Bootstrap grid works
                     className="w-100",
                     style={
-                        "width": "85vw",
-                        "minWidth": "85vw",
-                        "maxWidth": "85vw",
+                        "width": "83vw",
+                        "minWidth": "83vw",
+                        "maxWidth": "83vw",
                         "display": "block",
                         "marginLeft": "0",
                     },

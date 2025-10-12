@@ -87,9 +87,9 @@ body {
 
 /* Subtab card styling to keep tabs and visuals together */
 .be-subtab-card {
-  width: 85vw;
-  min-width: 85vw;
-  max-width: 85vw;
+  width: 83vw;
+  min-width: 83vw;
+  max-width: 83vw;
   margin-top: 8px;
   margin-left: 0;
   border-radius: 8px;
@@ -160,8 +160,8 @@ body {
 }
 
 .be-stage-tabs .tab-content {
-  width: 85vw;
-  max-width: 85vw;
+  width: 83vw;
+  max-width: 83vw;
 }
 
 .be-stage-tabs > div:first-child {
@@ -173,9 +173,9 @@ body {
 }
 
 .be-stage-tabs > div:last-child {
-  flex: 0 0 85vw;
-  width: 85vw;
-  max-width: 85vw;
+  flex: 0 0 83vw;
+  width: 83vw;
+  max-width: 83vw;
 } 
 
 /* AG Grid defaults for table replacements */
