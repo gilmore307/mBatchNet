@@ -102,6 +102,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -376,6 +413,9 @@ shape_var  <- "phenotype"
 model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 2
+if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+  ncol_grid <- max(1, opt_fig_ncol)
+}
 SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 
 # =========================
@@ -448,10 +488,11 @@ if (n_panels_clr == 1L) {
   w_clr <- 9.5 * min(ncol_grid, n_panels_clr)
   h_clr <- 6   * ceiling(n_panels_clr / ncol_grid)
 }
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300)
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300)
+       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300, compression = "lzw")
+       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
 
 # =========================
 # Set 2: Bray–Curtis (TSS)
@@ -523,10 +564,11 @@ if (n_panels_tss == 1L) {
   w_tss <- 9.5 * min(ncol_grid, n_panels_tss)
   h_tss <- 6   * ceiling(n_panels_tss / ncol_grid)
 }
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300)
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300)
+       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300, compression = "lzw")
+       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 
 # =========================
 # Unified PCoA ranking (Aitchison + Bray combined)

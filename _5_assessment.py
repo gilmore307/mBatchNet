@@ -27,10 +27,29 @@ def _param_controls(stage: str, key: str):
     """Return a list of parameter input components (with tooltips) for a group.
     IDs follow pattern: f"{stage}-{key}-param-<name>".
     """
-    def num_input(pid, label, value, step=None, min_=None, max_=None, tooltip=""):
+    def num_input(
+        pid,
+        label,
+        value,
+        step=None,
+        min_=None,
+        max_=None,
+        tooltip="",
+        placeholder=None,
+    ):
         comp = dbc.Col([
             dbc.Label(label, html_for=pid, className="mb-1 d-block"),
-            dbc.Input(id=pid, type="number", value=value, step=step, min=min_, max=max_, size="sm", className="w-100 be-param-input"),
+            dbc.Input(
+                id=pid,
+                type="number",
+                value=value,
+                step=step,
+                min=min_,
+                max=max_,
+                size="sm",
+                className="w-100 be-param-input",
+                placeholder=placeholder,
+            ),
             dbc.Tooltip(tooltip, target=pid, placement="right")
         ], xs=12, sm=6, md=3, lg=2, className="mb-2 be-param-col")
         return comp
@@ -115,9 +134,53 @@ def _param_controls(stage: str, key: str):
     else:
         return []
 
+    figure_controls: list = []
+    if stage == "post":
+        fig_tooltip_base = (
+            "Override exported figure dimensions (pixels converted using DPI). "
+            "Leave blank to keep script defaults."
+        )
+        figure_controls.extend([
+            num_input(
+                f"{sid}-param-fig-width",
+                "Figure width (px)",
+                None,
+                step=50,
+                min_=100,
+                tooltip=fig_tooltip_base,
+            ),
+            num_input(
+                f"{sid}-param-fig-height",
+                "Figure height (px)",
+                None,
+                step=50,
+                min_=100,
+                tooltip=fig_tooltip_base,
+            ),
+            num_input(
+                f"{sid}-param-fig-dpi",
+                "Figure DPI",
+                None,
+                step=10,
+                min_=50,
+                tooltip="Dots per inch used when saving figures.",
+            ),
+        ])
+        if key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+            figure_controls.append(
+                num_input(
+                    f"{sid}-param-fig-ncol",
+                    "Subplots per row",
+                    None,
+                    step=1,
+                    min_=1,
+                    tooltip="Number of method panels per row (where applicable).",
+                )
+            )
+
     return [
         dbc.Row(
-            controls,
+            controls + figure_controls,
             className="g-2 align-items-end",
             style={"marginLeft": "5px"},
         ),
@@ -347,8 +410,31 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-umap-metric", "value"),
             ]
 
-        @app.callback(*outputs, Input(run_id, "n_clicks"), *states, prevent_initial_call=True)
-        def _run_one(n_clicks: int, *values, _stage=stage, _key=key, _script=script_name):
+        has_ncol_param = False
+        if stage == "post":
+            states += [
+                State(f"{sid}-param-fig-width", "value"),
+                State(f"{sid}-param-fig-height", "value"),
+                State(f"{sid}-param-fig-dpi", "value"),
+            ]
+            if key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+                states.append(State(f"{sid}-param-fig-ncol", "value"))
+                has_ncol_param = True
+
+        @app.callback(
+            *outputs,
+            Input(run_id, "n_clicks"),
+            *states,
+            prevent_initial_call=True,
+        )
+        def _run_one(
+            n_clicks: int,
+            *values,
+            _stage=stage,
+            _key=key,
+            _script=script_name,
+            _has_ncol=has_ncol_param,
+        ):
             if not n_clicks:
                 raise dash.exceptions.PreventUpdate
             # unpack session id
@@ -382,29 +468,63 @@ def register_pre_post_callbacks(app):
                 flags.append(f"--{flag}={sval}")
 
             pv = param_vals
+            idx = 0
             if _key == "auc":
                 # order: cv-folds, cv-reps
-                _add("cv_folds", pv[0], int)
-                _add("cv_reps", pv[1], int)
+                _add("cv_folds", pv[idx], int)
+                idx += 1
+                _add("cv_reps", pv[idx], int)
+                idx += 1
             elif _key == "alignment":
-                _add("k", pv[0], int)
-                _add("var_prop_min", pv[1], float)
-                _add("max_pcs", pv[2], int)
+                _add("k", pv[idx], int)
+                idx += 1
+                _add("var_prop_min", pv[idx], float)
+                idx += 1
+                _add("max_pcs", pv[idx], int)
+                idx += 1
             elif _key == "ebm":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
-                _add("knn_k", pv[3], int)
-                _add("knn_pools", pv[4], int)
-                _add("knn_per_label", pv[5], int)
+                _add("umap_neighbors", pv[idx], int)
+                idx += 1
+                _add("umap_min_dist", pv[idx], float)
+                idx += 1
+                _add("umap_metric", pv[idx], str)
+                idx += 1
+                _add("knn_k", pv[idx], int)
+                idx += 1
+                _add("knn_pools", pv[idx], int)
+                idx += 1
+                _add("knn_per_label", pv[idx], int)
+                idx += 1
             elif _key == "lisi":
-                _add("k", pv[0], int)
-                _add("npcs", pv[1], int)
-                _add("coords", pv[2], str)
+                _add("k", pv[idx], int)
+                idx += 1
+                _add("npcs", pv[idx], int)
+                idx += 1
+                _add("coords", pv[idx], str)
+                idx += 1
             elif _key == "silhouette":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
+                _add("umap_neighbors", pv[idx], int)
+                idx += 1
+                _add("umap_min_dist", pv[idx], float)
+                idx += 1
+                _add("umap_metric", pv[idx], str)
+                idx += 1
+
+            if _stage == "post":
+                fig_width = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_height = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_dpi = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_ncol = pv[idx] if _has_ncol and idx < len(pv) else None
+                if _has_ncol:
+                    idx += 1
+                _add("fig-width-px", fig_width, int)
+                _add("fig-height-px", fig_height, int)
+                _add("fig-dpi", fig_dpi, int)
+                if fig_ncol is not None:
+                    _add("fig-ncol", fig_ncol, int)
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
             content = render_group_tabset(session_dir, _stage, _key)
