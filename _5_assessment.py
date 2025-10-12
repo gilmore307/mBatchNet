@@ -7,6 +7,13 @@ import dash
 import dash_bootstrap_components as dbc
 from typing import List
 
+from _6_description import (
+    ASSESSMENT_PARAM_TOOLTIPS,
+    FIGURE_DIMENSION_OVERRIDE_TOOLTIP,
+    FIGURE_DPI_TOOLTIP,
+    FIGURE_SUBPLOTS_TOOLTIP,
+)
+
 from _1_components import build_navbar
 from _2_utils import (
     get_session_dir,
@@ -97,64 +104,163 @@ def _param_controls(stage: str, key: str):
 
     controls = []
     sid = f"{stage}-{key}"
+    tooltips = ASSESSMENT_PARAM_TOOLTIPS.get(key, {})
 
     if key == "auc":
         # AUC.R parameters
         controls = [
-            num_input(f"{sid}-param-cv-folds", "CV_FOLDS", 5, step=1, min_=2,
-                      tooltip="Number of cross-validation folds (repeated CV)."),
-            num_input(f"{sid}-param-cv-reps", "CV_REPS", 5, step=1, min_=1,
-                      tooltip="Number of repetitions for repeated cross-validation."),
+            num_input(
+                f"{sid}-param-cv-folds",
+                "CV_FOLDS",
+                5,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("cv_folds", ""),
+            ),
+            num_input(
+                f"{sid}-param-cv-reps",
+                "CV_REPS",
+                5,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("cv_reps", ""),
+            ),
         ]
     elif key == "alignment":
         controls = [
-            num_input(f"{sid}-param-k", "K_NEIGHBORS", 10, step=1, min_=1,
-                      tooltip="k for k-NN graph in PCA space."),
-            num_input(f"{sid}-param-var-prop", "VAR_PROP_MIN", 0.95, step=0.01, min_=0.1, max_=1.0,
-                      tooltip="Min cumulative variance for PCA retention (0–1)."),
-            num_input(f"{sid}-param-max-pcs", "MAX_PCS", 10, step=1, min_=2,
-                      tooltip="Maximum number of principal components to use."),
+            num_input(
+                f"{sid}-param-k",
+                "K_NEIGHBORS",
+                10,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("k_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-var-prop",
+                "VAR_PROP_MIN",
+                0.95,
+                step=0.01,
+                min_=0.1,
+                max_=1.0,
+                tooltip=tooltips.get("var_prop_min", ""),
+            ),
+            num_input(
+                f"{sid}-param-max-pcs",
+                "MAX_PCS",
+                10,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("max_pcs", ""),
+            ),
         ]
     elif key == "ebm":
         controls = [
-            num_input(f"{sid}-param-umap-nn", "UMAP_NEIGHB", 15, step=1, min_=2,
-                      tooltip="UMAP: Number of neighbors (local connectivity)."),
-            num_input(f"{sid}-param-umap-min-dist", "UMAP_MIN_DIST", 0.3, step=0.05, min_=0.0, max_=1.0,
-                      tooltip="UMAP: Minimum distance between points in embedding."),
-            dropdown(f"{sid}-param-umap-metric", "UMAP_METRIC", ["euclidean", "cosine"], "euclidean",
-                     tooltip="UMAP distance metric (CLR uses Euclidean)."),
-            num_input(f"{sid}-param-knn-k", "KNN_K", 50, step=1, min_=1,
-                      tooltip="k for entropy mixing (neighbors per anchor)."),
-            num_input(f"{sid}-param-knn-pools", "KNN_POOLS", 50, step=1, min_=1,
-                      tooltip="Number of anchor pools to average entropy over."),
-            num_input(f"{sid}-param-knn-per-label", "KNN_PER_LABEL", 100, step=1, min_=1,
-                      tooltip="Anchors sampled per batch label per pool."),
+            num_input(
+                f"{sid}-param-umap-nn",
+                "UMAP_NEIGHB",
+                15,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("umap_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-umap-min-dist",
+                "UMAP_MIN_DIST",
+                0.3,
+                step=0.05,
+                min_=0.0,
+                max_=1.0,
+                tooltip=tooltips.get("umap_min_dist", ""),
+            ),
+            dropdown(
+                f"{sid}-param-umap-metric",
+                "UMAP_METRIC",
+                ["euclidean", "cosine"],
+                "euclidean",
+                tooltip=tooltips.get("umap_metric", ""),
+            ),
+            num_input(
+                f"{sid}-param-knn-k",
+                "KNN_K",
+                50,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("knn_k", ""),
+            ),
+            num_input(
+                f"{sid}-param-knn-pools",
+                "KNN_POOLS",
+                50,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("knn_pools", ""),
+            ),
+            num_input(
+                f"{sid}-param-knn-per-label",
+                "KNN_PER_LABEL",
+                100,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("knn_per_label", ""),
+            ),
         ]
     elif key == "lisi":
         controls = [
-            num_input(f"{sid}-param-k", "k (neighbors)", 30, step=1, min_=1,
-                      tooltip="k for k-NN graph when computing LISI."),
-            num_input(f"{sid}-param-npcs", "nPCs (PCA)", 50, step=1, min_=2,
-                      tooltip="Number of PCs for LISI (set via coords=CLR to use none)."),
-            dropdown(f"{sid}-param-coords", "coords", ["pca", "clr"], "pca",
-                     tooltip="Coordinate space for LISI: PCA or CLR."),
+            num_input(
+                f"{sid}-param-k",
+                "k (neighbors)",
+                30,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("k_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-npcs",
+                "nPCs (PCA)",
+                50,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("n_pcs", ""),
+            ),
+            dropdown(
+                f"{sid}-param-coords",
+                "coords",
+                ["pca", "clr"],
+                "pca",
+                tooltip=tooltips.get("coords", ""),
+            ),
         ]
     elif key == "silhouette":
         controls = [
-            num_input(f"{sid}-param-umap-nn", "UMAP_NEIGHB", 15, step=1, min_=2,
-                      tooltip="UMAP: Number of neighbors (local connectivity)."),
-            num_input(f"{sid}-param-umap-min-dist", "UMAP_MIN_DIST", 0.3, step=0.05, min_=0.0, max_=1.0,
-                      tooltip="UMAP: Minimum distance between points in embedding."),
-            dropdown(f"{sid}-param-umap-metric", "UMAP_METRIC", ["euclidean", "cosine"], "euclidean",
-                     tooltip="UMAP distance metric (CLR uses Euclidean)."),
+            num_input(
+                f"{sid}-param-umap-nn",
+                "UMAP_NEIGHB",
+                15,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("umap_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-umap-min-dist",
+                "UMAP_MIN_DIST",
+                0.3,
+                step=0.05,
+                min_=0.0,
+                max_=1.0,
+                tooltip=tooltips.get("umap_min_dist", ""),
+            ),
+            dropdown(
+                f"{sid}-param-umap-metric",
+                "UMAP_METRIC",
+                ["euclidean", "cosine"],
+                "euclidean",
+                tooltip=tooltips.get("umap_metric", ""),
+            ),
         ]
     figure_controls: list = []
     include_fig_controls = stage in {"pre", "post"}
     if include_fig_controls:
-        fig_tooltip_base = (
-            "Override exported figure dimensions (pixels converted using DPI). "
-            "Leave blank to keep script defaults."
-        )
         defaults = FIGURE_DEFAULTS.get(key, {})
         figure_controls.extend([
             num_input(
@@ -163,7 +269,7 @@ def _param_controls(stage: str, key: str):
                 defaults.get("width"),
                 step=50,
                 min_=100,
-                tooltip=fig_tooltip_base,
+                tooltip=FIGURE_DIMENSION_OVERRIDE_TOOLTIP,
             ),
             num_input(
                 f"{sid}-param-fig-height",
@@ -171,7 +277,7 @@ def _param_controls(stage: str, key: str):
                 defaults.get("height"),
                 step=50,
                 min_=100,
-                tooltip=fig_tooltip_base,
+                tooltip=FIGURE_DIMENSION_OVERRIDE_TOOLTIP,
             ),
             num_input(
                 f"{sid}-param-fig-dpi",
@@ -179,7 +285,7 @@ def _param_controls(stage: str, key: str):
                 defaults.get("dpi", 300),
                 step=10,
                 min_=50,
-                tooltip="Dots per inch used when saving figures.",
+                tooltip=FIGURE_DPI_TOOLTIP,
             ),
         ])
         if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
@@ -190,7 +296,7 @@ def _param_controls(stage: str, key: str):
                     defaults.get("ncol", 2),
                     step=1,
                     min_=1,
-                    tooltip="Number of method panels per row (where applicable).",
+                    tooltip=FIGURE_SUBPLOTS_TOOLTIP,
                 )
             )
 
