@@ -367,37 +367,59 @@ if ("MMUPHin" %in% method_list) {
   })
 }
 
-# RUV (fastRUV-III-NB) — expects counts; use the *counts* assay for outputs
+# RUV-III-NB — expects counts; use the *counts* assay for outputs
 if ("RUV" %in% method_list) {
-  run_method("fastRUV-III-NB", {
-    suppressPackageStartupMessages(library(ruvIIInb))
+  run_method("RUV-III-NB", {
+    suppressPackageStartupMessages({
+      library(DescTools)   # ruvIII.nb calls DescTools::Winsorize internally
+      library(ruvIIInb)
+      library(Matrix)
+    })
     
-    # Safer, deterministic linear algebra on headless/cloud boxes
+    # ---- Session-level shim: make DescTools::Winsorize accept probs/na.rm ----
+    patch_DescTools_Winsorize <- function() {
+      orig <- getFromNamespace("Winsorize", "DescTools")
+      if (!exists(".DescTools_Winsorize_backup", envir = .GlobalEnv, inherits = FALSE)) {
+        assign(".DescTools_Winsorize_backup", orig, envir = .GlobalEnv)
+      }
+      compat <- function(x, probs = c(0.05, 0.95), na.rm = FALSE, ...) {
+        orig_sig <- names(formals(get(".DescTools_Winsorize_backup", envir = .GlobalEnv)))
+        if (all(c("probs", "na.rm") %in% orig_sig)) {
+          return(get(".DescTools_Winsorize_backup", envir = .GlobalEnv)(x, probs = probs, na.rm = na.rm, ...))
+        }
+        qs <- stats::quantile(x, probs = probs, na.rm = na.rm, names = FALSE, type = 7)
+        lo <- qs[1]; hi <- qs[2]
+        x[x < lo] <- lo; x[x > hi] <- hi
+        x
+      }
+      utils::assignInNamespace("Winsorize", compat, ns = "DescTools")
+      invisible(TRUE)
+    }
+    patch_DescTools_Winsorize()
+    
+    # ---- Stable ruvIII.nb path (single-core, no pseudosamples) ----
     Sys.setenv(OMP_NUM_THREADS = "1", MKL_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1")
     
     # 1) Build genes x samples matrix and sanitize to integer counts
-    Y <- t(get_input_for("RUV", base_M, base_form))           # genes x samples
+    Y <- t(get_input_for("RUV", base_M, base_form))  # genes x samples
     if (is.null(colnames(Y))) colnames(Y) <- rownames(metadata)
     storage.mode(Y) <- "double"
     Y[!is.finite(Y) | Y < 0] <- 0
-    Y <- round(Y)
-    storage.mode(Y) <- "integer"
+    Y <- round(Y); storage.mode(Y) <- "integer"
     say("RUV: Y prepared")
     
     samp_ids <- colnames(Y)
     
-    # 2) Strict metadata alignment + batch checks
+    # 2) Align metadata / batch
     if (is.null(rownames(metadata)))
       fail_step("RUV", "metadata rownames must match colnames (currently NULL).")
-    
     in_meta <- !is.na(samp_ids) & (samp_ids %in% rownames(metadata))
     if (!isTRUE(all(in_meta))) {
       dropped <- samp_ids[!in_meta]
       if (length(dropped)) message("Dropping samples missing in metadata: ", paste(dropped, collapse = ", "))
       Y <- Y[, in_meta, drop = FALSE]
-      samp_ids <- samp_ids[in_meta]
+      samp_ids <- colnames(Y)
     }
-    
     if (!("batch_id" %in% colnames(metadata)))
       fail_step("RUV", "metadata must contain 'batch_id' column.")
     
@@ -405,61 +427,66 @@ if ("RUV" %in% method_list) {
     if (anyNA(batch_vec)) {
       bad <- samp_ids[is.na(batch_vec)]
       message("Dropping samples with NA batch_id: ", paste(bad, collapse = ", "))
-      keep_s <- !is.na(batch_vec)
-      Y <- Y[, keep_s, drop = FALSE]
-      samp_ids <- samp_ids[keep_s]
-      batch_vec <- batch_vec[keep_s]
+      keep <- !is.na(batch_vec)
+      Y <- Y[, keep, drop = FALSE]
+      samp_ids <- colnames(Y)
+      batch_vec <- batch_vec[keep]
     }
-    
     batch_factor <- droplevels(factor(batch_vec))
     if (nlevels(batch_factor) < 1L)
       fail_step("RUV", "No valid batch levels after cleaning.")
     
-    # 3) Drop all-zero genes (NA-safe) and zero-library samples
+    # 3) Drop all-zero genes and zero-library samples
     keep_rows <- rowSums(Y, na.rm = TRUE) > 0L
     if (!isTRUE(any(keep_rows)))
       fail_step("RUV", "All genes have zero or non-finite counts after cleaning.")
     Y <- Y[keep_rows, , drop = FALSE]
     
     lib <- colSums(Y, na.rm = TRUE)
-    if (any(lib <= 0L | is.na(lib))) {
-      drop <- which(lib <= 0L | is.na(lib))
+    if (any(!is.finite(lib) | lib <= 0L)) {
+      drop <- which(!is.finite(lib) | lib <= 0L)
       message("Dropping zero-library samples: ", paste(colnames(Y)[drop], collapse = ", "))
-      Y <- Y[, lib > 0L & !is.na(lib), drop = FALSE]
+      Y <- Y[, lib > 0L & is.finite(lib), drop = FALSE]
       samp_ids <- colnames(Y)
       batch_factor <- droplevels(factor(metadata[samp_ids, "batch_id"]))
       if (nlevels(batch_factor) < 1L)
         fail_step("RUV", "No valid batch levels after zero-library drop.")
     }
     
-    # 4) Design matrix + control set
-    M <- model.matrix(~ 0 + batch_factor); rownames(M) <- samp_ids
+    # 4) Build replicate matrix M (cells x groups) via one-hot batch encoding
+    M <- model.matrix(~ 0 + batch_factor)
+    rownames(M) <- samp_ids
+    cs <- colSums(M); if (any(cs == 0L)) M <- M[, cs > 0L, drop = FALSE]
+    rs <- rowSums(M)
+    if (any(rs == 0L)) {
+      bad_rows <- which(rs == 0L)
+      message("Dropping unannotated cells (zero rows in M): ", paste(rownames(M)[bad_rows], collapse = ", "))
+      M <- M[rs > 0L, , drop = FALSE]
+      Y <- Y[, rownames(M), drop = FALSE]
+      samp_ids <- colnames(Y)
+      batch_factor <- droplevels(factor(metadata[samp_ids, "batch_id"]))
+    }
+    
+    # 5) Control set (use all genes by default)
     ctl_names <- rownames(Y)
-    say("RUV: design ready")
+    say("RUV: design ready (ruvIII.nb)")
     
-    # 5) Fit: stable fast path (single-core, pseudosample) → fallback to slow ruvIII.nb if needed
-    fit <- NULL
-    fit <- tryCatch({
-      ruvIIInb::fastruvIII.nb(
-        Y = as.matrix(Y), M = M, ctl = ctl_names,
-        batch = as.numeric(batch_factor), k = 2,
-        pCells.touse = 1,               # avoid subset corner-cases
-        use.pseudosample = TRUE,        # more numerically stable on some BLAS builds
-        ncores = 1L,                    # avoid detectCores() NA / fork quirks
-        batch.disp = FALSE
-      )
-    }, error = function(e) {
-      message("fast path failed: ", conditionMessage(e), " — trying ruvIII.nb fallback")
-      ruvIIInb::ruvIII.nb(
-        Y = as.matrix(Y), M = M, ctl = ctl_names,
-        batch = as.numeric(batch_factor), k = 2
-      )
-    })
+    # 6) Fit (single core; stable settings)
+    fit <- ruvIIInb::ruvIII.nb(
+      Y = as.matrix(Y),
+      M = as.matrix(M),
+      ctl = ctl_names,
+      k = 2,
+      batch = as.numeric(batch_factor),
+      ncores = 1L,
+      use.pseudosample = FALSE,
+      batch.disp = FALSE,
+      zeroinf = rep(FALSE, ncol(Y))
+    )
+    say("RUV: fit complete (ruvIII.nb)")
     
-    say("RUV: fit complete")
-    
-    # 6) Emit counts assay for downstream TSS/CLR
-    out_counts <- t(SummarizedExperiment::assay(fit, "counts"))   # samples x genes/features
+    # 7) Emit counts (samples x genes/features)
+    out_counts <- t(as.matrix(fit$counts))
     write_tss_clr("RUV-III-NB", out_counts, "counts", "normalized_ruv.csv")
   })
 }
