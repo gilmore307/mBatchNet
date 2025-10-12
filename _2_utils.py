@@ -924,9 +924,12 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                     third_content,
                     dcc.Markdown(
                         description,
-                        className="text-muted small be-score-description",
+                        className="text-muted be-score-description",
                         mathjax=True,
-                        style={"marginTop": "12px"},
+                        style={
+                            "marginTop": "12px",
+                            "fontSize": "12pt",
+                        },
                     ),
                 ],
                 style={"width": "100%"},
