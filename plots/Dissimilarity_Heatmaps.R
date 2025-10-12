@@ -29,6 +29,27 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI <- 300
+IMG_WIDTH_PX <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+SUBPLOTS_PER_ROW <- NA_integer_
+if (length(args) > 1) {
+  for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
+    if (grepl("^--subplots_per_row=", a)) {
+      v <- suppressWarnings(as.integer(sub("^--subplots_per_row=", "", a)))
+      if (is.finite(v) && v >= 1) SUBPLOTS_PER_ROW <- v
+    }
+  }
+}
+
 # ==== Metadata ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
@@ -250,6 +271,9 @@ diag_mode <- "zero"
 label_digits <- 2
 text_threshold_frac <- 0.6
 ncol_grid <- 2
+if (!is.na(SUBPLOTS_PER_ROW)) {
+  ncol_grid <- max(1L, as.integer(SUBPLOTS_PER_ROW))
+}
 
 mat_list_ait <- list()
 ord_list_ait <- list()
@@ -291,10 +315,17 @@ if (n_panels_ait == 1L) {
   w_ait <- 8.5 * min(ncol_grid, n_panels_ait)
   h_ait <- 6   * ceiling(n_panels_ait / ncol_grid)
 }
+if (!is.na(IMG_WIDTH_PX)) {
+  w_ait <- IMG_WIDTH_PX / PLOT_DPI
+}
+if (!is.na(IMG_HEIGHT_PX)) {
+  h_ait <- IMG_HEIGHT_PX / PLOT_DPI
+}
+
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
-       plot = combined_ait, width = w_ait, height = h_ait, dpi = 300)
+       plot = combined_ait, width = w_ait, height = h_ait, dpi = PLOT_DPI)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
-       plot = combined_ait, width = w_ait, height = h_ait, dpi = 300, compression = "lzw")
+       plot = combined_ait, width = w_ait, height = h_ait, dpi = PLOT_DPI, compression = "lzw")
 
 # ==== B) Bray-Curtis heatmaps ====
 mat_list_bc <- list()
@@ -337,10 +368,17 @@ if (n_panels_bc == 1L) {
   w_bc <- 8.5 * min(ncol_grid, n_panels_bc)
   h_bc <- 6   * ceiling(n_panels_bc / ncol_grid)
 }
+if (!is.na(IMG_WIDTH_PX)) {
+  w_bc <- IMG_WIDTH_PX / PLOT_DPI
+}
+if (!is.na(IMG_HEIGHT_PX)) {
+  h_bc <- IMG_HEIGHT_PX / PLOT_DPI
+}
+
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
-       plot = combined_bc, width = w_bc, height = h_bc, dpi = 300)
+       plot = combined_bc, width = w_bc, height = h_bc, dpi = PLOT_DPI)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
-       plot = combined_bc, width = w_bc, height = h_bc, dpi = 300, compression = "lzw")
+       plot = combined_bc, width = w_bc, height = h_bc, dpi = PLOT_DPI, compression = "lzw")
 
 # ==== Unified ranking (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()

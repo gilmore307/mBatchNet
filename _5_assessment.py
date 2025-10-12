@@ -22,6 +22,8 @@ from _2_utils import (
     build_overall_div,
 )
 
+MULTI_PANEL_KEYS = {"pca", "pcoa", "nmds", "dissimilarity"}
+
 
 def _param_controls(stage: str, key: str):
     """Return a list of parameter input components (with tooltips) for a group.
@@ -112,7 +114,36 @@ def _param_controls(stage: str, key: str):
             dropdown(f"{sid}-param-umap-metric", "UMAP_METRIC", ["euclidean", "cosine"], "euclidean",
                      tooltip="UMAP distance metric (CLR uses Euclidean)."),
         ]
-    else:
+
+    if key in MULTI_PANEL_KEYS:
+        controls += [
+            num_input(
+                f"{sid}-param-width-px",
+                "Width (px)",
+                None,
+                step=100,
+                min_=1,
+                tooltip="Optional: override auto width in pixels (converted with dpi=300).",
+            ),
+            num_input(
+                f"{sid}-param-height-px",
+                "Height (px)",
+                None,
+                step=100,
+                min_=1,
+                tooltip="Optional: override auto height in pixels (converted with dpi=300).",
+            ),
+            num_input(
+                f"{sid}-param-subplots-per-row",
+                "Subplots / row",
+                None,
+                step=1,
+                min_=1,
+                tooltip="Optional: override panels per row. Leave blank for automatic layout.",
+            ),
+        ]
+
+    if not controls:
         return []
 
     return [
@@ -346,6 +377,12 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-umap-min-dist", "value"),
                 State(f"{sid}-param-umap-metric", "value"),
             ]
+        if key in MULTI_PANEL_KEYS:
+            states += [
+                State(f"{sid}-param-width-px", "value"),
+                State(f"{sid}-param-height-px", "value"),
+                State(f"{sid}-param-subplots-per-row", "value"),
+            ]
 
         @app.callback(*outputs, Input(run_id, "n_clicks"), *states, prevent_initial_call=True)
         def _run_one(n_clicks: int, *values, _stage=stage, _key=key, _script=script_name):
@@ -405,6 +442,13 @@ def register_pre_post_callbacks(app):
                 _add("umap_neighbors", pv[0], int)
                 _add("umap_min_dist", pv[1], float)
                 _add("umap_metric", pv[2], str)
+            elif _key in MULTI_PANEL_KEYS:
+                width_px = pv[0] if len(pv) > 0 else None
+                height_px = pv[1] if len(pv) > 1 else None
+                subplots = pv[2] if len(pv) > 2 else None
+                _add("width_px", width_px, int)
+                _add("height_px", height_px, int)
+                _add("subplots_per_row", subplots, int)
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
             content = render_group_tabset(session_dir, _stage, _key)

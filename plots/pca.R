@@ -79,6 +79,27 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI <- 300
+IMG_WIDTH_PX <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+SUBPLOTS_PER_ROW <- NA_integer_
+if (length(args) > 1) {
+  for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
+    if (grepl("^--subplots_per_row=", a)) {
+      v <- suppressWarnings(as.integer(sub("^--subplots_per_row=", "", a)))
+      if (is.finite(v) && v >= 1) SUBPLOTS_PER_ROW <- v
+    }
+  }
+}
+
 # ==== Read Metadata ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
@@ -317,6 +338,9 @@ for (nm in names(file_list)) {
 
 # ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
 ncol_grid <- 2
+if (!is.na(SUBPLOTS_PER_ROW)) {
+  ncol_grid <- max(1L, as.integer(SUBPLOTS_PER_ROW))
+}
 n_panels  <- length(plots)
 if (n_panels == 0L) stop("No PCA panels to plot.")
 
@@ -342,10 +366,17 @@ if (n_panels == 1L) {
   h <- 6   * ceiling(n_panels / ncol_grid)
 }
 
+if (!is.na(IMG_WIDTH_PX)) {
+  w <- IMG_WIDTH_PX / PLOT_DPI
+}
+if (!is.na(IMG_HEIGHT_PX)) {
+  h <- IMG_HEIGHT_PX / PLOT_DPI
+}
+
 ggsave(file.path(output_folder, "pca.png"),
-       plot = combined, width = w, height = h, dpi = 300)
+       plot = combined, width = w, height = h, dpi = PLOT_DPI)
 ggsave(file.path(output_folder, "pca.tif"),
-       plot = combined, width = w, height = h, dpi = 300, compression = "lzw")
+       plot = combined, width = w, height = h, dpi = PLOT_DPI, compression = "lzw")
 
 # =========================
 # PCA ranking / assessment
