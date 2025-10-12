@@ -170,7 +170,7 @@ if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   metadata     <- read.csv(custom_metadata_path, check.names = FALSE)
 } else {
   say("⚠️ No uploaded files found — using default assets")
-  uploaded_mat <- read.csv(default_matrix_path, check.names = FALSE)
+  uploaded_mat <- read.csv(default_matrix_path, header = FALSE, check.names = FALSE)
   metadata     <- read.csv(default_metadata_path, check.names = FALSE)
 }
 
@@ -387,8 +387,7 @@ if ("RUV" %in% method_list) {
     fit <- fastruvIII.nb(
       Y = as.matrix(Y), M = M, ctl = ctl_names,
       batch = as.numeric(batch_factor), k = 2,
-      pCells.touse = 0.05, use.pseudosample = FALSE,
-      ncores = max(1L, min(4L, parallel::detectCores(TRUE) - 1L))
+      pCells.touse = 0.05, use.pseudosample = FALSE
     )
     
     # Use the *counts* assay as native output for downstream TSS/CLR files

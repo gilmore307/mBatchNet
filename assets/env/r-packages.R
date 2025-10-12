@@ -2,10 +2,13 @@
 # Install the R package stack required by the Batch Effect Correction app.
 
 options(repos = c(CRAN = "https://cloud.r-project.org"))
+# Try to speed up source builds
+try({ ncpu <- parallel::detectCores(logical = TRUE); if (!is.na(ncpu) && ncpu > 1) Sys.setenv(MAKEFLAGS = paste0("-j", ncpu)) }, silent = TRUE)
 
-cat("\n===============================================\n")
-cat("Batch Effect Correction R dependency installer\n")
-cat("===============================================\n\n")
+msg <- function(...) cat(sprintf(...), "\n")
+rule <- function(t) { cat("\n", paste(rep("=", 55), collapse=""), "\n", t, "\n", paste(rep("=", 55), collapse=""), "\n\n", sep="") }
+
+rule("Batch Effect Correction R dependency installer")
 
 install_if_missing <- function(pkgs, install_fun, ..., quiet = FALSE) {
   pkgs <- unique(pkgs)
@@ -13,76 +16,78 @@ install_if_missing <- function(pkgs, install_fun, ..., quiet = FALSE) {
   installed <- rownames(installed.packages())
   missing <- setdiff(pkgs, installed)
   if (!length(missing)) {
-    if (!quiet) cat("✔ All", length(pkgs), "packages already installed.\n")
-    return(invisible(FALSE))
+    if (!quiet) msg("✔ All %d packages already installed.", length(pkgs))
+    return(invisible(character(0)))
   }
-  cat("→ Installing", length(missing), "package(s):", paste(missing, collapse = ", "), "\n")
+  msg("→ Installing %d package(s): %s", length(missing), paste(missing, collapse = ", "))
   install_fun(missing, ...)
-  invisible(TRUE)
+  invisible(missing)
 }
 
-cran_pkgs <- c(
-  "jsonlite",       # session summaries
-  "doParallel",     # ConQuR parallel backend
-  "reticulate",     # Python bridge for DEBIAS
-  "pamr",           # Batch mean centering
-  "vegan",          # MetaDICT distance metrics
-  "bapred",         # FAbatch implementation
-  "ggplot2",        # plotting backbone
-  "readr",          # CSV ingest helpers
-  "dplyr",          # data wrangling
-  "tidyr",          # reshaping utilities
-  "tibble",         # tidy tabular frames
-  "gridExtra",      # tableGrob utilities
-  "gtable",         # table layout tweaks
-  "patchwork",      # multi-plot layouts
-  "rlang",          # tidy evaluation helpers
-  "scales",         # axis formatting
-  "FNN",            # nearest neighbour metrics
-  "purrr",          # functional helpers
-  "uwot",           # UMAP embeddings
-  "cluster",        # silhouette widths
-  "caret",          # AUC benchmarking
-  "randomForest",   # AUC benchmarking
-  "pROC",           # ROC calculations
-  "forcats",        # factor releveling
-  "lme4"            # PVCA mixed models
+# ---- CRAN packages (core + graphics stack) ----
+cran_core <- c(
+  "jsonlite","doParallel","reticulate","pamr","vegan","bapred",
+  "ggplot2","readr","dplyr","tidyr","tibble","gridExtra","gtable",
+  "patchwork","rlang","scales","FNN","purrr","uwot","cluster",
+  "caret","randomForest","pROC","forcats","lme4"
 )
 
+# graphics/plotting toolchain needed by ragg/Cairo/ruvIIInb deps
+cran_graphics <- c("systemfonts","textshaping","ragg","Cairo","tidyverse","hrbrthemes")
+
+cran_pkgs <- unique(c(cran_core, cran_graphics))
+
+# ---- Bioconductor packages ----
 bioc_pkgs <- c(
-  "preprocessCore",  # Quantile normalisation
-  "limma",           # limma/ComBat
-  "sva",             # ComBat-Seq + sva utils
-  "MMUPHin",         # MMUPHin correction
-  "TreeSummarizedExperiment", # example dataset container
-  "mixOmics"         # example preprocessing helpers
+  "preprocessCore","limma","sva","MMUPHin",
+  "TreeSummarizedExperiment","mixOmics",
+  "scater","SummarizedExperiment","SingleCellExperiment","S4Vectors"
 )
 
+# ---- GitHub packages ----
 github_pkgs <- c(
-  "wdl2459/ConQuR",       # ConQuR implementation
-  "jenniferfranks/FSQN",  # FSQN normalisation
-  "limfuxing/ruvIIInb",   # fast RUV-III-NB
-  "EvaYiwenWang/PLSDAbatch", # PLSDA-batch
-  "BoYuan07/MetaDICT"     # MetaDICT toolkit
+  "wdl2459/ConQuR",
+  "jenniferfranks/FSQN",
+  "limfuxing/ruvIIInb",
+  "EvaYiwenWang/PLSDAbatch",
+  "BoYuan07/MetaDICT"
 )
 
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-if (!requireNamespace("remotes", quietly = TRUE)) {
-  install.packages("remotes")
-}
+# Ensure helpers
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!requireNamespace("remotes",     quietly = TRUE)) install.packages("remotes")
 
-install_if_missing(cran_pkgs, install.packages)
-install_if_missing(bioc_pkgs, BiocManager::install, ask = FALSE, update = FALSE)
+rule("Installing CRAN packages")
+miss_cran <- install_if_missing(cran_pkgs, install.packages, dependencies = TRUE)
 
+rule("Installing Bioconductor packages")
+miss_bioc <- install_if_missing(bioc_pkgs, BiocManager::install, ask = FALSE, update = FALSE)
+
+rule("Installing GitHub packages")
 for (repo in github_pkgs) {
   pkg <- sub(".*/", "", repo)
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    cat("→ Installing GitHub package", repo, "\n")
-    remotes::install_github(repo, upgrade = "never")
+    msg("→ Installing GitHub package %s", repo)
+    remotes::install_github(repo, upgrade = "never", build_vignettes = FALSE)
+  } else {
+    msg("✔ %s already installed", pkg)
   }
 }
 
-cat("\nR package installation attempted. Review messages above for any warnings.\n")
-cat("Missing system libraries? Install build tools (e.g. libgit2, BLAS/LAPACK, Fortran).\n")
+# Summary
+rule("Summary")
+installed <- rownames(installed.packages())
+wanted <- unique(c(cran_pkgs, bioc_pkgs, sub(".*/", "", github_pkgs)))
+missing <- setdiff(wanted, installed)
+
+if (length(missing)) {
+  msg("⚠ The following packages are still missing (likely system libs needed):")
+  msg("  %s", paste(missing, collapse = ", "))
+  msg("\nIf you see build errors about cairo/fonts, ensure these system libs are present:")
+  msg("  libcairo2-dev libxt-dev pkg-config libfontconfig1-dev libfreetype6-dev")
+  msg("  libharfbuzz-dev libfribidi-dev libpng-dev libjpeg-dev libtiff5-dev")
+} else {
+  msg("✅ All requested packages installed.")
+}
+
+invisible(NULL)
