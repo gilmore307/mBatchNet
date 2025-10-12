@@ -27,6 +27,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -242,12 +279,18 @@ p_tss <- make_boxplot(
 )
 
 if (!is.null(p_clr)) {
-  ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr, width = 10, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr, width = 10, height = 5.2, dpi = 300, compression = "lzw")
+  fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)
+  ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr,
+         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
+  ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr,
+         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
 }
 if (!is.null(p_tss)) {
-  ggsave(file.path(output_folder, "R2_braycurtis.png"), p_tss, width = 10, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "R2_braycurtis.tif"), p_tss, width = 10, height = 5.2, dpi = 300, compression = "lzw")
+  fig_dims_tss <- apply_fig_overrides(10, 5.2, 300)
+  ggsave(file.path(output_folder, "R2_braycurtis.png"), p_tss,
+         width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
+  ggsave(file.path(output_folder, "R2_braycurtis.tif"), p_tss,
+         width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 }
 
 # ----------------- Unified ranking or baseline-only assessment -----------------

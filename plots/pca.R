@@ -79,6 +79,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 # ==== Read Metadata ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
@@ -317,6 +354,9 @@ for (nm in names(file_list)) {
 
 # ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
 ncol_grid <- 2
+if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+  ncol_grid <- max(1, opt_fig_ncol)
+}
 n_panels  <- length(plots)
 if (n_panels == 0L) stop("No PCA panels to plot.")
 
@@ -342,10 +382,11 @@ if (n_panels == 1L) {
   h <- 6   * ceiling(n_panels / ncol_grid)
 }
 
+fig_dims <- apply_fig_overrides(w, h, 300)
 ggsave(file.path(output_folder, "pca.png"),
-       plot = combined, width = w, height = h, dpi = 300)
+       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
 ggsave(file.path(output_folder, "pca.tif"),
-       plot = combined, width = w, height = h, dpi = 300, compression = "lzw")
+       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 
 # =========================
 # PCA ranking / assessment

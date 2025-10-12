@@ -5,6 +5,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
+from typing import List
 
 from _1_components import build_navbar
 from _2_utils import (
@@ -23,14 +24,49 @@ from _2_utils import (
 )
 
 
+FIGURE_DEFAULTS = {
+    "pca": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "dissimilarity": {"width": 2550, "height": 1800, "dpi": 300, "ncol": 2},
+    "r2": {"width": 3000, "height": 1560, "dpi": 300},
+    "prda": {"width": 2280, "height": 2070, "dpi": 300},
+    "pvca": {"width": 2160, "height": 2040, "dpi": 300},
+    "alignment": {"width": 1950, "height": 1380, "dpi": 300},
+    "auc": {"width": 2640, "height": 1860, "dpi": 300},
+    "lisi": {"width": 2700, "height": 2400, "dpi": 300},
+    "ebm": {"width": 2550, "height": 1560, "dpi": 300},
+    "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
+}
+
+
 def _param_controls(stage: str, key: str):
     """Return a list of parameter input components (with tooltips) for a group.
     IDs follow pattern: f"{stage}-{key}-param-<name>".
     """
-    def num_input(pid, label, value, step=None, min_=None, max_=None, tooltip=""):
+    def num_input(
+        pid,
+        label,
+        value,
+        step=None,
+        min_=None,
+        max_=None,
+        tooltip="",
+        placeholder=None,
+    ):
         comp = dbc.Col([
             dbc.Label(label, html_for=pid, className="mb-1 d-block"),
-            dbc.Input(id=pid, type="number", value=value, step=step, min=min_, max=max_, size="sm", className="w-100 be-param-input"),
+            dbc.Input(
+                id=pid,
+                type="number",
+                value=value,
+                step=step,
+                min=min_,
+                max=max_,
+                size="sm",
+                className="w-100 be-param-input",
+                placeholder=placeholder,
+            ),
             dbc.Tooltip(tooltip, target=pid, placement="right")
         ], xs=12, sm=6, md=3, lg=2, className="mb-2 be-param-col")
         return comp
@@ -112,12 +148,58 @@ def _param_controls(stage: str, key: str):
             dropdown(f"{sid}-param-umap-metric", "UMAP_METRIC", ["euclidean", "cosine"], "euclidean",
                      tooltip="UMAP distance metric (CLR uses Euclidean)."),
         ]
-    else:
+    figure_controls: list = []
+    include_fig_controls = stage in {"pre", "post"}
+    if include_fig_controls:
+        fig_tooltip_base = (
+            "Override exported figure dimensions (pixels converted using DPI). "
+            "Leave blank to keep script defaults."
+        )
+        defaults = FIGURE_DEFAULTS.get(key, {})
+        figure_controls.extend([
+            num_input(
+                f"{sid}-param-fig-width",
+                "Figure width (px)",
+                defaults.get("width"),
+                step=50,
+                min_=100,
+                tooltip=fig_tooltip_base,
+            ),
+            num_input(
+                f"{sid}-param-fig-height",
+                "Figure height (px)",
+                defaults.get("height"),
+                step=50,
+                min_=100,
+                tooltip=fig_tooltip_base,
+            ),
+            num_input(
+                f"{sid}-param-fig-dpi",
+                "Figure DPI",
+                defaults.get("dpi", 300),
+                step=10,
+                min_=50,
+                tooltip="Dots per inch used when saving figures.",
+            ),
+        ])
+        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+            figure_controls.append(
+                num_input(
+                    f"{sid}-param-fig-ncol",
+                    "Subplots per row",
+                    defaults.get("ncol", 2),
+                    step=1,
+                    min_=1,
+                    tooltip="Number of method panels per row (where applicable).",
+                )
+            )
+
+    if not controls and not figure_controls:
         return []
 
     return [
         dbc.Row(
-            controls,
+            controls + figure_controls,
             className="g-2 align-items-end",
             style={"marginLeft": "5px"},
         ),
@@ -200,6 +282,10 @@ def assessment_layout(active_path: str, stage: str):
                 selected_style=TOP_TAB_SELECTED_STYLE,
                 children=html.Div(
                     [
+                        dcc.Store(
+                            id=f"{stage}-{key}-param-store",
+                            storage_type="session",
+                        ),
                         *(controls or []),
                         dcc.Loading([
                             dbc.Button(
@@ -292,6 +378,7 @@ def register_pre_post_callbacks(app):
     ]
 
     def _register_group(stage: str, key: str, script_name: str):
+        sid = f"{stage}-{key}"
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
 
@@ -310,22 +397,40 @@ def register_pre_post_callbacks(app):
         # Only post stage updates an Overall tab
         if stage == "post":
             outputs.append(Output(f"{stage}-overall-content", "children", allow_duplicate=True))
+        outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
 
         # Parameter States by group
-        sid = f"{stage}-{key}"
         states: list = [State("session-id", "data")]
+        param_state_ids: List[str] = []
         if key == "auc":
+            param_state_ids.extend([
+                f"{sid}-param-cv-folds",
+                f"{sid}-param-cv-reps",
+            ])
             states += [
                 State(f"{sid}-param-cv-folds", "value"),
                 State(f"{sid}-param-cv-reps", "value"),
             ]
         elif key == "alignment":
+            param_state_ids.extend([
+                f"{sid}-param-k",
+                f"{sid}-param-var-prop",
+                f"{sid}-param-max-pcs",
+            ])
             states += [
                 State(f"{sid}-param-k", "value"),
                 State(f"{sid}-param-var-prop", "value"),
                 State(f"{sid}-param-max-pcs", "value"),
             ]
         elif key == "ebm":
+            param_state_ids.extend([
+                f"{sid}-param-umap-nn",
+                f"{sid}-param-umap-min-dist",
+                f"{sid}-param-umap-metric",
+                f"{sid}-param-knn-k",
+                f"{sid}-param-knn-pools",
+                f"{sid}-param-knn-per-label",
+            ])
             states += [
                 State(f"{sid}-param-umap-nn", "value"),
                 State(f"{sid}-param-umap-min-dist", "value"),
@@ -335,20 +440,62 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-knn-per-label", "value"),
             ]
         elif key == "lisi":
+            param_state_ids.extend([
+                f"{sid}-param-k",
+                f"{sid}-param-npcs",
+                f"{sid}-param-coords",
+            ])
             states += [
                 State(f"{sid}-param-k", "value"),
                 State(f"{sid}-param-npcs", "value"),
                 State(f"{sid}-param-coords", "value"),
             ]
         elif key == "silhouette":
+            param_state_ids.extend([
+                f"{sid}-param-umap-nn",
+                f"{sid}-param-umap-min-dist",
+                f"{sid}-param-umap-metric",
+            ])
             states += [
                 State(f"{sid}-param-umap-nn", "value"),
                 State(f"{sid}-param-umap-min-dist", "value"),
                 State(f"{sid}-param-umap-metric", "value"),
             ]
 
-        @app.callback(*outputs, Input(run_id, "n_clicks"), *states, prevent_initial_call=True)
-        def _run_one(n_clicks: int, *values, _stage=stage, _key=key, _script=script_name):
+        has_ncol_param = False
+        if stage in {"pre", "post"}:
+            param_state_ids.extend([
+                f"{sid}-param-fig-width",
+                f"{sid}-param-fig-height",
+                f"{sid}-param-fig-dpi",
+            ])
+            states += [
+                State(f"{sid}-param-fig-width", "value"),
+                State(f"{sid}-param-fig-height", "value"),
+                State(f"{sid}-param-fig-dpi", "value"),
+            ]
+            if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+                param_state_ids.append(f"{sid}-param-fig-ncol")
+                states.append(State(f"{sid}-param-fig-ncol", "value"))
+                has_ncol_param = True
+
+        state_ids_tuple = tuple(param_state_ids)
+
+        @app.callback(
+            *outputs,
+            Input(run_id, "n_clicks"),
+            *states,
+            prevent_initial_call=True,
+        )
+        def _run_one(
+            n_clicks: int,
+            *values,
+            _stage=stage,
+            _key=key,
+            _script=script_name,
+            _has_ncol=has_ncol_param,
+            _state_ids=state_ids_tuple,
+        ):
             if not n_clicks:
                 raise dash.exceptions.PreventUpdate
             # unpack session id
@@ -356,17 +503,54 @@ def register_pre_post_callbacks(app):
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
             param_vals = list(values[1:])
+            persisted_payload = dash.no_update
+            if _state_ids:
+                persisted_payload = {"values": {pid: val for pid, val in zip(_state_ids, param_vals)}}
             if not session_id:
                 if _stage == "pre":
-                    return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return (
+                        html.Div("Session not initialised."),
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                    )
                 else:
-                    return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return (
+                        html.Div("Session not initialised."),
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                    )
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 if _stage == "pre":
-                    return html.Div("Upload both raw.csv and metadata.csv first."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return (
+                        html.Div("Upload both raw.csv and metadata.csv first."),
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                    )
                 else:
-                    return html.Div("Upload both raw.csv and metadata.csv first."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    return (
+                        html.Div("Upload both raw.csv and metadata.csv first."),
+                        True,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                        dash.no_update,
+                    )
 
             # Append all analysis logs into a single session-wide log file
             log_path = session_dir / "run.log"
@@ -382,39 +566,108 @@ def register_pre_post_callbacks(app):
                 flags.append(f"--{flag}={sval}")
 
             pv = param_vals
+            idx = 0
             if _key == "auc":
                 # order: cv-folds, cv-reps
-                _add("cv_folds", pv[0], int)
-                _add("cv_reps", pv[1], int)
+                _add("cv_folds", pv[idx], int)
+                idx += 1
+                _add("cv_reps", pv[idx], int)
+                idx += 1
             elif _key == "alignment":
-                _add("k", pv[0], int)
-                _add("var_prop_min", pv[1], float)
-                _add("max_pcs", pv[2], int)
+                _add("k", pv[idx], int)
+                idx += 1
+                _add("var_prop_min", pv[idx], float)
+                idx += 1
+                _add("max_pcs", pv[idx], int)
+                idx += 1
             elif _key == "ebm":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
-                _add("knn_k", pv[3], int)
-                _add("knn_pools", pv[4], int)
-                _add("knn_per_label", pv[5], int)
+                _add("umap_neighbors", pv[idx], int)
+                idx += 1
+                _add("umap_min_dist", pv[idx], float)
+                idx += 1
+                _add("umap_metric", pv[idx], str)
+                idx += 1
+                _add("knn_k", pv[idx], int)
+                idx += 1
+                _add("knn_pools", pv[idx], int)
+                idx += 1
+                _add("knn_per_label", pv[idx], int)
+                idx += 1
             elif _key == "lisi":
-                _add("k", pv[0], int)
-                _add("npcs", pv[1], int)
-                _add("coords", pv[2], str)
+                _add("k", pv[idx], int)
+                idx += 1
+                _add("npcs", pv[idx], int)
+                idx += 1
+                _add("coords", pv[idx], str)
+                idx += 1
             elif _key == "silhouette":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
+                _add("umap_neighbors", pv[idx], int)
+                idx += 1
+                _add("umap_min_dist", pv[idx], float)
+                idx += 1
+                _add("umap_metric", pv[idx], str)
+                idx += 1
+
+            if _stage in {"pre", "post"}:
+                fig_width = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_height = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_dpi = pv[idx] if idx < len(pv) else None
+                idx += 1
+                fig_ncol = pv[idx] if _has_ncol and idx < len(pv) else None
+                if _has_ncol:
+                    idx += 1
+                _add("fig-width-px", fig_width, int)
+                _add("fig-height-px", fig_height, int)
+                _add("fig-dpi", fig_dpi, int)
+                if _has_ncol and fig_ncol is not None:
+                    _add("fig-ncol", fig_ncol, int)
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
             content = render_group_tabset(session_dir, _stage, _key)
             if _stage == "pre":
                 # pre: no Overall tab to update
-                return content, True, str(log_path), None, dash.no_update, dash.no_update
+                return (
+                    content,
+                    True,
+                    str(log_path),
+                    None,
+                    dash.no_update,
+                    dash.no_update,
+                    persisted_payload,
+                )
             else:
                 # post: update Overall
                 overall = build_overall_div(session_dir, _stage)
-                return content, True, str(log_path), None, dash.no_update, dash.no_update, overall
+                return (
+                    content,
+                    True,
+                    str(log_path),
+                    None,
+                    dash.no_update,
+                    dash.no_update,
+                    overall,
+                    persisted_payload,
+                )
+
+        if state_ids_tuple:
+
+            @app.callback(
+                *(Output(pid, "value") for pid in state_ids_tuple),
+                Input(f"{sid}-param-store", "data"),
+            )
+            def _restore_params(store_data, _ids=state_ids_tuple):
+                if not store_data:
+                    return [dash.no_update] * len(_ids)
+                values_map = store_data.get("values", {}) if isinstance(store_data, dict) else {}
+                restored = []
+                for pid in _ids:
+                    if pid in values_map:
+                        restored.append(values_map[pid])
+                    else:
+                        restored.append(dash.no_update)
+                return restored
 
         # Update subtab content when user clicks a subtab (after results are rendered)
         @app.callback(

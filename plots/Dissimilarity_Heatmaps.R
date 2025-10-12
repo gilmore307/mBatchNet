@@ -29,6 +29,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 # ==== Metadata ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
@@ -250,6 +287,9 @@ diag_mode <- "zero"
 label_digits <- 2
 text_threshold_frac <- 0.6
 ncol_grid <- 2
+if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+  ncol_grid <- max(1, opt_fig_ncol)
+}
 
 mat_list_ait <- list()
 ord_list_ait <- list()
@@ -291,10 +331,11 @@ if (n_panels_ait == 1L) {
   w_ait <- 8.5 * min(ncol_grid, n_panels_ait)
   h_ait <- 6   * ceiling(n_panels_ait / ncol_grid)
 }
+fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
-       plot = combined_ait, width = w_ait, height = h_ait, dpi = 300)
+       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
-       plot = combined_ait, width = w_ait, height = h_ait, dpi = 300, compression = "lzw")
+       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
 
 # ==== B) Bray-Curtis heatmaps ====
 mat_list_bc <- list()
@@ -337,10 +378,11 @@ if (n_panels_bc == 1L) {
   w_bc <- 8.5 * min(ncol_grid, n_panels_bc)
   h_bc <- 6   * ceiling(n_panels_bc / ncol_grid)
 }
+fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
-       plot = combined_bc, width = w_bc, height = h_bc, dpi = 300)
+       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
-       plot = combined_bc, width = w_bc, height = h_bc, dpi = 300, compression = "lzw")
+       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
 
 # ==== Unified ranking (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()

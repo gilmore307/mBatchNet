@@ -31,6 +31,11 @@ VAR_PROP_MIN  <- 0.95   # keep PCs explaining at least 95% variance
 MAX_PCS       <- 10     # safety cap
 set.seed(42)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
 # ---- Optional CLI flags ----
 # Support: --k=INT  --var_prop_min=FLOAT  --max_pcs=INT
 if (length(args) > 1) {
@@ -47,7 +52,36 @@ if (length(args) > 1) {
       v <- suppressWarnings(as.integer(sub("^--max_pcs=", "", a)))
       if (is.finite(v) && v >= 2) MAX_PCS <- v
     }
+    if (grepl("^--fig-width-px=", a)) {
+      opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+      if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+    }
+    if (grepl("^--fig-height-px=", a)) {
+      opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+      if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+    }
+    if (grepl("^--fig-dpi=", a)) {
+      opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+      if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+    }
+    if (grepl("^--fig-ncol=", a)) {
+      opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+      if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+    }
   }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
 }
 
 # --------- Load metadata ---------
@@ -176,8 +210,11 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = 6.5, height = 4.6, dpi = 300)
-  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = 6.5, height = 4.6, dpi = 300, compression = "lzw")
+  fig_dims <- apply_fig_overrides(6.5, 4.6, 300)
+  ggsave(file.path(output_folder, "alignment_score.png"), p_as,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, "alignment_score.tif"), p_as,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   
   # No correction recommendation messages
   
@@ -204,6 +241,9 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = 8.5, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = 8.5, height = 5.2, dpi = 300, compression = "lzw")
+  fig_dims <- apply_fig_overrides(8.5, 5.2, 300)
+  ggsave(file.path(output_folder, "alignment_score.png"), p_as,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, "alignment_score.tif"), p_as,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 }

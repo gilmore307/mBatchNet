@@ -35,6 +35,11 @@ SIL_THRESHOLD  <- 0.50         # baseline-only: if < threshold 鈫?recommend cor
 
 set.seed(42)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
 # ---- Optional CLI flags ----
 # Support: --umap_neighbors=INT  --umap_min_dist=FLOAT  --umap_metric=STR
 args <- commandArgs(trailingOnly = TRUE)
@@ -52,7 +57,36 @@ if (length(args) > 1) {
       v <- tolower(sub("^--umap_metric=", "", a))
       if (nzchar(v)) UMAP_METRIC <- v
     }
+    if (grepl("^--fig-width-px=", a)) {
+      opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+      if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+    }
+    if (grepl("^--fig-height-px=", a)) {
+      opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+      if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+    }
+    if (grepl("^--fig-dpi=", a)) {
+      opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+      if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+    }
+    if (grepl("^--fig-ncol=", a)) {
+      opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+      if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+    }
   }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
 }
 
 # ---- Metadata ----
@@ -198,8 +232,11 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "silhouette.png"), p_sil, width = 6.5, height = 4.6, dpi = 300)
-  ggsave(file.path(output_folder, "silhouette.tif"), p_sil, width = 6.5, height = 4.6, dpi = 300, compression = "lzw")
+  fig_dims <- apply_fig_overrides(6.5, 4.6, 300)
+  ggsave(file.path(output_folder, "silhouette.png"), p_sil,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, "silhouette.tif"), p_sil,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   
 } else {
   # Multiple methods - write a ranking CSV but KEEP ORIGINAL ORDER IN THE PLOT
@@ -241,6 +278,9 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "silhouette.png"), p_sil, width = 8.5, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "silhouette.tif"), p_sil, width = 8.5, height = 5.2, dpi = 300, compression = "lzw")
+  fig_dims <- apply_fig_overrides(8.5, 5.2, 300)
+  ggsave(file.path(output_folder, "silhouette.png"), p_sil,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, "silhouette.tif"), p_sil,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 }
