@@ -498,9 +498,9 @@ if ("MetaDICT" %in% method_list) {
     O <- t(get_input_for("MetaDICT", base_M, base_form))  # samples x features for vegdist
     meta <- transform(metadata, batch = batch_id)
     O <- O[rowSums(O) > 0, , drop=FALSE]
-    if (nrow(O) < 2) fail_step("MetaDICT", "Too few non-zero samples.")
+    meta <- transform(metadata[colnames(O), , drop = FALSE], batch = batch_id)
     D <- as.matrix(vegdist(O, method = "bray"))
-    res <- MetaDICT(O, meta, distance_matrix = D)
+    res <- MetaDICT(O, meta, distance_matrix = D, max_iter = 2000, customize_parameter = TRUE, alpha = 0.05, beta  = 0.20,)
     out_pos <- t(res$count)
     write_tss_clr("MetaDICT", out_pos, "positive", "normalized_metadict.csv")
   })
