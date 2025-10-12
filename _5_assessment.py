@@ -115,24 +115,27 @@ def _param_controls(stage: str, key: str):
                      tooltip="UMAP distance metric (CLR uses Euclidean)."),
         ]
 
+    controls += [
+        num_input(
+            f"{sid}-param-width-px",
+            "Width (px)",
+            None,
+            step=100,
+            min_=1,
+            tooltip="Optional: override export width in pixels (converted with dpi=300).",
+        ),
+        num_input(
+            f"{sid}-param-height-px",
+            "Height (px)",
+            None,
+            step=100,
+            min_=1,
+            tooltip="Optional: override export height in pixels (converted with dpi=300).",
+        ),
+    ]
+
     if key in MULTI_PANEL_KEYS:
-        controls += [
-            num_input(
-                f"{sid}-param-width-px",
-                "Width (px)",
-                None,
-                step=100,
-                min_=1,
-                tooltip="Optional: override auto width in pixels (converted with dpi=300).",
-            ),
-            num_input(
-                f"{sid}-param-height-px",
-                "Height (px)",
-                None,
-                step=100,
-                min_=1,
-                tooltip="Optional: override auto height in pixels (converted with dpi=300).",
-            ),
+        controls.append(
             num_input(
                 f"{sid}-param-subplots-per-row",
                 "Subplots / row",
@@ -140,8 +143,8 @@ def _param_controls(stage: str, key: str):
                 step=1,
                 min_=1,
                 tooltip="Optional: override panels per row. Leave blank for automatic layout.",
-            ),
-        ]
+            )
+        )
 
     if not controls:
         return []
@@ -377,22 +380,26 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-umap-min-dist", "value"),
                 State(f"{sid}-param-umap-metric", "value"),
             ]
+        states += [
+            State(f"{sid}-param-width-px", "value"),
+            State(f"{sid}-param-height-px", "value"),
+        ]
         if key in MULTI_PANEL_KEYS:
-            states += [
-                State(f"{sid}-param-width-px", "value"),
-                State(f"{sid}-param-height-px", "value"),
-                State(f"{sid}-param-subplots-per-row", "value"),
-            ]
+            states.append(State(f"{sid}-param-subplots-per-row", "value"))
+
+        state_ids = [s.component_id for s in states]
 
         @app.callback(*outputs, Input(run_id, "n_clicks"), *states, prevent_initial_call=True)
-        def _run_one(n_clicks: int, *values, _stage=stage, _key=key, _script=script_name):
+        def _run_one(n_clicks: int, *values, _stage=stage, _key=key, _script=script_name, _state_ids=state_ids):
             if not n_clicks:
                 raise dash.exceptions.PreventUpdate
             # unpack session id
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
-            param_vals = list(values[1:])
+            param_map = {
+                cid: val for cid, val in zip(_state_ids[1:], values[1:])
+            }
             if not session_id:
                 if _stage == "pre":
                     return html.Div("Session not initialised."), True, dash.no_update, dash.no_update, dash.no_update, dash.no_update
@@ -418,37 +425,38 @@ def register_pre_post_callbacks(app):
                     sval = val
                 flags.append(f"--{flag}={sval}")
 
-            pv = param_vals
             if _key == "auc":
                 # order: cv-folds, cv-reps
-                _add("cv_folds", pv[0], int)
-                _add("cv_reps", pv[1], int)
+                _add("cv_folds", param_map.get(f"{_stage}-{_key}-param-cv-folds"), int)
+                _add("cv_reps", param_map.get(f"{_stage}-{_key}-param-cv-reps"), int)
             elif _key == "alignment":
-                _add("k", pv[0], int)
-                _add("var_prop_min", pv[1], float)
-                _add("max_pcs", pv[2], int)
+                _add("k", param_map.get(f"{_stage}-{_key}-param-k"), int)
+                _add("var_prop_min", param_map.get(f"{_stage}-{_key}-param-var-prop"), float)
+                _add("max_pcs", param_map.get(f"{_stage}-{_key}-param-max-pcs"), int)
             elif _key == "ebm":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
-                _add("knn_k", pv[3], int)
-                _add("knn_pools", pv[4], int)
-                _add("knn_per_label", pv[5], int)
+                _add("umap_neighbors", param_map.get(f"{_stage}-{_key}-param-umap-nn"), int)
+                _add("umap_min_dist", param_map.get(f"{_stage}-{_key}-param-umap-min-dist"), float)
+                _add("umap_metric", param_map.get(f"{_stage}-{_key}-param-umap-metric"), str)
+                _add("knn_k", param_map.get(f"{_stage}-{_key}-param-knn-k"), int)
+                _add("knn_pools", param_map.get(f"{_stage}-{_key}-param-knn-pools"), int)
+                _add("knn_per_label", param_map.get(f"{_stage}-{_key}-param-knn-per-label"), int)
             elif _key == "lisi":
-                _add("k", pv[0], int)
-                _add("npcs", pv[1], int)
-                _add("coords", pv[2], str)
+                _add("k", param_map.get(f"{_stage}-{_key}-param-k"), int)
+                _add("npcs", param_map.get(f"{_stage}-{_key}-param-npcs"), int)
+                _add("coords", param_map.get(f"{_stage}-{_key}-param-coords"), str)
             elif _key == "silhouette":
-                _add("umap_neighbors", pv[0], int)
-                _add("umap_min_dist", pv[1], float)
-                _add("umap_metric", pv[2], str)
-            elif _key in MULTI_PANEL_KEYS:
-                width_px = pv[0] if len(pv) > 0 else None
-                height_px = pv[1] if len(pv) > 1 else None
-                subplots = pv[2] if len(pv) > 2 else None
-                _add("width_px", width_px, int)
-                _add("height_px", height_px, int)
-                _add("subplots_per_row", subplots, int)
+                _add("umap_neighbors", param_map.get(f"{_stage}-{_key}-param-umap-nn"), int)
+                _add("umap_min_dist", param_map.get(f"{_stage}-{_key}-param-umap-min-dist"), float)
+                _add("umap_metric", param_map.get(f"{_stage}-{_key}-param-umap-metric"), str)
+
+            _add("width_px", param_map.get(f"{_stage}-{_key}-param-width-px"), int)
+            _add("height_px", param_map.get(f"{_stage}-{_key}-param-height-px"), int)
+            if _key in MULTI_PANEL_KEYS:
+                _add(
+                    "subplots_per_row",
+                    param_map.get(f"{_stage}-{_key}-param-subplots-per-row"),
+                    int,
+                )
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
             content = render_group_tabset(session_dir, _stage, _key)

@@ -32,6 +32,35 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
+if (length(args) > 1) {
+  for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
+  }
+}
+
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -304,10 +333,11 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   
   combined <- gridExtra::arrangeGrob(p, tbl_grob, ncol = 1, heights = c(3, 1.35))
   
+  dims <- size_from_defaults(7.6, 6.9)
   ggsave(file.path(output_folder, paste0(outfile_prefix, ".png")),
-         plot = combined, width = 7.6, height = 6.9, dpi = 300)
+         plot = combined, width = dims$width, height = dims$height, dpi = PLOT_DPI)
   ggsave(file.path(output_folder, paste0(outfile_prefix, ".tif")),
-         plot = combined, width = 7.6, height = 6.9, dpi = 300, compression = "lzw")
+         plot = combined, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
   
   invisible(list(plot = p, table = tbl))
 }

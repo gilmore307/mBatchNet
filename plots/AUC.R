@@ -28,6 +28,22 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
 PHENO_COL     <- "phenotype"  # binary outcome in metadata.csv (0/1 or 2-level factor)
 CV_FOLDS      <- 5
 CV_REPS       <- 5
@@ -37,6 +53,14 @@ set.seed(42)
 # Support: --cv_folds=INT  --cv_reps=INT
 if (length(args) > 1) {
   for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
     if (grepl("^--cv_folds=", a)) {
       v <- suppressWarnings(as.integer(sub("^--cv_folds=", "", a)))
       if (is.finite(v) && v >= 2) CV_FOLDS <- v
@@ -223,9 +247,10 @@ if (only_baseline) {
          color = NULL) +
     theme_minimal(base_size = 14) +
     theme(legend.position = "bottom")
-  
-  ggsave(file.path(output_folder, "auroc.png"), p_roc, width = 6.5, height = 5, dpi = 300)
-  ggsave(file.path(output_folder, "auroc.tif"), p_roc, width = 6.5, height = 5, dpi = 300, compression = "lzw")
+
+  dims <- size_from_defaults(6.5, 5)
+  ggsave(file.path(output_folder, "auroc.png"), p_roc, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "auroc.tif"), p_roc, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
   
   # No correction recommendation messages
   
@@ -271,9 +296,10 @@ if (only_baseline) {
          color = NULL) +
     theme_minimal(base_size = 14) +
     theme(legend.position = "bottom")
-  
-  ggsave(file.path(output_folder, "auroc.png"), p_roc, width = 8.8, height = 6.2, dpi = 300)
-  ggsave(file.path(output_folder, "auroc.tif"), p_roc, width = 8.8, height = 6.2, dpi = 300, compression = "lzw")
+
+  dims <- size_from_defaults(8.8, 6.2)
+  ggsave(file.path(output_folder, "auroc.png"), p_roc, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "auroc.tif"), p_roc, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
   
   # quick console summary
   auc_annot <- auc_ranked %>% mutate(Label = sprintf("%s (AUC=%.3f)", Method, AUC)) %>% pull(Label)

@@ -26,6 +26,22 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
 K_NEIGHBORS   <- 10     # k in kNN
 VAR_PROP_MIN  <- 0.95   # keep PCs explaining at least 95% variance
 MAX_PCS       <- 10     # safety cap
@@ -35,6 +51,14 @@ set.seed(42)
 # Support: --k=INT  --var_prop_min=FLOAT  --max_pcs=INT
 if (length(args) > 1) {
   for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
     if (grepl("^--k=", a)) {
       v <- suppressWarnings(as.integer(sub("^--k=", "", a)))
       if (is.finite(v) && v >= 1) K_NEIGHBORS <- v
@@ -175,9 +199,10 @@ if (only_baseline) {
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )
-  
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = 6.5, height = 4.6, dpi = 300)
-  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = 6.5, height = 4.6, dpi = 300, compression = "lzw")
+
+  dims <- size_from_defaults(6.5, 4.6)
+  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
   
   # No correction recommendation messages
   
@@ -203,7 +228,8 @@ if (only_baseline) {
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )
-  
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = 8.5, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = 8.5, height = 5.2, dpi = 300, compression = "lzw")
+
+  dims <- size_from_defaults(8.5, 5.2)
+  ggsave(file.path(output_folder, "alignment_score.png"), p_as, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "alignment_score.tif"), p_as, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
 }

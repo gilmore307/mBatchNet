@@ -27,6 +27,35 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
+if (length(args) > 1) {
+  for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
+  }
+}
+
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -242,12 +271,14 @@ p_tss <- make_boxplot(
 )
 
 if (!is.null(p_clr)) {
-  ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr, width = 10, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr, width = 10, height = 5.2, dpi = 300, compression = "lzw")
+  dims <- size_from_defaults(10, 5.2)
+  ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
 }
 if (!is.null(p_tss)) {
-  ggsave(file.path(output_folder, "R2_braycurtis.png"), p_tss, width = 10, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "R2_braycurtis.tif"), p_tss, width = 10, height = 5.2, dpi = 300, compression = "lzw")
+  dims <- size_from_defaults(10, 5.2)
+  ggsave(file.path(output_folder, "R2_braycurtis.png"), p_tss, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "R2_braycurtis.tif"), p_tss, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
 }
 
 # ----------------- Unified ranking or baseline-only assessment -----------------

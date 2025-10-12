@@ -27,6 +27,22 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
 # UMAP (CLR/Aitchison geometry)
 UMAP_NEIGHB   <- 15
 UMAP_MIN_DIST <- 0.3
@@ -47,9 +63,16 @@ set.seed(42)  # uwot uses global RNG
 # ---- Optional CLI flags ----
 # Support: --umap_neighbors=INT  --umap_min_dist=FLOAT  --umap_metric=STR
 #          --knn_k=INT  --knn_pools=INT  --knn_per_label=INT
-args <- commandArgs(trailingOnly = TRUE)
 if (length(args) > 1) {
   for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
     if (grepl("^--umap_neighbors=", a)) {
       v <- suppressWarnings(as.integer(sub("^--umap_neighbors=", "", a)))
       if (is.finite(v) && v >= 2) UMAP_NEIGHB <- v
@@ -292,8 +315,9 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "ebm.png"), p_ebm, width = 6.5, height = 4.6, dpi = 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm, width = 6.5, height = 4.6, dpi = 300, compression = "lzw")
+  dims <- size_from_defaults(6.5, 4.6)
+  ggsave(file.path(output_folder, "ebm.png"), p_ebm, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "ebm.tif"), p_ebm, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
   
   # No correction recommendation messages
   
@@ -324,6 +348,7 @@ if (only_baseline) {
       panel.grid.minor   = element_blank()
     )
   
-  ggsave(file.path(output_folder, "ebm.png"), p_ebm, width = 8.5, height = 5.2, dpi = 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm, width = 8.5, height = 5.2, dpi = 300, compression = "lzw")
+  dims <- size_from_defaults(8.5, 5.2)
+  ggsave(file.path(output_folder, "ebm.png"), p_ebm, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+  ggsave(file.path(output_folder, "ebm.tif"), p_ebm, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
 }

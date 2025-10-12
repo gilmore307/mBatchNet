@@ -14,6 +14,35 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
+if (length(args) > 1) {
+  for (a in args[grepl("^--", args)]) {
+    if (grepl("^--width_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+    }
+    if (grepl("^--height_px=", a)) {
+      v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+      if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+    }
+  }
+}
+
 # Your metadata outcome column:
 PHENO_COL <- "phenotype"
 
@@ -212,5 +241,6 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch_id', '.outcome'))
-ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = 12, height = 8, dpi = 300)
-ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
+dims <- size_from_defaults(12, 8)
+ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = dims$width, height = dims$height, dpi = PLOT_DPI)
+ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")

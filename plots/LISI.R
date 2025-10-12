@@ -35,6 +35,22 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+PLOT_DPI      <- 300
+IMG_WIDTH_PX  <- NA_real_
+IMG_HEIGHT_PX <- NA_real_
+
+size_from_defaults <- function(default_w, default_h) {
+  w <- default_w
+  h <- default_h
+  if (!is.na(IMG_WIDTH_PX)) {
+    w <- IMG_WIDTH_PX / PLOT_DPI
+  }
+  if (!is.na(IMG_HEIGHT_PX)) {
+    h <- IMG_HEIGHT_PX / PLOT_DPI
+  }
+  list(width = w, height = h)
+}
+
 # defaults (can be overridden via flags):
 opt_k       <- 30          # local neighborhood size
 opt_npcs    <- 50          # number of PCs (set to NA to use CLR directly)
@@ -42,6 +58,14 @@ opt_coords  <- "pca"       # "pca" or "clr" (alias for n_pcs = NA)
 
 # parse flags: --k=30 --npcs=50 --coords=pca|clr
 for (a in args) {
+  if (grepl("^--width_px=", a)) {
+    v <- suppressWarnings(as.numeric(sub("^--width_px=", "", a)))
+    if (is.finite(v) && v > 0) IMG_WIDTH_PX <- v
+  }
+  if (grepl("^--height_px=", a)) {
+    v <- suppressWarnings(as.numeric(sub("^--height_px=", "", a)))
+    if (is.finite(v) && v > 0) IMG_HEIGHT_PX <- v
+  }
   if (grepl("^--k=", a))       opt_k      <- as.integer(sub("^--k=", "", a))
   if (grepl("^--npcs=", a))    opt_npcs   <- as.integer(sub("^--npcs=", "", a))
   if (grepl("^--coords=", a))  opt_coords <- tolower(sub("^--coords=", "", a))
@@ -305,7 +329,8 @@ combined <- p_scatter /
   plot_layout(heights = c(1.6, 1), guides = "collect") &
   theme(legend.position = "right")  # collect legend to the right
 
+dims <- size_from_defaults(9.0, 8.0)
 ggsave(file.path(output_folder, "LISI.png"),
-       combined, width = 9.0, height = 8.0, dpi = 300)
+       combined, width = dims$width, height = dims$height, dpi = PLOT_DPI)
 ggsave(file.path(output_folder, "LISI.tif"),
-       combined, width = 9.0, height = 8.0, dpi = 300, compression = "lzw")
+       combined, width = dims$width, height = dims$height, dpi = PLOT_DPI, compression = "lzw")
