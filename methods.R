@@ -368,34 +368,68 @@ if ("MMUPHin" %in% method_list) {
 }
 
 # RUV (fastRUV-III-NB) — expects counts; use the *counts* assay for outputs
-if ("RUV" %in% method_list) {
-  run_method("fastRUV-III-NB", {
-    suppressPackageStartupMessages(library(ruvIIInb))
-    # ruviinb expects genes x samples; we build Y accordingly
-    Y <- t(get_input_for("RUV", base_M, base_form))  # genes x samples
-    if (is.null(colnames(Y))) colnames(Y) <- rownames(metadata)
-    samp_ids <- colnames(Y)
-    if (is.null(rownames(metadata)) || !all(samp_ids %in% rownames(metadata)))
-      fail_step("RUV", "metadata rownames must match colnames.")
-    keep <- rowSums(Y) > 0
-    if (!any(keep)) fail_step("RUV", "All genes have zero counts.")
-    Y <- Y[keep, samp_ids, drop=FALSE]
-    ctl_names <- rownames(Y)  # using all genes as controls (fast variant)
-    batch_factor <- factor(metadata[samp_ids, "batch_id"])
-    M <- model.matrix(~ 0 + batch_factor); rownames(M) <- samp_ids
-    
-    fit <- fastruvIII.nb(
-      Y = as.matrix(Y), M = M, ctl = ctl_names,
-      batch = as.numeric(batch_factor), k = 2,
-      pCells.touse = 0.05, use.pseudosample = FALSE,
-      ncores = 1
-    )
-    
-    # Use the *counts* assay as native output for downstream TSS/CLR files
-    out_counts <- t(SummarizedExperiment::assay(fit, "counts"))   # samples x genes/features
-    write_tss_clr("RUV-III-NB", out_counts, "counts", "normalized_ruv.csv")
-  })
-}
+run_method("fastRUV-III-NB", {
+  suppressPackageStartupMessages(library(ruvIIInb))
+  
+  # Build genes x samples matrix
+  Y <- t(get_input_for("RUV", base_M, base_form))           # genes x samples
+  storage.mode(Y) <- "double"
+  # Remove non-finite and negative artifacts from inverse-CLR
+  Y[!is.finite(Y) | Y < 0] <- 0
+  
+  # Sample IDs
+  if (is.null(colnames(Y))) colnames(Y) <- rownames(metadata)
+  samp_ids <- colnames(Y)
+  
+  # === Robust metadata alignment ===
+  if (is.null(rownames(metadata)))
+    fail_step("RUV", "metadata rownames must match colnames (currently NULL).")
+  
+  # Treat NA in samp_ids as not present; require strict containment
+  in_meta <- !is.na(samp_ids) & (samp_ids %in% rownames(metadata))
+  if (!isTRUE(all(in_meta))) {
+    keep_samples <- in_meta
+    Y <- Y[, keep_samples, drop = FALSE]
+    samp_ids <- samp_ids[keep_samples]
+  }
+  
+  # Require a batch_id column and drop samples with NA batch
+  if (!("batch_id" %in% colnames(metadata)))
+    fail_step("RUV", "metadata must contain 'batch_id' column.")
+  batch_vec <- metadata[samp_ids, "batch_id"]
+  if (anyNA(batch_vec)) {
+    keep_samples <- !is.na(batch_vec)
+    Y <- Y[, keep_samples, drop = FALSE]
+    samp_ids <- samp_ids[keep_samples]
+    batch_vec <- batch_vec[keep_samples]
+  }
+  batch_factor <- factor(batch_vec)
+  
+  # === Keep only non-all-zero rows; NA-safe ===
+  rs <- rowSums(Y, na.rm = TRUE)
+  keep_rows <- rs > 0
+  if (!isTRUE(any(keep_rows))) {
+    fail_step("RUV", "All genes have zero or non-finite counts after cleaning.")
+  }
+  Y <- Y[keep_rows, samp_ids, drop = FALSE]
+  
+  # Design matrix
+  M <- model.matrix(~ 0 + batch_factor)
+  rownames(M) <- samp_ids
+  ctl_names <- rownames(Y)
+  
+  # === ncores guard (no NA) ===
+  fit <- ruvIIInb::fastruvIII.nb(
+    Y = as.matrix(Y), M = M, ctl = ctl_names,
+    batch = as.numeric(batch_factor), k = 2,
+    pCells.touse = 0.05, use.pseudosample = FALSE,
+    ncores = 1
+  )
+  
+  out_counts <- t(SummarizedExperiment::assay(fit, "counts"))  # samples x genes
+  write_tss_clr("RUV-III-NB", out_counts, "counts", "normalized_ruv.csv")
+})
+
 
 # MetaDICT — expects TSS
 if ("MetaDICT" %in% method_list) {
