@@ -7,7 +7,7 @@ import dash
 import dash_bootstrap_components as dbc
 from typing import List
 
-from _6_description import (
+from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
     FIGURE_DIMENSION_OVERRIDE_TOOLTIP,
     FIGURE_DPI_TOOLTIP,

@@ -24,7 +24,7 @@ from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
 from _5_assessment import assessment_layout, register_pre_post_callbacks
 from _6_correction import correction_layout, register_correction_callbacks
-from _6_description import HELP_MODAL_SECTIONS
+from _7_description import HELP_MODAL_SECTIONS
 
 
 app: Dash = dash.Dash(

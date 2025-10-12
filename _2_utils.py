@@ -22,7 +22,7 @@ from dash import html, dcc
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 
-from _6_description import RANKING_SCORE_DESCRIPTIONS
+from _7_description import RANKING_SCORE_DESCRIPTIONS
 
 # Paths & constants
 BASE_DIR = Path(__file__).resolve().parent
