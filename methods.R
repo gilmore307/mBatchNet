@@ -387,7 +387,8 @@ if ("RUV" %in% method_list) {
     fit <- fastruvIII.nb(
       Y = as.matrix(Y), M = M, ctl = ctl_names,
       batch = as.numeric(batch_factor), k = 2,
-      pCells.touse = 0.05, use.pseudosample = FALSE
+      pCells.touse = 0.05, use.pseudosample = FALSE,
+      ncores = 1
     )
     
     # Use the *counts* assay as native output for downstream TSS/CLR files
