@@ -16,7 +16,7 @@ if (!interactive()) {
 # All Methods: FSQN, QN, BMC, limma, ConQuR, PLSDA, ComBat, MMUPHin, RUV, MetaDICT, SVD, PN, FAbatch, ComBatSeq, DEBIAS
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
-  args <- c("FSQN, QN, BMC, limma, ConQuR, PLSDA, ComBat, MMUPHin, RUV, MetaDICT, SVD, PN, FAbatch, ComBatSeq, DEBIAS", "output/example")
+  args <- c("FSQN, QN", "output/example")
 }
 
 # Split and trim whitespace so names match exactly
@@ -246,12 +246,41 @@ run_method("Input checks", {
 # QN — expects TSS
 if ("QN" %in% method_list) {
   run_method("QN", {
-    require(preprocessCore)
-    X_tss  <- get_input_for("QN", base_M, base_form)         # rows = samples
+    suppressPackageStartupMessages({ library(preprocessCore) })
+    # --- tame threads (prevents pthread_create() = 22) ---
+    old_env <- Sys.getenv(c("OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS","VECLIB_MAXIMUM_THREADS"), unset = NA)
+    on.exit({
+      # restore env
+      for (k in names(old_env)) if (!is.na(old_env[[k]])) Sys.setenv(structure(old_env[[k]], .Names = k)) else Sys.unsetenv(k)
+      # best effort restore BLAS threads
+      if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(0L), silent = TRUE)
+    }, add = TRUE)
+    Sys.setenv(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", VECLIB_MAXIMUM_THREADS="1")
+    if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE)
+    
+    # data
+    X_tss   <- as.matrix(get_input_for("QN", base_M, base_form))   # rows = samples
+    storage.mode(X_tss) <- "double"
     ref_tss <- X_tss[ref_idx, , drop=FALSE]
     if (nrow(ref_tss) < 2) warn_step("QN", "Reference batch has <2 samples; results may be unstable.")
-    target  <- normalize.quantiles.determine.target(ref_tss)
-    qn_tss  <- normalize.quantiles.use.target(X_tss, target = target)
+    
+    # target from reference
+    target  <- preprocessCore::normalize.quantiles.determine.target(ref_tss)
+    
+    # try fast path; on pthread error, fall back to pure-R target mapping
+    qn_tss <- tryCatch(
+      preprocessCore::normalize.quantiles.use.target(X_tss, target = target),
+      error = function(e) {
+        warn_step("QN", paste("pthread error; using pure-R fallback:", conditionMessage(e)))
+        # pure-R: per column, assign sorted values to 'target'
+        Z <- matrix(NA_real_, nrow(X_tss), ncol(X_tss), dimnames = dimnames(X_tss))
+        for (j in seq_len(ncol(X_tss))) {
+          ord <- order(X_tss[, j], na.last = TRUE)
+          Z[ord, j] <- target
+        }
+        Z
+      }
+    )
     dimnames(qn_tss) <- dimnames(X_tss)
     write_tss_clr("QN", qn_tss, "positive", "normalized_qn.csv")
   })
@@ -341,10 +370,36 @@ if ("ComBat" %in% method_list) {
 # FSQN — expects TSS
 if ("FSQN" %in% method_list) {
   run_method("FSQN", {
-    require(FSQN)
-    X_tss <- get_input_for("FSQN", base_M, base_form)
+    suppressPackageStartupMessages({ library(FSQN) })
+    # --- tame threads (same as QN) ---
+    old_env <- Sys.getenv(c("OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS","VECLIB_MAXIMUM_THREADS"), unset = NA)
+    on.exit({
+      for (k in names(old_env)) if (!is.na(old_env[[k]])) Sys.setenv(structure(old_env[[k]], .Names = k)) else Sys.unsetenv(k)
+      if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(0L), silent = TRUE)
+    }, add = TRUE)
+    Sys.setenv(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", VECLIB_MAXIMUM_THREADS="1")
+    if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE)
+    
+    X_tss   <- as.matrix(get_input_for("FSQN", base_M, base_form))  # rows = samples
+    storage.mode(X_tss) <- "double"
     ref_tss <- X_tss[ref_idx, , drop=FALSE]
-    out_tss <- quantileNormalizeByFeature(X_tss, ref_tss)
+    
+    out_tss <- tryCatch(
+      quantileNormalizeByFeature(X_tss, ref_tss),
+      error = function(e) {
+        warn_step("FSQN", paste("pthread error; using pure-R fallback:", conditionMessage(e)))
+        # pure-R fallback: feature-wise QN to reference
+        # For each feature (column), map sample ranks to the reference’s sorted values
+        Z <- matrix(NA_real_, nrow(X_tss), ncol(X_tss), dimnames = dimnames(X_tss))
+        for (j in seq_len(ncol(X_tss))) {
+          tgt <- sort(ref_tss[, j], na.last = TRUE)
+          # rank within this feature across samples
+          ord <- order(X_tss[, j], na.last = TRUE)
+          Z[ord, j] <- tgt[pmin(length(tgt), seq_along(ord))]  # guard lengths
+        }
+        Z
+      }
+    )
     write_tss_clr("FSQN", out_tss, "positive", "normalized_fsqn.csv")
   })
 }
@@ -496,8 +551,6 @@ if ("MetaDICT" %in% method_list) {
   run_method("MetaDICT", {
     suppressPackageStartupMessages({ library(MetaDICT); library(vegan) })
     O <- t(get_input_for("MetaDICT", base_M, base_form))  # samples x features for vegdist
-    meta <- transform(metadata, batch = batch_id)
-    O <- O[rowSums(O) > 0, , drop=FALSE]
     meta <- transform(metadata[colnames(O), , drop = FALSE], batch = batch_id)
     D <- as.matrix(vegdist(O, method = "bray"))
     res <- MetaDICT(O, meta, distance_matrix = D, max_iter = 2000, customize_parameter = TRUE, alpha = 0.05, beta  = 0.20,)
