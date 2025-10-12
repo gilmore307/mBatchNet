@@ -15,7 +15,13 @@ import dash_bootstrap_components as dbc
 
 # Local modules
 from _1_components import build_navbar, NAV_LINKS, NAV_ID_MAP
-from _2_utils import cleanup_old_sessions, get_session_dir, OUTPUT_ROOT
+from _2_utils import (
+    cleanup_old_sessions,
+    get_session_dir,
+    OUTPUT_ROOT,
+    RANKING_SCORE_DESCRIPTIONS,
+    RANKING_SCORE_LABELS,
+)
 from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
 from _5_assessment import assessment_layout, register_pre_post_callbacks
@@ -102,16 +108,52 @@ def serve_layout() -> html.Div:
             dbc.Modal(
                 [
                     dbc.ModalHeader(dbc.ModalTitle("Help")),
-                    dbc.ModalBody(
-                        html.Div([
-                            html.P("Help content coming soon."),
-                            html.P("Resources:"),
-                            html.Ul([
-                                html.Li(html.A("GitHub repository", href="https://github.com/gilmore307/Batch-Effect", target="_blank")),
-                                html.Li(html.A("Report an issue", href="https://github.com/gilmore307/Batch-Effect/issues", target="_blank")),
-                            ])
-                        ])
-                    ),
+            dbc.ModalBody(
+                html.Div(
+                    [
+                        html.P(
+                            "Score formulas summarise how each assessment ranks correction methods. "
+                            "The expressions below mirror the logic implemented in the R exporters."
+                        ),
+                        html.Div(
+                            [
+                                html.Div(
+                                    [
+                                        html.H5(RANKING_SCORE_LABELS.get(key, key.title())),
+                                        dcc.Markdown(
+                                            description,
+                                            mathjax=True,
+                                            className="text-muted small",
+                                        ),
+                                    ],
+                                    className="mb-4",
+                                )
+                                for key, description in RANKING_SCORE_DESCRIPTIONS.items()
+                            ],
+                        ),
+                        html.Hr(),
+                        html.P("Resources:"),
+                        html.Ul(
+                            [
+                                html.Li(
+                                    html.A(
+                                        "GitHub repository",
+                                        href="https://github.com/gilmore307/Batch-Effect",
+                                        target="_blank",
+                                    )
+                                ),
+                                html.Li(
+                                    html.A(
+                                        "Report an issue",
+                                        href="https://github.com/gilmore307/Batch-Effect/issues",
+                                        target="_blank",
+                                    )
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
                     dbc.ModalFooter(
                         dbc.Button("Close", id="help-close", color="secondary")
                     ),

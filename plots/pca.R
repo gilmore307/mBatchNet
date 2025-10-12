@@ -79,6 +79,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 # ==== Read Metadata ====
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
@@ -317,6 +354,9 @@ for (nm in names(file_list)) {
 
 # ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
 ncol_grid <- 2
+if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+  ncol_grid <- max(1, opt_fig_ncol)
+}
 n_panels  <- length(plots)
 if (n_panels == 0L) stop("No PCA panels to plot.")
 
@@ -342,10 +382,11 @@ if (n_panels == 1L) {
   h <- 6   * ceiling(n_panels / ncol_grid)
 }
 
+fig_dims <- apply_fig_overrides(w, h, 300)
 ggsave(file.path(output_folder, "pca.png"),
-       plot = combined, width = w, height = h, dpi = 300)
+       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
 ggsave(file.path(output_folder, "pca.tif"),
-       plot = combined, width = w, height = h, dpi = 300, compression = "lzw")
+       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 
 # =========================
 # PCA ranking / assessment
@@ -377,10 +418,23 @@ compute_within_dispersion <- function(scores, batch_var = "batch_id") {
   if (!length(ws)) return(NA_real_)
   stats::weighted.mean(ws, w = ns)
 }
-pca_metric_score <- function(batch_distance, coverage) {
+pca_metric_score <- function(batch_distance, coverage, within_dispersion = NA_real_) {
   if (is.na(batch_distance) || is.na(coverage)) return(NA_real_)
   coverage <- max(0, min(1, coverage))
-  (1 / (1 + batch_distance)) * coverage  # higher = better
+  mix_term <- NA_real_
+  if (!is.na(within_dispersion) && within_dispersion >= 0) {
+    if (batch_distance == 0 && within_dispersion == 0) {
+      mix_term <- 1
+    } else if (!is.finite(batch_distance)) {
+      mix_term <- NA_real_
+    } else {
+      mix_term <- within_dispersion / (within_dispersion + batch_distance)
+    }
+  } else if (!is.na(batch_distance)) {
+    mix_term <- 1 / (1 + batch_distance)
+  }
+  if (is.na(mix_term)) return(NA_real_)
+  coverage * mix_term  # higher = better
 }
 
 only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
@@ -403,7 +457,7 @@ if (only_baseline) {
   
   ve <- fr$metric.df$var.explained
   coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-  score <- pca_metric_score(D_between, coverage2)
+  score <- pca_metric_score(D_between, coverage2, W_within)
   
   # Simple, data-driven decision rule:
   # If batches are separated more than their average within-batch spread -> likely batch effect.
@@ -433,6 +487,7 @@ if (only_baseline) {
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance = numeric(),
+    Within_Dispersion = numeric(),
     Coverage = numeric(),
     `Absolute score` = numeric()
   )
@@ -446,13 +501,15 @@ if (only_baseline) {
       dplyr::mutate(batch_id = factor(md$batch_id))
     cents <- compute_centroids_pca(scores, "batch_id")
     D <- compute_centroid_distances(cents)
+    W <- compute_within_dispersion(scores, "batch_id")
     ve <- fr$metric.df$var.explained
     cov2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-    
-    abs_score <- pca_metric_score(D, cov2)
+
+    abs_score <- pca_metric_score(D, cov2, W)
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
       Batch_Distance = D,
+      Within_Dispersion = W,
       Coverage = cov2,
       `Absolute score` = abs_score
     ))

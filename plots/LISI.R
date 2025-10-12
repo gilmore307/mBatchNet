@@ -39,12 +39,32 @@ if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 opt_k       <- 30          # local neighborhood size
 opt_npcs    <- 50          # number of PCs (set to NA to use CLR directly)
 opt_coords  <- "pca"       # "pca" or "clr" (alias for n_pcs = NA)
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
 
 # parse flags: --k=30 --npcs=50 --coords=pca|clr
 for (a in args) {
   if (grepl("^--k=", a))       opt_k      <- as.integer(sub("^--k=", "", a))
   if (grepl("^--npcs=", a))    opt_npcs   <- as.integer(sub("^--npcs=", "", a))
   if (grepl("^--coords=", a))  opt_coords <- tolower(sub("^--coords=", "", a))
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
 }
 if (!is.na(opt_npcs) && opt_coords == "clr") opt_npcs <- NA           # honor --coords=clr
 if (is.na(opt_npcs) && opt_coords == "pca")  opt_npcs <- 50            # honor --coords=pca
@@ -52,6 +72,19 @@ if (is.na(opt_npcs) && opt_coords == "pca")  opt_npcs <- 50            # honor -
 message("Output folder: ", output_folder)
 message("k (neighbors): ", opt_k)
 message("Coordinates: ", if (is.na(opt_npcs)) "CLR (no PCA)" else paste0("PCA (", opt_npcs, " PCs)"))
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
 
 # ------------------------------- Helpers ----------------------------------------
 safe_closure <- function(X) {
@@ -305,7 +338,8 @@ combined <- p_scatter /
   plot_layout(heights = c(1.6, 1), guides = "collect") &
   theme(legend.position = "right")  # collect legend to the right
 
+fig_dims <- apply_fig_overrides(9.0, 8.0, 300)
 ggsave(file.path(output_folder, "LISI.png"),
-       combined, width = 9.0, height = 8.0, dpi = 300)
+       combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
 ggsave(file.path(output_folder, "LISI.tif"),
-       combined, width = 9.0, height = 8.0, dpi = 300, compression = "lzw")
+       combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")

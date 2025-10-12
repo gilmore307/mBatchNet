@@ -102,6 +102,43 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+opt_fig_width_px  <- NA_real_
+opt_fig_height_px <- NA_real_
+opt_fig_dpi       <- NA_real_
+opt_fig_ncol      <- NA_integer_
+
+for (a in args[-1]) {
+  if (grepl("^--fig-width-px=", a)) {
+    opt_fig_width_px <- suppressWarnings(as.numeric(sub("^--fig-width-px=", "", a)))
+    if (!is.finite(opt_fig_width_px) || opt_fig_width_px <= 0) opt_fig_width_px <- NA_real_
+  }
+  if (grepl("^--fig-height-px=", a)) {
+    opt_fig_height_px <- suppressWarnings(as.numeric(sub("^--fig-height-px=", "", a)))
+    if (!is.finite(opt_fig_height_px) || opt_fig_height_px <= 0) opt_fig_height_px <- NA_real_
+  }
+  if (grepl("^--fig-dpi=", a)) {
+    opt_fig_dpi <- suppressWarnings(as.numeric(sub("^--fig-dpi=", "", a)))
+    if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
+  }
+  if (grepl("^--fig-ncol=", a)) {
+    opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
+    if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
+  }
+}
+
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
+  w <- width_in
+  h <- height_in
+  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
+    w <- opt_fig_width_px / dpi
+  }
+  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
+    h <- opt_fig_height_px / dpi
+  }
+  list(width = w, height = h, dpi = dpi)
+}
+
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
@@ -376,6 +413,9 @@ shape_var  <- "phenotype"
 model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 2
+if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+  ncol_grid <- max(1, opt_fig_ncol)
+}
 SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 
 # =========================
@@ -448,10 +488,11 @@ if (n_panels_clr == 1L) {
   w_clr <- 9.5 * min(ncol_grid, n_panels_clr)
   h_clr <- 6   * ceiling(n_panels_clr / ncol_grid)
 }
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300)
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300)
+       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
-       plot = combined_clr, width = w_clr, height = h_clr, dpi = 300, compression = "lzw")
+       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
 
 # =========================
 # Set 2: Bray–Curtis (TSS)
@@ -523,10 +564,11 @@ if (n_panels_tss == 1L) {
   w_tss <- 9.5 * min(ncol_grid, n_panels_tss)
   h_tss <- 6   * ceiling(n_panels_tss / ncol_grid)
 }
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300)
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300)
+       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
-       plot = combined_tss, width = w_tss, height = h_tss, dpi = 300, compression = "lzw")
+       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 
 # =========================
 # Unified PCoA ranking (Aitchison + Bray combined)
@@ -558,10 +600,23 @@ compute_within_dispersion_pcoa <- function(scores, batch_var = "batch_id") {
   if (!length(ws)) return(NA_real_)
   stats::weighted.mean(ws, w = ns)
 }
-pcoa_metric_score <- function(batch_distance, coverage) {
+pcoa_metric_score <- function(batch_distance, coverage, within_dispersion = NA_real_) {
   if (is.na(batch_distance) || is.na(coverage)) return(NA_real_)
   coverage <- max(0, min(1, coverage))  # clamp [0,1]
-  (1 / (1 + batch_distance)) * coverage  # higher = better
+  mix_term <- NA_real_
+  if (!is.na(within_dispersion) && within_dispersion >= 0) {
+    if (batch_distance == 0 && within_dispersion == 0) {
+      mix_term <- 1
+    } else if (!is.finite(batch_distance)) {
+      mix_term <- NA_real_
+    } else {
+      mix_term <- within_dispersion / (within_dispersion + batch_distance)
+    }
+  } else if (!is.na(batch_distance)) {
+    mix_term <- 1 / (1 + batch_distance)
+  }
+  if (is.na(mix_term)) return(NA_real_)
+  coverage * mix_term  # higher = better
 }
 
 methods_clr <- names(frames_cache_clr)
@@ -585,7 +640,7 @@ if (only_baseline) {
     W_within  <- compute_within_dispersion_pcoa(scores, "batch_id")
     ve <- fr$metric.df$var.explained
     coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-    score <- pcoa_metric_score(D_between, coverage2)
+    score <- pcoa_metric_score(D_between, coverage2, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["CLR"]] <- tibble::tibble(
@@ -610,7 +665,7 @@ if (only_baseline) {
     W_within  <- compute_within_dispersion_pcoa(scores, "batch_id")
     ve <- fr$metric.df$var.explained
     coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-    score <- pcoa_metric_score(D_between, coverage2)
+    score <- pcoa_metric_score(D_between, coverage2, W_within)
     needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
     
     assess_rows[["TSS"]] <- tibble::tibble(
@@ -656,9 +711,11 @@ if (only_baseline) {
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance_CLR = numeric(),
+    Within_Dispersion_CLR = numeric(),
     Coverage_CLR       = numeric(),
     Score_CLR          = numeric(),
     Batch_Distance_TSS = numeric(),
+    Within_Dispersion_TSS = numeric(),
     Coverage_TSS       = numeric(),
     Score_TSS          = numeric(),
     `Absolute score`   = numeric()
@@ -666,7 +723,7 @@ if (only_baseline) {
   
   for (m in union(names(frames_cache_clr), names(frames_cache_tss))) {
     # ----- CLR -----
-    D_a <- NA_real_; Cov_a <- NA_real_; S_a <- NA_real_
+    D_a <- NA_real_; W_a <- NA_real_; Cov_a <- NA_real_; S_a <- NA_real_
     if (m %in% names(frames_cache_clr)) {
       fr_a <- frames_cache_clr[[m]]
       md_a <- metadata[match(fr_a$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -675,13 +732,14 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_a$batch_id))
       cents_a <- compute_centroids_pcoa(scores_a, "batch_id")
       D_a <- compute_centroid_distances(cents_a)
+      W_a <- compute_within_dispersion_pcoa(scores_a, "batch_id")
       ve_a <- fr_a$metric.df$var.explained
       Cov_a <- sum(ve_a[1:min(2, length(ve_a))], na.rm = TRUE) / 100
-      S_a <- pcoa_metric_score(D_a, Cov_a)
+      S_a <- pcoa_metric_score(D_a, Cov_a, W_a)
     }
-    
+
     # ----- TSS -----
-    D_b <- NA_real_; Cov_b <- NA_real_; S_b <- NA_real_
+    D_b <- NA_real_; W_b <- NA_real_; Cov_b <- NA_real_; S_b <- NA_real_
     if (m %in% names(frames_cache_tss)) {
       fr_b <- frames_cache_tss[[m]]
       md_b <- metadata[match(fr_b$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -690,9 +748,10 @@ if (only_baseline) {
         dplyr::mutate(batch_id = factor(md_b$batch_id))
       cents_b <- compute_centroids_pcoa(scores_b, "batch_id")
       D_b <- compute_centroid_distances(cents_b)
+      W_b <- compute_within_dispersion_pcoa(scores_b, "batch_id")
       ve_b <- fr_b$metric.df$var.explained
       Cov_b <- sum(ve_b[1:min(2, length(ve_b))], na.rm = TRUE) / 100
-      S_b <- pcoa_metric_score(D_b, Cov_b)
+      S_b <- pcoa_metric_score(D_b, Cov_b, W_b)
     }
     
     Combined <- dplyr::case_when(
@@ -705,9 +764,11 @@ if (only_baseline) {
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
       Batch_Distance_CLR = D_a,
+      Within_Dispersion_CLR = W_a,
       Coverage_CLR       = Cov_a,
       Score_CLR          = S_a,
       Batch_Distance_TSS = D_b,
+      Within_Dispersion_TSS = W_b,
       Coverage_TSS       = Cov_b,
       Score_TSS          = S_b,
       `Absolute score`   = Combined

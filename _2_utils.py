@@ -16,7 +16,7 @@ from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set, Callable
+from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set
 
 from dash import html, dcc
 import dash_ag_grid as dag
@@ -83,15 +83,31 @@ POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
     "Silhouette.R",
 )
 
+RANKING_SCORE_LABELS: Dict[str, str] = {
+    "pca": "PCA score",
+    "pcoa": "PCoA score",
+    "nmds": "NMDS score",
+    "dissimilarity": "Dissimilarity score",
+    "r2": "R² score",
+    "prda": "pRDA score",
+    "pvca": "PVCA score",
+    "alignment": "Alignment score",
+    "auc": "AUC score",
+    "lisi": "LISI score",
+    "ebm": "Entropy score",
+    "silhouette": "Silhouette score",
+}
+
+
 RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
     "pca": (
-        "**Score formula:** $S = c_{1:2} \\times \\frac{1}{1 + d_{\\text{batch}}}$\n\n**Symbols:** $c_{1:2}$ = variance coverage of PC1 and PC2; $d_{\\text{batch}}$ = mean Euclidean distance between batch centroids in the retained PC space.\n\nHigh values retain variance coverage while shrinking batch centroids in PC1-2."
+        "**Score formula:** $S = c_{1:2} \\times \\frac{w_{\\text{batch}}}{w_{\\text{batch}} + d_{\\text{batch}}}$\n\n**Symbols:** $c_{1:2}$ = variance coverage of PC1 and PC2; $w_{\\text{batch}}$ = mean within-batch dispersion on PC1-2; $d_{\\text{batch}}$ = mean Euclidean distance between batch centroids.\n\nHigher scores reflect strong variance retention and low between-batch separation relative to within-batch spread."
     ),
     "pcoa": (
-        "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$ with $S_{\\text{geom}} = c_{1:2} \\times \\frac{1}{1 + d_{\\text{batch}}}$\n\n**Symbols:** $S_{\\text{CLR}}, S_{\\text{TSS}}$ = geometry-specific PCoA scores; $c_{1:2}$ = variance coverage of the first two PCoA axes; $d_{\\text{batch}}$ = mean distance between batch centroids in that geometry.\n\nBlends CLR and TSS PCoA scores via a geometric mean."
+        "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$ with $S_{\\text{geom}} = c_{1:2} \\times \\frac{w_{\\text{geom}}}{w_{\\text{geom}} + d_{\\text{geom}}}$\n\n**Symbols:** $S_{\\text{CLR}}, S_{\\text{TSS}}$ = geometry-specific PCoA scores; $c_{1:2}$ = variance coverage of the first two PCoA axes; $w_{\\text{geom}}$ = mean within-batch dispersion on that geometry's first two axes; $d_{\\text{geom}}$ = mean distance between batch centroids in that geometry.\n\nBalances CLR and TSS PCoA via a geometric mean while contrasting between- vs within-batch separation."
     ),
     "nmds": (
-        "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\sqrt{\\frac{1}{1 + d_{\\text{batch}}} \\times \\Big(1 - \\frac{\\min(\\text{stress}, 0.30)}{0.30}\\Big)}$\n\n**Symbols:** $S_{\\text{CLR}}, S_{\\text{TSS}}$ = geometry-specific NMDS scores; $d_{\\text{batch}}$ = mean distance between batch centroids in NMDS space; $\\text{stress}$ = Kruskal stress of the NMDS fit capped at $0.30$.\n\nRewards small batch spread and low NMDS stress."
+        "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\sqrt{\\frac{w_{\\text{geom}}}{w_{\\text{geom}} + d_{\\text{geom}}} \\times \\Big(1 - \\frac{\\min(\\text{stress}, 0.30)}{0.30}\\Big)}$\n\n**Symbols:** $S_{\\text{CLR}}, S_{\\text{TSS}}$ = geometry-specific NMDS scores; $w_{\\text{geom}}$ = mean within-batch dispersion on NMDS1-2; $d_{\\text{geom}}$ = mean distance between batch centroids; $\\text{stress}$ = Kruskal stress of the NMDS fit capped at $0.30$.\n\nEmphasises low between-batch separation relative to within-batch spread while keeping NMDS stress low."
     ),
     "dissimilarity": (
         "**Score formula:** $S = S_{\\text{CLR}}^{w_a} S_{\\text{TSS}}^{w_b}$ (with $w_a + w_b = 1$), $S_{\\text{geom}} = \\frac{1}{1 + \\overline{\\text{RMSE}}_{\\text{between}}}$\n\n**Symbols:** $S_{\\text{CLR}}, S_{\\text{TSS}}$ = geometry-specific dissimilarity scores; $w_a, w_b$ = weights for CLR and TSS contributions; $\\overline{\\text{RMSE}}_{\\text{between}}$ = mean between-batch RMSE of the distance matrix.\n\nPenalises large between-batch dissimilarity in CLR and TSS geometries."
@@ -1037,7 +1053,6 @@ def render_group_tabset(session_dir: Path, stage: str, key: str):
 @dataclass(frozen=True)
 class ScoreSpec:
     field: Optional[str] = None  # column name containing the absolute score (case-insensitive)
-    transform: Optional[Callable[[Dict[str, str]], Optional[float]]] = None  # fallback extractor
     baseline_label: str = "Before correction"
 
 
@@ -1090,39 +1105,17 @@ def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]
     return None
 
 
-def _score_lisi(row_lower: Dict[str, str]) -> Optional[float]:
-    ilisi = _safe_float(row_lower.get("ilisi") or row_lower.get("median_ilisi"))
-    clisi = _safe_float(row_lower.get("clisi") or row_lower.get("median_clisi"))
-    if ilisi is None or clisi is None:
-        return None
-    ilisi = min(max(ilisi, 0.0), 1.0)
-    clisi = min(max(clisi, 0.0), 1.0)
-    return 0.5 * (ilisi + (1.0 - clisi))
-
-
-def _score_pvca(row_lower: Dict[str, str]) -> Optional[float]:
-    treatment = _safe_float(row_lower.get("treatment"))
-    batch = _safe_float(row_lower.get("batch"))
-    if treatment is None:
-        return None
-    batch = batch or 0.0
-    denom = treatment + batch
-    if denom <= 0:
-        return None
-    return min(max(treatment / denom, 0.0), 1.0)
-
-
 RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
     "alignment_score": ScoreSpec(field="absolute score"),
     "auroc": ScoreSpec(field="absolute score"),
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
-    "lisi": ScoreSpec(field="absolute score", transform=_score_lisi),
+    "lisi": ScoreSpec(field="absolute score"),
     "nmds": ScoreSpec(field="absolute score"),
     "pca": ScoreSpec(field="absolute score"),
     "pcoa": ScoreSpec(field="absolute score"),
     "prda": ScoreSpec(field="absolute score"),
-    "pvca": ScoreSpec(field="absolute score", transform=_score_pvca),
+    "pvca": ScoreSpec(field="absolute score"),
     "r2": ScoreSpec(field="absolute score"),
     "silhouette": ScoreSpec(field="absolute score"),
 }
@@ -1176,11 +1169,6 @@ def _compute_absolute_score(metric_key: str, row: Dict[str, str]) -> Optional[fl
     if spec:
         if spec.field:
             return _safe_float(row_lower.get(spec.field.lower()))
-        if spec.transform:
-            try:
-                return spec.transform(row_lower)
-            except Exception:
-                return None
     return _score_from_fields(row, "Score", "Combined_Score", "Value")
 
 
