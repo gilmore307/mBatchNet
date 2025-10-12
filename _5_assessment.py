@@ -623,6 +623,8 @@ def register_pre_post_callbacks(app):
                 _add("fig-dpi", fig_dpi, int)
                 if _has_ncol and fig_ncol is not None:
                     _add("fig-ncol", fig_ncol, int)
+                if _stage == "post" and _has_ncol:
+                    flags.append("--fig-per-panel=true")
 
             success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
             content = render_group_tabset(session_dir, _stage, _key)
