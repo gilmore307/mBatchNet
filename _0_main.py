@@ -123,7 +123,7 @@ def serve_layout() -> html.Div:
                                         dcc.Markdown(
                                             description,
                                             mathjax=True,
-                                            className="text-muted small",
+                                            className="text-muted fs-5",
                                         ),
                                     ],
                                     className="mb-4",
