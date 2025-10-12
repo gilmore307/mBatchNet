@@ -24,6 +24,22 @@ from _2_utils import (
 )
 
 
+FIGURE_DEFAULTS = {
+    "pca": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
+    "dissimilarity": {"width": 2550, "height": 1800, "dpi": 300, "ncol": 2},
+    "r2": {"width": 3000, "height": 1560, "dpi": 300},
+    "prda": {"width": 2280, "height": 2070, "dpi": 300},
+    "pvca": {"width": 2160, "height": 2040, "dpi": 300},
+    "alignment": {"width": 1950, "height": 1380, "dpi": 300},
+    "auc": {"width": 2640, "height": 1860, "dpi": 300},
+    "lisi": {"width": 2700, "height": 2400, "dpi": 300},
+    "ebm": {"width": 2550, "height": 1560, "dpi": 300},
+    "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
+}
+
+
 def _param_controls(stage: str, key: str):
     """Return a list of parameter input components (with tooltips) for a group.
     IDs follow pattern: f"{stage}-{key}-param-<name>".
@@ -139,11 +155,12 @@ def _param_controls(stage: str, key: str):
             "Override exported figure dimensions (pixels converted using DPI). "
             "Leave blank to keep script defaults."
         )
+        defaults = FIGURE_DEFAULTS.get(key, {})
         figure_controls.extend([
             num_input(
                 f"{sid}-param-fig-width",
                 "Figure width (px)",
-                None,
+                defaults.get("width"),
                 step=50,
                 min_=100,
                 tooltip=fig_tooltip_base,
@@ -151,7 +168,7 @@ def _param_controls(stage: str, key: str):
             num_input(
                 f"{sid}-param-fig-height",
                 "Figure height (px)",
-                None,
+                defaults.get("height"),
                 step=50,
                 min_=100,
                 tooltip=fig_tooltip_base,
@@ -159,7 +176,7 @@ def _param_controls(stage: str, key: str):
             num_input(
                 f"{sid}-param-fig-dpi",
                 "Figure DPI",
-                None,
+                defaults.get("dpi", 300),
                 step=10,
                 min_=50,
                 tooltip="Dots per inch used when saving figures.",
@@ -170,7 +187,7 @@ def _param_controls(stage: str, key: str):
                 num_input(
                     f"{sid}-param-fig-ncol",
                     "Subplots per row",
-                    None,
+                    defaults.get("ncol", 2),
                     step=1,
                     min_=1,
                     tooltip="Number of method panels per row (where applicable).",
