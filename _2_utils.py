@@ -928,7 +928,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                         mathjax=True,
                         style={
                             "marginTop": "12px",
-                            "fontSize": "12pt",
+                            "fontSize": "16pt",
                         },
                     ),
                 ],
