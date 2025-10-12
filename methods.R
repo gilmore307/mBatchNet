@@ -16,7 +16,7 @@ if (!interactive()) {
 # All Methods: FSQN, QN, BMC, limma, ConQuR, PLSDA, ComBat, MMUPHin, RUV, MetaDICT, SVD, PN, FAbatch, ComBatSeq, DEBIAS
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
-  args <- c("FSQN, QN", "output/example")
+  args <- c("FSQN, QN, BMC, limma, ConQuR, PLSDA, ComBat, MMUPHin, RUV, MetaDICT, SVD, PN, FAbatch, ComBatSeq, DEBIAS", "output/example")
 }
 
 # Split and trim whitespace so names match exactly
@@ -246,42 +246,26 @@ run_method("Input checks", {
 # QN — expects TSS
 if ("QN" %in% method_list) {
   run_method("QN", {
-    suppressPackageStartupMessages({ library(preprocessCore) })
-    # --- tame threads (prevents pthread_create() = 22) ---
-    old_env <- Sys.getenv(c("OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS","VECLIB_MAXIMUM_THREADS"), unset = NA)
-    on.exit({
-      # restore env
-      for (k in names(old_env)) if (!is.na(old_env[[k]])) Sys.setenv(structure(old_env[[k]], .Names = k)) else Sys.unsetenv(k)
-      # best effort restore BLAS threads
-      if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(0L), silent = TRUE)
-    }, add = TRUE)
-    Sys.setenv(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", VECLIB_MAXIMUM_THREADS="1")
-    if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE)
-    
-    # data
-    X_tss   <- as.matrix(get_input_for("QN", base_M, base_form))   # rows = samples
+    X_tss  <- as.matrix(get_input_for("QN", base_M, base_form))   # rows = samples
     storage.mode(X_tss) <- "double"
-    ref_tss <- X_tss[ref_idx, , drop=FALSE]
+    ref_tss <- X_tss[ref_idx, , drop = FALSE]
     if (nrow(ref_tss) < 2) warn_step("QN", "Reference batch has <2 samples; results may be unstable.")
     
-    # target from reference
-    target  <- preprocessCore::normalize.quantiles.determine.target(ref_tss)
+    # Build reference target: average of each ref sample's sorted feature vector
+    # sorted_ref: features x (#ref samples)
+    sorted_ref <- apply(ref_tss, 1, function(r) sort(r, na.last = TRUE))
+    if (is.null(dim(sorted_ref))) sorted_ref <- matrix(sorted_ref, ncol = 1)
+    target <- rowMeans(sorted_ref, na.rm = TRUE)   # length = ncol(X_tss)
     
-    # try fast path; on pthread error, fall back to pure-R target mapping
-    qn_tss <- tryCatch(
-      preprocessCore::normalize.quantiles.use.target(X_tss, target = target),
-      error = function(e) {
-        warn_step("QN", paste("pthread error; using pure-R fallback:", conditionMessage(e)))
-        # pure-R: per column, assign sorted values to 'target'
-        Z <- matrix(NA_real_, nrow(X_tss), ncol(X_tss), dimnames = dimnames(X_tss))
-        for (j in seq_len(ncol(X_tss))) {
-          ord <- order(X_tss[, j], na.last = TRUE)
-          Z[ord, j] <- target
-        }
-        Z
-      }
-    )
-    dimnames(qn_tss) <- dimnames(X_tss)
+    # Map each sample's ranks to the target
+    qn_tss <- matrix(NA_real_, nrow(X_tss), ncol(X_tss), dimnames = dimnames(X_tss))
+    for (i in seq_len(nrow(X_tss))) {
+      xi  <- X_tss[i, ]
+      o   <- order(xi, na.last = TRUE)    # indices of features sorted within the sample
+      out <- xi
+      out[o] <- target
+      qn_tss[i, ] <- out
+    }
     write_tss_clr("QN", qn_tss, "positive", "normalized_qn.csv")
   })
 }
@@ -370,36 +354,49 @@ if ("ComBat" %in% method_list) {
 # FSQN — expects TSS
 if ("FSQN" %in% method_list) {
   run_method("FSQN", {
-    suppressPackageStartupMessages({ library(FSQN) })
-    # --- tame threads (same as QN) ---
-    old_env <- Sys.getenv(c("OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS","VECLIB_MAXIMUM_THREADS"), unset = NA)
-    on.exit({
-      for (k in names(old_env)) if (!is.na(old_env[[k]])) Sys.setenv(structure(old_env[[k]], .Names = k)) else Sys.unsetenv(k)
-      if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(0L), silent = TRUE)
-    }, add = TRUE)
-    Sys.setenv(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", VECLIB_MAXIMUM_THREADS="1")
-    if (requireNamespace("RhpcBLASctl", quietly = TRUE)) try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE)
-    
-    X_tss   <- as.matrix(get_input_for("FSQN", base_M, base_form))  # rows = samples
+    # Input should be TSS with rows = samples, cols = features
+    X_tss  <- as.matrix(get_input_for("FSQN", base_M, base_form))
     storage.mode(X_tss) <- "double"
-    ref_tss <- X_tss[ref_idx, , drop=FALSE]
     
-    out_tss <- tryCatch(
-      quantileNormalizeByFeature(X_tss, ref_tss),
-      error = function(e) {
-        warn_step("FSQN", paste("pthread error; using pure-R fallback:", conditionMessage(e)))
-        # pure-R fallback: feature-wise QN to reference
-        # For each feature (column), map sample ranks to the reference’s sorted values
-        Z <- matrix(NA_real_, nrow(X_tss), ncol(X_tss), dimnames = dimnames(X_tss))
-        for (j in seq_len(ncol(X_tss))) {
-          tgt <- sort(ref_tss[, j], na.last = TRUE)
-          # rank within this feature across samples
-          ord <- order(X_tss[, j], na.last = TRUE)
-          Z[ord, j] <- tgt[pmin(length(tgt), seq_along(ord))]  # guard lengths
+    # Reference = samples in the chosen reference batch
+    ref_mask <- seq_len(nrow(X_tss)) %in% ref_idx
+    ref_tss  <- X_tss[ref_mask, , drop = FALSE]
+    if (nrow(ref_tss) < 2) warn_step("FSQN", "Reference batch has <2 samples; columns with <2 ref values will be left unchanged.")
+    
+    # Pure-R FSQN (handles n_ref != n via quantile interpolation)
+    quantile_normalize_by_feature <- function(X, Xref) {
+      n <- nrow(X); p <- ncol(X)
+      out <- matrix(NA_real_, n, p, dimnames = dimnames(X))
+      for (j in seq_len(p)) {
+        x  <- X[, j]
+        xr <- Xref[, j]
+        xr <- xr[is.finite(xr)]
+        if (length(xr) < 2L) { out[, j] <- x; next }  # not enough ref points
+        xr <- sort(xr, na.last = TRUE)
+        nref <- length(xr)
+        
+        idx <- which(is.finite(x))
+        k <- length(idx)
+        if (k == 0L) { out[, j] <- x; next }
+        
+        ord <- order(x[idx], na.last = NA)
+        if (k == nref) {
+          tgt <- xr
+        } else {
+          pref <- (seq_len(nref) - 0.5) / nref
+          pk   <- (seq_len(k)    - 0.5) / k
+          f <- stats::approxfun(pref, xr, rule = 2, ties = "ordered")
+          tgt <- f(pk)
         }
-        Z
+        y <- x
+        y[idx[ord]] <- tgt
+        out[, j] <- y
       }
-    )
+      rownames(out) <- rownames(X); colnames(out) <- colnames(X)
+      out
+    }
+    
+    out_tss <- quantile_normalize_by_feature(X_tss, ref_tss)
     write_tss_clr("FSQN", out_tss, "positive", "normalized_fsqn.csv")
   })
 }
