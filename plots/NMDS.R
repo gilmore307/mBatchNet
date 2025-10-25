@@ -227,7 +227,7 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
 }
 
 # ==== NMDS panel (scatter with ellipses) with GLOBAL limit overrides ====
-nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
+nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
                        label = NULL, xlim_override = NULL, ylim_override = NULL,
                        palette_name = "Batch") {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
@@ -235,7 +235,6 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
                 "#8C564B","#C49C94","#F7B6D2","#7F7F7F","#C7C7C7","#DBDB8D",
                 "#17BECF","#9EDAE5")
   var.color <- model.vars[1]
-  var.shape <- ifelse(length(model.vars) >= 2, model.vars[2], NA_character_)
   xcol <- paste0("NMDS", axes[1]); ycol <- paste0("NMDS", axes[2])
   
   # per-panel: ranges via 95% ellipses
@@ -248,38 +247,23 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
   eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
   xr <- safe_range(scores$AX1); yr <- safe_range(scores$AX2)
   xlim <- finite_range(xr, eb$x); ylim <- finite_range(yr, eb$y)
-  pad_x <- safe_pad(xlim, 0.06); pad_y <- safe_pad(ylim, 0.06)
+  pad_x <- safe_pad(xlim, 0.12); pad_y <- safe_pad(ylim, 0.12)
   xlim <- c(xlim[1] - pad_x, xlim[2] + pad_x)
   ylim <- c(ylim[1] - pad_y, ylim[2] + pad_y)
   if (!is.null(xlim_override)) xlim <- xlim_override
   if (!is.null(ylim_override)) ylim <- ylim_override
   
-  title_text <- if (is.null(label)) sprintf("NMDS (stress=%.3f)", stress) else sprintf("%s - NMDS (stress=%.3f)", label, stress)
-  
+  title_text <- if (is.null(label)) "NMDS" else label
+
   p <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_point(aes(shape = !!sym(var.shape)), size = 2, alpha = 0.9)
-      } else {
-        geom_point(size = 2, alpha = 0.9)
-      }
-    } +
+    geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
     scale_color_manual(values = mbecCols, name = palette_name) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        shape_vals <- c(0,1,2,3,6,8,15,16,17,23,25,4,5,9)
-        nshape <- nlevels(plot.df[[var.shape]])
-        if (nshape <= length(shape_vals)) {
-          scale_shape_manual(values = shape_vals[seq_len(nshape)], name = "Phenotype")
-        } else scale_shape_discrete(name = "Phenotype")
-      }
-    } +
-    guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE),
-           shape  = guide_legend(order = 2, nrow = 1)) +
-    labs(title = title_text, x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
+    guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
+    labs(title = title_text,
+         x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
     theme_bw() +
@@ -291,15 +275,14 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 10)
+      plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
     )
   p
 }
 
 # ==== Params ====
 batch_var  <- "batch_id"
-shape_var  <- "phenotype"
-model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
+model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 2
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
@@ -329,14 +312,14 @@ for (nm in names(file_list_clr)) {
   all_x <- if (is.null(all_x)) finite_range(scores$AX1, eb$x) else finite_range(all_x, scores$AX1, eb$x)
   all_y <- if (is.null(all_y)) finite_range(scores$AX2, eb$y) else finite_range(all_y, scores$AX2, eb$y)
 }
-pad_x <- safe_pad(all_x, 0.06); pad_y <- safe_pad(all_y, 0.06)
+pad_x <- safe_pad(all_x, 0.12); pad_y <- safe_pad(all_y, 0.12)
 xlim_clr <- c(all_x[1] - pad_x, all_x[2] + pad_x)
 ylim_clr <- c(all_y[1] - pad_y, all_y[2] + pad_y)
 if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_clr)); yh <- max(abs(ylim_clr)); xlim_clr <- c(-xh, xh); ylim_clr <- c(-yh, yh) }
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
-  nmds_panel(fr$plot.df, fr$stress, model_vars,
+  nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = nm,
              xlim_override = xlim_clr, ylim_override = ylim_clr, palette_name = "Batch")
 })
@@ -390,14 +373,14 @@ for (nm in names(file_list_tss)) {
   all_x <- if (is.null(all_x)) finite_range(scores$AX1, eb$x) else finite_range(all_x, scores$AX1, eb$x)
   all_y <- if (is.null(all_y)) finite_range(scores$AX2, eb$y) else finite_range(all_y, scores$AX2, eb$y)
 }
-pad_x <- safe_pad(all_x, 0.06); pad_y <- safe_pad(all_y, 0.06)
+pad_x <- safe_pad(all_x, 0.12); pad_y <- safe_pad(all_y, 0.12)
 xlim_tss <- c(all_x[1] - pad_x, all_x[2] + pad_x)
 ylim_tss <- c(all_y[1] - pad_y, all_y[2] + pad_y)
 if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_tss)); yh <- max(abs(ylim_tss)); xlim_tss <- c(-xh, xh); ylim_tss <- c(-yh, yh) }
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
-  nmds_panel(fr$plot.df, fr$stress, model_vars,
+  nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = nm,
              xlim_override = xlim_tss, ylim_override = ylim_tss, palette_name = "Batch")
 })
