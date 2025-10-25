@@ -311,13 +311,16 @@ CB
   assembled <- (pTop + pRight + pMain) +
     plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
 
-  if (!is.null(label)) {
-    assembled <- assembled + plot_annotation(
-      title = label,
-      theme = theme(
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+  if (!is.null(label) && nzchar(label)) {
+    title_strip <- ggplot() +
+      labs(title = label) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.margin = margin(0, 16, 2, 16)
       )
-    )
+    assembled <- (title_strip / assembled) +
+      plot_layout(heights = c(0.18, 1))
   }
 
   assembled

@@ -193,6 +193,8 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
   stop("No normalized files found (expected raw_clr.csv/raw_tss.csv and/or normalized_*_clr.csv / normalized_*_tss.csv) in ", output_folder)
 }
 
+has_dual_geometries <- length(file_list_clr) > 0 && length(file_list_tss) > 0
+
 # ==== PCoA frames (Aitchison on CLR) ====
 compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch_id","phenotype"),
                                       n_axes = 5) {
@@ -395,13 +397,16 @@ CB
   assembled <- (pTop + pRight + pMain) +
     plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
 
-  if (!is.null(label)) {
-    assembled <- assembled + plot_annotation(
-      title = label,
-      theme = theme(
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+  if (!is.null(label) && nzchar(label)) {
+    title_strip <- ggplot() +
+      labs(title = label) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.margin = margin(0, 16, 2, 16)
       )
-    )
+    assembled <- (title_strip / assembled) +
+      plot_layout(heights = c(0.18, 1))
   }
 
   assembled
@@ -455,8 +460,9 @@ if (isTRUE(SYMMETRIC_AXES)) {
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
+  label_nm <- if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm
   pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
-             axes = axes_to_plot, label = nm,
+             axes = axes_to_plot, label = label_nm,
              xlim_override = xlim_global_clr, ylim_override = ylim_global_clr,
              palette_name = "Batch")
 })
@@ -533,8 +539,9 @@ if (isTRUE(SYMMETRIC_AXES)) {
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
+  label_nm <- if (has_dual_geometries) sprintf("%s - Bray-Curtis", nm) else nm
   pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
-             axes = axes_to_plot, label = nm,
+             axes = axes_to_plot, label = label_nm,
              xlim_override = xlim_global_tss, ylim_override = ylim_global_tss,
              palette_name = "Batch")
 })
