@@ -227,7 +227,7 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
 }
 
 # ==== NMDS panel (scatter with ellipses) with GLOBAL limit overrides ====
-nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
+nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
                        label = NULL, xlim_override = NULL, ylim_override = NULL,
                        palette_name = "Batch") {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
@@ -253,8 +253,7 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
   if (!is.null(xlim_override)) xlim <- xlim_override
   if (!is.null(ylim_override)) ylim <- ylim_override
   
-  title_text <- if (is.null(label)) sprintf("NMDS (stress=%.3f)", stress) else label
-  subtitle_text <- sprintf("Stress = %.3f", stress)
+  title_text <- if (is.null(label)) "NMDS" else label
 
   p <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
@@ -263,7 +262,7 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
     scale_color_manual(values = mbecCols, name = palette_name) +
     guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
-    labs(title = title_text, subtitle = subtitle_text,
+    labs(title = title_text,
          x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
@@ -276,8 +275,7 @@ nmds_panel <- function(plot.df, stress, model.vars, axes = c(1,2),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 10, hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5)
+      plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
     )
   p
 }
@@ -321,7 +319,7 @@ if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_clr)); yh <- max(abs(ylim_clr))
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
-  nmds_panel(fr$plot.df, fr$stress, model_vars,
+  nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = nm,
              xlim_override = xlim_clr, ylim_override = ylim_clr, palette_name = "Batch")
 })
@@ -382,7 +380,7 @@ if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_tss)); yh <- max(abs(ylim_tss))
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
-  nmds_panel(fr$plot.df, fr$stress, model_vars,
+  nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = nm,
              xlim_override = xlim_tss, ylim_override = ylim_tss, palette_name = "Batch")
 })
