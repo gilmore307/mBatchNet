@@ -163,6 +163,7 @@ if (!length(clr_paths) && !length(tss_paths)) {
 name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
 file_list_tss <- setNames(tss_paths, method_short_label(name_from(tss_paths, "tss")))
+has_dual_geometries <- length(file_list_clr) > 0 && length(file_list_tss) > 0
 
 # Include raw_clr.csv / raw_tss.csv as "Before correction" if present
 raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
@@ -272,10 +273,12 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.line = element_blank(),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 12, face = "plain"),
+      axis.title.y = element_text(size = 12, face = "plain"),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
+      plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
     )
   p
 }
@@ -319,8 +322,9 @@ if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_clr)); yh <- max(abs(ylim_clr))
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
+  label_nm <- if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm
   nmds_panel(fr$plot.df, model_vars,
-             axes = axes_to_plot, label = nm,
+             axes = axes_to_plot, label = label_nm,
              xlim_override = xlim_clr, ylim_override = ylim_clr, palette_name = "Batch")
 })
 names(plots_clr) <- names(file_list_clr)
@@ -380,8 +384,9 @@ if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_tss)); yh <- max(abs(ylim_tss))
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
+  label_nm <- if (has_dual_geometries) sprintf("%s - Bray-Curtis", nm) else nm
   nmds_panel(fr$plot.df, model_vars,
-             axes = axes_to_plot, label = nm,
+             axes = axes_to_plot, label = label_nm,
              xlim_override = xlim_tss, ylim_override = ylim_tss, palette_name = "Batch")
 })
 names(plots_tss) <- names(file_list_tss)

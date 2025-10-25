@@ -50,9 +50,7 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
     FigureSpec("R^2 (Aitchison)", "R2_aitchison.png"),
-    FigureSpec("R^2 (Bray-Curtis)", "R2_braycurtis.png"),
     FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("pRDA (Bray-Curtis)", "pRDA_braycurtis.png"),
     FigureSpec("PVCA", "PVCA.png"),
     FigureSpec("Alignment score", "alignment_score.png"),
     FigureSpec("AUC", "auroc.png"),
@@ -102,21 +100,21 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
 
 
 SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
-    ("QN", "Quantile normalization"),
-    ("BMC", "Batch mean centering"),
-    ("limma", "Limma removeBatchEffect"),
+    ("QN", "QN"),
+    ("BMC", "BMC"),
+    ("limma", "Limma"),
     ("ConQuR", "ConQuR"),
     ("PLSDA", "PLSDA-batch"),
     ("ComBat", "ComBat"),
     ("FSQN", "FSQN"),
     ("MMUPHin", "MMUPHin"),
     ("RUV", "RUV-III-NB"),
-    ("MetaDICT", "Meta-DICT"),
-    ("SVD", "Surrogate variable decomposition"),
-    ("PN", "Percentile normalization"),
+    ("MetaDICT", "MetaDICT"),
+    ("SVD", "SVD"),
+    ("PN", "PN"),
     ("FAbatch", "FAbatch"),
-    ("ComBatSeq", "ComBat-Seq"),
-    ("DEBIAS", "DEBIAS"),
+    ("ComBatSeq", "ComBat-seq"),
+    ("DEBIAS", "DEBIAS-M"),
 )
 
 # Map method identifiers (as they may appear in CSVs) to formal display names
@@ -489,7 +487,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
 
     Group metrics by base (e.g., PCoA, NMDS, R2, pRDA, Dissimilarity heatmaps).
     For groups with multiple geometries (Aitchison/Bray-Curtis), show a single
-    top-level tab with sub-tabs: Aitchison (CLR), Bray-Curtis (TSS), and a third
+    top-level tab with sub-tabs: Aitchison, Bray-Curtis, and a third
     sub-tab that is either Assessment (stage='pre') or Rank (stage='post').
     Single-geometry plots also include the third sub-tab accordingly.
     """
@@ -616,9 +614,9 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         elif low.startswith("dissimilarity_heatmaps_braycurtis"):
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "bray", fn)
         elif low.startswith("r2_aitchison"):
-            add_group_item("r2", "R^2", "ait", fn)
+            add_group_item("r2", "Feature-wise ANOVA R²", "ait", fn)
         elif low.startswith("r2_braycurtis"):
-            add_group_item("r2", "R^2", "bray", fn)
+            add_group_item("r2", "Feature-wise ANOVA R²", "bray", fn)
         elif low.startswith("prda_aitchison"):
             add_group_item("prda", "pRDA", "ait", fn)
         elif low.startswith("prda_braycurtis"):
@@ -640,9 +638,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         # Build sub-tab definitions first so we can size them evenly later
         sub_defs = []
         if g["ait"]:
-            sub_defs.append(("Aitchison (CLR)", f"{key}-ait", content_for_image(g["ait"])) )
+            sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
         if g["bray"]:
-            sub_defs.append(("Bray-Curtis (TSS)", f"{key}-bray", content_for_image(g["bray"])) )
+            sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
+        if g["single"] and not (g["ait"] or g["bray"]):
+            sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
         # Third sub-tab: Assessment (pre) or Rank (post)
         third_label = "Assessment" if stage == "pre" else "Rank"
@@ -666,8 +666,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                     for idx, column_name in enumerate(header):
                         source_idx = keep_idx[idx]
                         cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                        numeric_value = _safe_float(cell)
-                        row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
+                        if column_name.lower() == "method":
+                            row_dict[column_name] = method_formal_name(str(cell))
+                        else:
+                            numeric_value = _safe_float(cell)
+                            row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
                     formatted_rows.append(row_dict)
                 numeric_headers = {
                     col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -791,7 +794,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                 g["ait"] = spec.filename
             elif low.startswith("r2_braycurtis"):
                 g["bray"] = spec.filename
-            g["title"] = "R^2"
+            g["title"] = "Feature-wise ANOVA R²"
         elif key == "prda":
             if low.startswith("prda_aitchison"):
                 g["ait"] = spec.filename
@@ -815,9 +818,9 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
     if g["ait"]:
-        sub_defs.append(("Aitchison (CLR)", f"{key}-ait", content_for_image(g["ait"])) )
+        sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
     if g["bray"]:
-        sub_defs.append(("Bray-Curtis (TSS)", f"{key}-bray", content_for_image(g["bray"])) )
+        sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
     if g["single"] and not (g["ait"] or g["bray"]):
         sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
@@ -848,8 +851,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             record: Dict[str, object] = {}
                             for idx, col_name in enumerate(header):
                                 cell = row[idx] if idx < len(row) else ""
-                                numeric_value = _safe_float(cell)
-                                record[col_name] = numeric_value if numeric_value is not None else cell
+                                if col_name.lower() == "method":
+                                    record[col_name] = method_formal_name(str(cell))
+                                else:
+                                    numeric_value = _safe_float(cell)
+                                    record[col_name] = numeric_value if numeric_value is not None else cell
                             formatted_rows.append(record)
                         numeric_headers = {
                             col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -1626,8 +1632,11 @@ def build_raw_assessments_tab(session_dir: Path):
             for idx, column_name in enumerate(header):
                 source_idx = keep_idx[idx]
                 cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                numeric_value = _safe_float(cell)
-                record[column_name] = numeric_value if numeric_value is not None else cell
+                if column_name.lower() == "method":
+                    record[column_name] = method_formal_name(str(cell))
+                else:
+                    numeric_value = _safe_float(cell)
+                    record[column_name] = numeric_value if numeric_value is not None else cell
             formatted_rows.append(record)
         numeric_headers = {
             col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)

@@ -1,4 +1,4 @@
-# ===================== One-way ANOVA R^2 boxplots (Batch vs Treatment) - CLR *and* TSS =====================
+# ===================== One-way ANOVA R^2 boxplots (Batch vs Treatment) — CLR only =====================
 suppressPackageStartupMessages({
   library(ggplot2)
   library(readr)
@@ -76,27 +76,21 @@ if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
 
 # ---- Find normalized files ----
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
-tss_paths <- list.files(output_folder, pattern = "^normalized_.*_tss\\.csv$", full.names = TRUE)
 
-# Fallback: if no suffix-specific outputs, use any normalized_*.csv for both
-if (!length(clr_paths) && !length(tss_paths)) {
-  any_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
-  clr_paths <- any_paths
-  tss_paths <- any_paths
+# Fallback: if no suffix-specific outputs, use any normalized_*.csv as CLR
+if (!length(clr_paths)) {
+  clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
 }
 
 name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
-file_list_tss <- setNames(tss_paths, method_short_label(name_from(tss_paths, "tss")))
 
-# Include raw_clr.csv / raw_tss.csv as "Before correction" if present
+# Include raw_clr.csv as "Before correction" if present
 raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
-raw_tss_fp <- file.path(output_folder, "raw_tss.csv")
 if (file.exists(raw_clr_fp)) file_list_clr <- c("Before correction" = raw_clr_fp, file_list_clr)
-if (file.exists(raw_tss_fp)) file_list_tss <- c("Before correction" = raw_tss_fp, file_list_tss)
 
-if (!length(file_list_clr) && !length(file_list_tss)) {
-  stop("No normalized files found (expected raw_clr.csv/raw_tss.csv and/or normalized_*_clr.csv / normalized_*_tss.csv) in ", output_folder)
+if (!length(file_list_clr)) {
+  stop("No normalized CLR files found (expected raw_clr.csv and/or normalized_*_clr.csv) in ", output_folder)
 }
 
 # ----------------- Helpers -----------------
@@ -136,8 +130,7 @@ anova_r2 <- function(y, g) {
 }
 
 # ----------------- Core: per-feature one-way ANOVA R^2 (Batch vs Treatment) -----------------
-compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype", geometry = c("CLR","TSS")) {
-  geometry <- match.arg(geometry)
+compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype") {
   # align to metadata
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
@@ -157,11 +150,7 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "p
   X <- X[, keep, drop = FALSE]
   if (!ncol(X)) return(tibble(Feature = character(), Effect = character(), R2 = numeric()))
   
-  if (geometry == "CLR") {
-    Y <- if (any(X < 0, na.rm = TRUE)) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
-  } else {
-    Y <- safe_closure(X)
-  }
+  Y <- if (any(X < 0, na.rm = TRUE)) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
   colnames(Y) <- colnames(X)
   
   keep_row <- !is.na(dfx[[batch_col]]) & !is.na(dfx[[treat_col]])
@@ -194,23 +183,13 @@ if (dplyr::n_distinct(metadata$batch_id)   < 2) stop("'batch_id' needs at least 
 r2_long_clr <- lapply(names(file_list_clr), function(nm) {
   message("Per-feature ANOVA R^2 (CLR): ", nm)
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
-  out <- compute_anova_r2_BT(df, metadata, batch_col, treat_col, geometry = "CLR")
-  out$Method <- nm
-  out
-}) %>% bind_rows()
-
-# TSS set
-r2_long_tss <- lapply(names(file_list_tss), function(nm) {
-  message("Per-feature ANOVA R^2 (TSS): ", nm)
-  df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
-  out <- compute_anova_r2_BT(df, metadata, batch_col, treat_col, geometry = "TSS")
+  out <- compute_anova_r2_BT(df, metadata, batch_col, treat_col)
   out$Method <- nm
   out
 }) %>% bind_rows()
 
 # tidy labels/order for plotting
 method_levels_clr <- names(file_list_clr)
-method_levels_tss <- names(file_list_tss)
 
 tidy_long <- function(df, method_levels) {
   if (!nrow(df)) return(df)
@@ -227,7 +206,6 @@ tidy_long <- function(df, method_levels) {
     filter(!is.na(R2), is.finite(R2), R2 >= 0, R2 <= 1)
 }
 r2_long_clr <- tidy_long(r2_long_clr, method_levels_clr)
-r2_long_tss <- tidy_long(r2_long_tss, method_levels_tss)
 
 # ----------------- Figure (auto facet only if >1 method) -----------------
 make_boxplot <- function(r2_long_df, method_levels, title) {
@@ -245,7 +223,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
     scale_fill_manual(values = c(Batch = "#FF7F0E", Treatment = "#BDBDBD"),
                       name = "Effect", drop = FALSE) +
     scale_y_continuous(limits = c(0, 1)) +
-    labs(y = expression("One-way ANOVA "*R^2), x = NULL, title = title) +
+    labs(y = expression("Feature-wise ANOVA "*R^2), x = NULL, title = title) +
     theme_bw() +
     theme(
       axis.text.x  = element_text(angle = 45, hjust = 1, vjust = 1),
@@ -271,26 +249,14 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
 
 p_clr <- make_boxplot(
   r2_long_clr, method_levels_clr,
-  expression("Per-feature " * R^2 * " (one-way ANOVA) - CLR (Aitchison)")
+  expression("Feature-wise ANOVA " * R^2 * " - CLR (Aitchison)")
 )
-p_tss <- make_boxplot(
-  r2_long_tss, method_levels_tss,
-  expression("Per-feature " * R^2 * " (one-way ANOVA) - TSS (proportions)")
-)
-
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)
   ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
   ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-}
-if (!is.null(p_tss)) {
-  fig_dims_tss <- apply_fig_overrides(10, 5.2, 300)
-  ggsave(file.path(output_folder, "R2_braycurtis.png"), p_tss,
-         width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
-  ggsave(file.path(output_folder, "R2_braycurtis.tif"), p_tss,
-         width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 }
 
 # ----------------- Unified ranking or baseline-only assessment -----------------
@@ -305,9 +271,8 @@ score_from_long <- function(df) {
 }
 
 score_clr <- score_from_long(r2_long_clr) %>% rename(Score_CLR = Score)
-score_tss <- score_from_long(r2_long_tss) %>% rename(Score_TSS = Score)
 
-all_methods <- sort(unique(c(levels(r2_long_clr$Method), levels(r2_long_tss$Method))))
+all_methods <- sort(unique(levels(r2_long_clr$Method)))
 only_baseline <- length(all_methods) == 1L && identical(all_methods, "Before correction")
 
 if (only_baseline) {
@@ -324,34 +289,15 @@ if (only_baseline) {
       Needs_Correction = needs_corr
     )
   }
-  if (nrow(r2_long_tss)) {
-    med_tbl <- r2_long_tss %>% group_by(Effect) %>% summarise(median_R2 = median(R2), .groups = "drop")
-    mb <- med_tbl$median_R2[med_tbl$Effect == "Batch"]
-    mt <- med_tbl$median_R2[med_tbl$Effect == "Treatment"]
-    needs_corr <- is.finite(mb) && (mb > mt || mb > 0.05)
-    assess_rows[["TSS"]] <- tibble::tibble(
-      Geometry = "Bray-Curtis (TSS)",
-      Median_R2_Batch = mb,
-      Median_R2_Treatment = mt,
-      Needs_Correction = needs_corr
-    )
-  }
   assess_df <- dplyr::bind_rows(assess_rows)
   print(assess_df, n = nrow(assess_df))
 readr::write_csv(assess_df, file.path(output_folder, "R2_raw_assessment.csv"))
-  
+
   # No correction recommendation messages
-  
+
 } else {
-  ranking_unified <- full_join(score_clr, score_tss, by = "Method") %>%
-    mutate(
-      `Absolute score` = dplyr::case_when(
-        !is.na(Score_CLR) & !is.na(Score_TSS) ~ sqrt(Score_CLR * Score_TSS),
-        is.na(Score_TSS)                       ~ Score_CLR,
-        is.na(Score_CLR)                       ~ Score_TSS,
-        TRUE                                   ~ NA_real_
-      )
-    )
+  ranking_unified <- score_clr %>%
+    mutate(`Absolute score` = Score_CLR)
 
   baseline_abs <- ranking_unified$`Absolute score`[ranking_unified$Method == "Before correction"][1]
   rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_

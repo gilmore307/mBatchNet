@@ -21,20 +21,14 @@ from _2_utils import (
 
 METHOD_GRID_COLUMNS = [
     {
-        "headerName": "Code",
-        "field": "code",
-        "checkboxSelection": True,
-        "headerCheckboxSelection": True,
-        "width": 110,
-        "pinned": "left",
-        "headerTooltip": "Internal method code. Select methods using the checkboxes.",
-    },
-    {
         "headerName": "Method",
         "field": "method",
+        "checkboxSelection": True,
+        "headerCheckboxSelection": True,
         "flex": 1,
-        "minWidth": 180,
-        "headerTooltip": "Display name of the batch-correction method.",
+        "minWidth": 200,
+        "pinned": "left",
+        "headerTooltip": "Display name of the batch-correction method. Use the checkboxes to select methods.",
     },
     {
         "headerName": "Runs",
