@@ -406,7 +406,7 @@ CB
         plot.margin = margin(0, 16, 0, 16)
       )
     assembled <- (title_strip / assembled) +
-      plot_layout(heights = c(0.12, 1))
+      plot_layout(heights = c(0.08, 1))
   }
 
   assembled
