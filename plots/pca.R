@@ -25,7 +25,7 @@ method_short_label <- function(x) {
     metadict = "MetaDICT",
     svd = "SVD",
     pn = "PN",
-    fabatch = "FAbatch",
+    fabatch = "Fabatch",
     combatseq = "ComBat-seq",
     debias = "DEBIAS-M"
   )

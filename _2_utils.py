@@ -50,9 +50,7 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
     FigureSpec("R^2 (Aitchison)", "R2_aitchison.png"),
-    FigureSpec("R^2 (Bray-Curtis)", "R2_braycurtis.png"),
     FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("pRDA (Bray-Curtis)", "pRDA_braycurtis.png"),
     FigureSpec("PVCA", "PVCA.png"),
     FigureSpec("Alignment score", "alignment_score.png"),
     FigureSpec("AUC", "auroc.png"),
@@ -102,20 +100,20 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
 
 
 SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
-    ("QN", "Quantile normalization"),
-    ("BMC", "Batch mean centering"),
-    ("limma", "Limma removeBatchEffect"),
+    ("QN", "QN"),
+    ("BMC", "BMC"),
+    ("limma", "Limma"),
     ("ConQuR", "ConQuR"),
     ("PLSDA", "PLSDA-batch"),
     ("ComBat", "ComBat"),
     ("FSQN", "FSQN"),
     ("MMUPHin", "MMUPHin"),
     ("RUV", "RUV-III-NB"),
-    ("MetaDICT", "Meta-DICT"),
-    ("SVD", "Surrogate variable decomposition"),
-    ("PN", "Percentile normalization"),
-    ("FAbatch", "FAbatch"),
-    ("ComBatSeq", "ComBat-Seq"),
+    ("MetaDICT", "MetaDICT"),
+    ("SVD", "SVD"),
+    ("PN", "PN"),
+    ("FAbatch", "Fabatch"),
+    ("ComBatSeq", "ComBat-seq"),
     ("DEBIAS", "DEBIAS"),
 )
 
@@ -616,9 +614,9 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         elif low.startswith("dissimilarity_heatmaps_braycurtis"):
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "bray", fn)
         elif low.startswith("r2_aitchison"):
-            add_group_item("r2", "R^2", "ait", fn)
+            add_group_item("r2", "Feature-wise ANOVA R²", "ait", fn)
         elif low.startswith("r2_braycurtis"):
-            add_group_item("r2", "R^2", "bray", fn)
+            add_group_item("r2", "Feature-wise ANOVA R²", "bray", fn)
         elif low.startswith("prda_aitchison"):
             add_group_item("prda", "pRDA", "ait", fn)
         elif low.startswith("prda_braycurtis"):
@@ -791,7 +789,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                 g["ait"] = spec.filename
             elif low.startswith("r2_braycurtis"):
                 g["bray"] = spec.filename
-            g["title"] = "R^2"
+            g["title"] = "Feature-wise ANOVA R²"
         elif key == "prda":
             if low.startswith("prda_aitchison"):
                 g["ait"] = spec.filename

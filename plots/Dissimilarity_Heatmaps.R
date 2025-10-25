@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
       qn = "QN", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
       plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
       ruv = "RUV-III-NB", metadict = "MetaDICT", svd = "SVD", pn = "PN",
-      fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
+      fabatch = "Fabatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
     )
     sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
   }

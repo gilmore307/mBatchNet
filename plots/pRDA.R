@@ -1,6 +1,5 @@
-# ================= pRDA variance partition in two geometries =================
-# A) Aitchison (CLR + RDA)    -> uses files: normalized_*_clr.csv  (+ raw.csv if present)
-# B) Bray-Curtis (TSS + dbRDA)-> uses files: normalized_*_tss.csv  (+ raw.csv if present)
+# ================= pRDA variance partition (Aitchison geometry) =================
+# Uses normalized_*_clr.csv matrices (and raw_clr.csv baseline when available)
 suppressPackageStartupMessages({
   library(ggplot2)
   library(readr)
@@ -15,7 +14,7 @@ method_short_label <- function(x) {
     qn = "QN", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
     plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
     ruv = "RUV-III-NB", metadict = "MetaDICT", svd = "SVD", pn = "PN",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
+    fabatch = "Fabatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
   )
   sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
 }
@@ -81,27 +80,21 @@ if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
 
 # ---- Find normalized files ----
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
-tss_paths <- list.files(output_folder, pattern = "^normalized_.*_tss\\.csv$", full.names = TRUE)
 
-# Fallback: if no suffix-specific outputs, use any normalized_*.csv for both
-if (!length(clr_paths) && !length(tss_paths)) {
-  any_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
-  clr_paths <- any_paths
-  tss_paths <- any_paths
+# Fallback: if no suffix-specific outputs, use any normalized_*.csv as CLR
+if (!length(clr_paths)) {
+  clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
 }
 
 name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
-file_list_tss <- setNames(tss_paths, method_short_label(name_from(tss_paths, "tss")))
 
-# Include raw_clr.csv / raw_tss.csv as "Before correction" if present
+# Include raw_clr.csv as "Before correction" if present
 raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
-raw_tss_fp <- file.path(output_folder, "raw_tss.csv")
 if (file.exists(raw_clr_fp)) file_list_clr <- c("Before correction" = raw_clr_fp, file_list_clr)
-if (file.exists(raw_tss_fp)) file_list_tss <- c("Before correction" = raw_tss_fp, file_list_tss)
 
-if (!length(file_list_clr) && !length(file_list_tss)) {
-  stop("No normalized files found (expected raw_clr.csv/raw_tss.csv and/or normalized_*_clr.csv / normalized_*_tss.csv) in ", output_folder)
+if (!length(file_list_clr)) {
+  stop("No normalized CLR files found (expected raw_clr.csv and/or normalized_*_clr.csv) in ", output_folder)
 }
 
 # --------- Helpers (CLR + safe R^2) ---------
@@ -172,56 +165,6 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch_id", treat_col
   fit_both  <- vegan::rda(f_both,   data = dfx)
   fit_t     <- vegan::rda(f_t_pure, data = dfx)
   fit_b     <- vegan::rda(f_b_pure, data = dfx)
-  
-  r2_both   <- safe_adjR2(fit_both)
-  r2_t_pure <- safe_adjR2(fit_t)
-  r2_b_pure <- safe_adjR2(fit_b)
-  
-  r2_inter  <- max(0, r2_both - r2_t_pure - r2_b_pure)
-  r2_resid  <- max(0, 1 - (r2_t_pure + r2_b_pure + r2_inter))
-  
-  parts <- c(Treatment = r2_t_pure, Intersection = r2_inter,
-             Batch = r2_b_pure, Residuals = r2_resid)
-  parts[!is.finite(parts)] <- 0
-  parts <- pmax(0, parts)
-  s <- sum(parts)
-  if (s > 0) parts <- parts / s
-  parts
-}
-
-compute_prda_parts_bray <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype") {
-  # ensure sample_id present & align
-  if (!"sample_id" %in% names(df)) {
-    if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
-    else stop("Input lacks 'sample_id' and row count != metadata; can't align samples.")
-  }
-  df  <- df %>% mutate(sample_id = as.character(sample_id))
-  dfx <- inner_join(df, meta, by = "sample_id") %>%
-    filter(!is.na(.data[[batch_col]]), !is.na(.data[[treat_col]]))
-  
-  # features (TSS proportions for Bray-Curtis)
-  feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfx %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
-  keep <- apply(X, 2, function(z) all(is.finite(z)) && sd(z, na.rm = TRUE) > 0)
-  X <- X[, keep, drop = FALSE]
-  if (!ncol(X)) return(c(Treatment=0, Intersection=0, Batch=0, Residuals=1))
-  
-  Xtss <- safe_closure(X)
-  
-  dfx[[batch_col]] <- factor(dfx[[batch_col]])
-  dfx[[treat_col]] <- factor(dfx[[treat_col]])
-  if (nlevels(dfx[[treat_col]]) < 2 || nlevels(dfx[[batch_col]]) < 2) {
-    return(c(Treatment=0, Intersection=0, Batch=0, Residuals=1))
-  }
-  
-  # distance-based RDA (dbRDA) via capscale with Bray-Curtis
-  f_both   <- as.formula(paste("Xtss ~", treat_col, "+", batch_col))
-  f_t_pure <- as.formula(paste("Xtss ~", treat_col, "+ Condition(", batch_col, ")"))
-  f_b_pure <- as.formula(paste("Xtss ~", batch_col, "+ Condition(", treat_col, ")"))
-  
-  fit_both  <- vegan::capscale(f_both,   data = dfx, distance = "bray")
-  fit_t     <- vegan::capscale(f_t_pure, data = dfx, distance = "bray")
-  fit_b     <- vegan::capscale(f_b_pure, data = dfx, distance = "bray")
   
   r2_both   <- safe_adjR2(fit_both)
   r2_t_pure <- safe_adjR2(fit_t)
@@ -370,30 +313,9 @@ if (length(file_list_clr)) {
   )
 }
 
-# --------- Compute & plot: B) Bray-Curtis (TSS + dbRDA) ---------
-if (length(file_list_tss)) {
-  batch_col <- "batch_id"; treat_col <- "phenotype"
-  if (!("phenotype" %in% names(metadata))) stop("metadata.csv has no 'phenotype'.")
-  if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs ≥ 2 levels.")
-  
-  parts_df_bray <- lapply(names(file_list_tss), function(nm) {
-    message("pRDA (Bray-Curtis) for: ", nm)
-    df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
-    v  <- compute_prda_parts_bray(df, metadata, batch_col, treat_col)
-    tibble::tibble(Method = nm, Fraction = as.numeric(v))
-  }) |> bind_rows()
-  
-  plot_prda_with_table(
-    parts_df_bray, file_list_tss,
-    title_prefix  = "pRDA variance partition — Bray-Curtis (TSS + dbRDA)",
-    outfile_prefix = "pRDA_braycurtis"
-  )
-}
-
-# ==== Unified pRDA scoring (Aitchison + Bray-Curtis) =========================
-# Per-geometry score (higher = better):
+# ==== pRDA scoring (Aitchison) =========================
+# Per-method score (higher = better):
 #   Score = Treatment / (Treatment + Batch + 1e-12)
-# Unified score = geometric mean of available per-geometry scores.
 
 component_order <- c("Treatment","Intersection","Batch","Residuals")
 
@@ -429,31 +351,21 @@ score_tb <- function(tb) {
     mutate(Score = Treatment / (Treatment + Batch + eps))
 }
 
-tb_ait <- if (exists("parts_df_aitch")) score_tb(extract_TB(parts_df_aitch)) %>%
+tb_clr <- if (exists("parts_df_aitch")) score_tb(extract_TB(parts_df_aitch)) %>%
   rename(
     Treatment_CLR = Treatment,
     Batch_CLR     = Batch,
     Score_CLR     = Score
   ) else NULL
 
-tb_bra <- if (exists("parts_df_bray")) score_tb(extract_TB(parts_df_bray)) %>%
-  rename(
-    Treatment_TSS = Treatment,
-    Batch_TSS     = Batch,
-    Score_TSS     = Score
-  ) else NULL
-
 # Determine if we only have the baseline ("Before correction")
-avail_methods <- unique(c(
-  if (exists("parts_df_aitch")) unique(parts_df_aitch$Method) else character(),
-  if (exists("parts_df_bray"))  unique(parts_df_bray$Method)  else character()
-))
+avail_methods <- if (exists("parts_df_aitch")) unique(parts_df_aitch$Method) else character()
 only_baseline <- length(avail_methods) == 1L && identical(avail_methods, "Before correction")
 
 if (only_baseline) {
   # ---- Baseline-only assessment (no ranking) ----
   assess_rows <- list()
-  
+
   if (exists("parts_df_aitch")) {
     pf <- ensure_components(parts_df_aitch) %>% filter(Method == "Before correction")
     tr <- sum(pf$Fraction[pf$Component == "Treatment"], na.rm = TRUE)
@@ -468,60 +380,41 @@ if (only_baseline) {
       Needs_Correction = needs
     )
   }
-  
-  if (exists("parts_df_bray")) {
-    pf <- ensure_components(parts_df_bray) %>% filter(Method == "Before correction")
-    tr <- sum(pf$Fraction[pf$Component == "Treatment"], na.rm = TRUE)
-    bt <- sum(pf$Fraction[pf$Component == "Batch"],     na.rm = TRUE)
-    it <- sum(pf$Fraction[pf$Component == "Intersection"], na.rm = TRUE)
-    rs <- sum(pf$Fraction[pf$Component == "Residuals"],    na.rm = TRUE)
-    needs <- (is.finite(bt) && is.finite(tr) && (bt >= tr)) || (bt > 0.05)
-    assess_rows[["Bray-Curtis (TSS)"]] <- tibble::tibble(
-      Geometry = "Bray-Curtis (TSS)",
-      Treatment = tr, Batch = bt, Intersection = it, Residuals = rs,
-      Score = if (is.finite(tr) && is.finite(bt)) tr / (tr + bt + 1e-12) else NA_real_,
-      Needs_Correction = needs
-    )
-  }
-  
+
   assess_df <- dplyr::bind_rows(assess_rows)
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, "pRDA_raw_assessment.csv"))
-  
+
   suppressMessages({
-  if (any(assess_df$Needs_Correction, na.rm = TRUE)) {
-    message("pRDA baseline: Batch fraction ≥ Treatment (and/or Batch > 0.05) in at least one geometry — correction recommended.")
-  } else {
-    message("pRDA baseline: Batch fraction appears modest relative to Treatment — correction may not be necessary.")
-  }
+    if (any(assess_df$Needs_Correction, na.rm = TRUE)) {
+      message("pRDA baseline: Batch fraction ≥ Treatment (and/or Batch > 0.05) — correction recommended.")
+    } else {
+      message("pRDA baseline: Batch fraction appears modest relative to Treatment — correction may not be necessary.")
+    }
   })
-  
+
 } else {
   # ---- Normal multi-method ranking ----
-  unified <- dplyr::full_join(tb_ait, tb_bra, by = "Method") %>%
-    dplyr::rowwise() %>%
-    dplyr::mutate(
-      `Absolute score` = {
-        s <- c(Score_CLR, Score_TSS)
-        s <- s[is.finite(s)]
-        if (!length(s)) NA_real_ else exp(mean(log(s)))
-      }
-    ) %>%
-    dplyr::ungroup()
+  unified <- tibble::as_tibble(tb_clr)
 
-  baseline_abs <- unified$`Absolute score`[unified$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  if (nrow(unified)) {
+    unified <- unified %>%
+      dplyr::mutate(`Absolute score` = Score_CLR)
 
-  unified <- unified %>%
-    dplyr::mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
-    dplyr::mutate(Rank = dplyr::row_number()) %>%
-    dplyr::relocate(`Absolute score`, .after = Method) %>%
-    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
-    dplyr::relocate(Rank, .after = `Relative score`)
-  
+    baseline_abs <- unified$`Absolute score`[unified$Method == "Before correction"][1]
+    rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+
+    unified <- unified %>%
+      dplyr::mutate(
+        `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+      ) %>%
+      dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
+      dplyr::mutate(Rank = dplyr::row_number()) %>%
+      dplyr::relocate(`Absolute score`, .after = Method) %>%
+      dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
+      dplyr::relocate(Rank, .after = `Relative score`)
+  }
+
   print(unified, n = nrow(unified))
   readr::write_csv(unified, file.path(output_folder, "pRDA_ranking.csv"))
 }
