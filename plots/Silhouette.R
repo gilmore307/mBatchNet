@@ -7,6 +7,9 @@ suppressPackageStartupMessages({
   library(cluster)   # silhouette
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # ---- Config ----
 
 # Map method codes to short labels for figures
@@ -226,8 +229,10 @@ if (only_baseline) {
       x = "Method", y = "Silhouette (0-1, higher = tighter class separation)"
     ) +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )
@@ -272,8 +277,10 @@ if (only_baseline) {
       x = "Method", y = "Silhouette (0- , higher = tighter class separation)"
     ) +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )

@@ -7,6 +7,9 @@ suppressPackageStartupMessages({
   library(forcats)
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # ----------------- Args / IO -----------------
 
 # Map method codes to short labels for figures
@@ -247,14 +250,13 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
     scale_y_continuous(limits = c(0, 1)) +
     labs(y = expression("One-way ANOVA "*R^2), x = NULL, title = title) +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
+    theme_plot_legend() +
+    theme_plot_strip() +
     theme(
-      axis.text.x  = element_text(angle = 45, hjust = 1, vjust = 1),
-      panel.grid   = element_blank(),
-      axis.text    = element_text(size = 10),
-      axis.title   = element_text(size = 12),
-      strip.background = element_rect(fill = "grey90", colour = NA),
-      strip.text   = element_text(size = 10),
-      plot.title   = element_text(hjust = 0.5, size = rel(1.2))
+      axis.text.x  = element_text(angle = 45, hjust = 1, vjust = 1, size = plot_axis_text_size),
+      panel.grid   = element_blank()
     ) +
     geom_text(
       data = med_df,

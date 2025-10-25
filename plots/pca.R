@@ -7,6 +7,9 @@ suppressPackageStartupMessages({
   library(rlang)
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # ---- helpers ----
 mbecUpperCase <- function(x) paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x)))
 
@@ -212,15 +215,13 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
                 "#17BECF","#9EDAE5")
   
   var.color <- model.vars[1]
-  var.shape <- ifelse(length(model.vars) >= 2, model.vars[2], NA_character_)
   
   xcol <- colnames(plot.df)[pca.axes[1] + 1]
   ycol <- colnames(plot.df)[pca.axes[2] + 1]
-  
+
   x.label <- paste0(xcol, ": ", metric.df$var.explained[pca.axes[1]], "% expl.var")
   y.label <- paste0(ycol, ": ", metric.df$var.explained[pca.axes[2]], "% expl.var")
-  if (!is.null(label)) x.label <- paste(label, "-", x.label)
-  
+
   # compute zoomed-out limits using ellipse bounds + points
   scores <- data.frame(
     PCX = plot.df[[xcol]],
@@ -230,47 +231,31 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
   ell_bounds <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
   xr <- range(scores$PCX, na.rm = TRUE); yr <- range(scores$PCY, na.rm = TRUE)
   xlim <- range(c(xr, ell_bounds$x)); ylim <- range(c(yr, ell_bounds$y))
-  pad_x <- diff(xlim) * 0.06; pad_y <- diff(ylim) * 0.06
+  dx <- diff(xlim); dy <- diff(ylim)
+  pad_x <- if (is.finite(dx) && dx > 0) dx * 0.12 else 1e-6
+  pad_y <- if (is.finite(dy) && dy > 0) dy * 0.12 else 1e-6
   xlim <- c(xlim[1] - pad_x, xlim[2] + pad_x)
   ylim <- c(ylim[1] - pad_y, ylim[2] + pad_y)
-  
+
   pmar <- margin(10, 16, 10, 16)
-  
+
   # main scatter (legend source)
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_point(aes(shape = !!sym(var.shape)), size = 2, alpha = 0.9)
-      } else {
-        geom_point(size = 2, alpha = 0.9)
-      }
-    } +
+    geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
     scale_color_manual(values = mbecCols, name = "Batch") +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        shape_vals <- c(0,1,2,3,6,8,15,16,17,23,25,4,5,9)
-        nshape <- nlevels(plot.df[[var.shape]])
-        if (nshape <= length(shape_vals)) {
-          scale_shape_manual(values = shape_vals[seq_len(nshape)], name = "Phenotype")
-        } else scale_shape_discrete(name = "Phenotype")
-      }
-    } +
     guides(
-      colour = guide_legend(order = 1, nrow = 1, byrow = TRUE),  # many batches on one row
-      shape  = guide_legend(order = 2, nrow = 1)
+      colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +
     labs(title = NULL) +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
     xlab(x.label) + ylab(y.label) + theme_bw() +
+    theme_plot_common() +
     theme(
       panel.background = element_blank(),
-      axis.line = element_blank(),
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
@@ -279,55 +264,39 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
   
   # top density (PC1) — no legend
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_density(aes(fill = !!sym(var.color), linetype = !!sym(var.shape)),
-                     linewidth = 0.3, alpha = 0.5, show.legend = FALSE)
-      } else {
-        geom_density(aes(fill = !!sym(var.color)),
-                     linewidth = 0.3, alpha = 0.5, show.legend = FALSE)
-      }
-    } +
+    geom_density(aes(fill = !!sym(var.color)),
+                 linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
     ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     theme_bw() +
+    theme_plot_common() +
     theme(
       panel.background = element_blank(),
-      axis.line = element_blank(),
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
       legend.position = 'none',
       axis.title.x = element_blank(),
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
       plot.margin = pmar
     )
   
   # right density (PC2)
   pRight <- ggplot(plot.df, aes(y = !!sym(ycol))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_density(
-          aes(x = after_stat(density), fill = !!sym(var.color), linetype = !!sym(var.shape)),
-          linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
-        )
-      } else {
-        geom_density(
-          aes(x = after_stat(density), fill = !!sym(var.color)),
-          linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
-        )
-      }
-    } +
+    geom_density(
+      aes(x = after_stat(density), fill = !!sym(var.color)),
+      linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
+    ) +
     xlab(NULL) + ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
     theme_bw() +
+    theme_plot_common() +
     theme(
       panel.background = element_blank(),
-      axis.line = element_blank(),
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
       legend.position = "none",
       axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
       plot.margin = margin(10, 16, 10, 16)
     )
   
@@ -336,16 +305,23 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
 A#
 CB
 "
-  (pTop + pRight + pMain) + plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
+  assembled <- (pTop + pRight + pMain) +
+    plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
+
+  if (!is.null(label)) {
+    assembled <- assembled + plot_annotation(
+      title = label,
+      theme = theme_plot_title()
+    )
+  }
+
+  assembled
 }
 
 # ==== choose covariates (auto-detect shape var) ====
 batch_var  <- "batch_id"
-shape_var  <- guess_shape_var(metadata, batch_var)
-model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
-message(sprintf("Using color=%s%s",
-                batch_var,
-                if (is.na(shape_var)) " (shape: none)" else paste0(", shape=", shape_var)))
+model_vars <- c(batch_var)
+message(sprintf("Using color=%s (shape: none)", batch_var))
 
 # ==== build + save PCA panels for each matrix (single legend across ALL) ====
 pcs_to_plot <- c(1, 2)
@@ -386,6 +362,8 @@ if (n_panels == 1L) {
       legend.position  = "bottom",
       legend.direction = "horizontal",
       legend.box       = "vertical",
+      legend.title     = element_text(size = plot_legend_title_size, face = "bold"),
+      legend.text      = element_text(size = plot_legend_text_size),
       plot.margin      = margin(8, 14, 8, 14)
     )
   w <- 9.5; h <- 6
@@ -398,11 +376,15 @@ if (n_panels == 1L) {
       legend.position  = "bottom",
       legend.direction = "horizontal",
       legend.box       = "vertical",
+      legend.title     = element_text(size = plot_legend_title_size, face = "bold"),
+      legend.text      = element_text(size = plot_legend_text_size),
       plot.margin      = margin(8, 14, 8, 14)
     )
   w <- 9.5 * panel_cols
   h <- 6   * panel_rows
 }
+
+combined <- combined + plot_annotation(theme = theme_plot_overall_title())
 
 fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
 ggsave(file.path(output_folder, "pca.png"),

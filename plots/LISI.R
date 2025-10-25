@@ -25,6 +25,9 @@ method_short_label <- function(x) {
   library(patchwork)  # combine plots
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 has_repel <- requireNamespace("ggrepel", quietly = TRUE)
 
 # ------------------------------- CLI options ------------------------------------
@@ -301,10 +304,13 @@ p_scatter <- ggplot(plot_df, aes(x = x, y = y, color = Method)) +
                    ", k=", opt_k, ")")
   ) +
   theme_bw() +
+  theme_plot_axes() +
+  theme_plot_title() +
+  theme_plot_legend() +
   theme(
     legend.position    = "right",
     legend.title       = element_blank(),
-    axis.text.x        = element_text(angle = 45, hjust = 1),
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
     panel.grid.major.x = element_blank(),
     panel.grid.minor   = element_blank()
   )
@@ -316,9 +322,11 @@ p_i <- ggplot(lisi_long %>% filter(Metric=="iLISI"),
   coord_cartesian(ylim = c(0,1)) +
   labs(title = "iLISI distribution", y = "iLISI", x = NULL) +
   theme_bw() +
+  theme_plot_axes() +
+  theme_plot_title() +
   theme(
     legend.position = "none",
-    axis.text.x     = element_text(angle = 45, hjust = 1)
+    axis.text.x     = element_text(angle = 45, hjust = 1, size = plot_axis_text_size)
   )
 
 p_c <- ggplot(lisi_long %>% filter(Metric=="cLISI"),
@@ -327,9 +335,11 @@ p_c <- ggplot(lisi_long %>% filter(Metric=="cLISI"),
   coord_cartesian(ylim = c(0,1)) +
   labs(title = "cLISI distribution", y = "cLISI", x = NULL) +
   theme_bw() +
+  theme_plot_axes() +
+  theme_plot_title() +
   theme(
     legend.position = "none",
-    axis.text.x     = element_text(angle = 45, hjust = 1)
+    axis.text.x     = element_text(angle = 45, hjust = 1, size = plot_axis_text_size)
   )
 
 # 3) Combined panel: scatter on top, two boxplots below

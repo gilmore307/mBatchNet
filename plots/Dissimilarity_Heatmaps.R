@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(patchwork)
   library(vegan)  # Bray-Curtis
-  
+
   # Map method codes to short labels for figures
   method_short_label <- function(x) {
     map <- c(
@@ -20,6 +20,9 @@ suppressPackageStartupMessages({
     sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
   }
 })
+
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
 
 # ==== IO ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -279,10 +282,12 @@ upper_heatmap_panel <- function(Db, ord, title_label, fill_label,
     coord_fixed() +
     labs(title = title_label, x = NULL, y = NULL) +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
+    theme_plot_legend() +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 8),
-      axis.text.y = element_text(size = 8),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = plot_axis_text_size),
+      axis.text.y = element_text(size = plot_axis_text_size),
       axis.ticks  = element_blank(),
       panel.grid  = element_blank(),
       legend.position = "bottom",

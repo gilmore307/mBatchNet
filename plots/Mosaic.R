@@ -6,6 +6,9 @@ library(tidyr)      # for pivot_wider()
 library(gridExtra)
 library(grid)       # for unit()
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # ==== Args / config (for input and output folder) ====
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -153,21 +156,21 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
     guides(fill = guide_legend(title = "Batch", reverse = TRUE, keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = batchCols) +
     ylab("Proportion of all observations") +
-    theme(axis.text.x = element_blank(),
-          axis.text.y = element_text(colour = main_color, size = 12),
-          axis.ticks = element_blank(),
-          axis.line = element_line(color = "#7F7F7F"),
-          axis.title.x = element_blank(),
-          axis.title.y = element_text(size = rel(1), angle = 90),
-          legend.position = 'bottom', legend.box = 'horizontal',
-          legend.direction = 'horizontal',
-          legend.key.height = unit(0.2, 'cm'),
-          legend.key.width  = unit(0.1, 'cm'),
-          legend.title = element_text(size = rel(legend.title.cex)),
-          legend.spacing.x = unit(0.1, 'cm'),
-          legend.spacing.y = unit(0.1, 'cm'),
-          legend.text  = element_text(size = rel(legend.cex)),
-          plot.margin = unit(c(0.2, 0.2, 0.05, 0.2), "cm"))
+    theme_bw() +
+    theme_plot_axes() +
+    theme_plot_legend() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(colour = main_color, size = plot_axis_text_size),
+      axis.ticks = element_blank(),
+      axis.line = element_line(color = "#7F7F7F"),
+      axis.title.x = element_blank(),
+      legend.position = 'bottom', legend.box = 'horizontal',
+      legend.direction = 'horizontal',
+      legend.key.height = unit(0.2, 'cm'),
+      legend.key.width  = unit(0.1, 'cm'),
+      plot.margin = unit(c(0.2, 0.2, 0.05, 0.2), "cm")
+    )
   
   # ----- Facet 2: bars colored by outcome (legend = Outcome) -----
   plot.v1 <- ggplot(
@@ -178,21 +181,21 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
     guides(fill = guide_legend(title = "Outcome", reverse = TRUE, keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = outcomeCols, breaks = names(outcomeCols)) +
     ylab("Proportion of all observations") +
-    theme(axis.text.x = element_blank(),
-          axis.text.y = element_text(colour = main_color, size = 12),
-          axis.ticks = element_blank(),
-          axis.line = element_line(color = "#7F7F7F"),
-          axis.title.x = element_blank(),
-          axis.title.y = element_text(size = rel(1), angle = 90),
-          legend.position = 'bottom', legend.box = 'horizontal',
-          legend.direction = 'horizontal',
-          legend.key.height = unit(0.2, 'cm'),
-          legend.key.width  = unit(0.1, 'cm'),
-          legend.title = element_text(size = rel(legend.title.cex)),
-          legend.spacing.x = unit(0.1, 'cm'),
-          legend.spacing.y = unit(0.1, 'cm'),
-          legend.text  = element_text(size = rel(legend.cex)),
-          plot.margin = unit(c(0.05, 0.2, 0.2, 0.2), "cm"))
+    theme_bw() +
+    theme_plot_axes() +
+    theme_plot_legend() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(colour = main_color, size = plot_axis_text_size),
+      axis.ticks = element_blank(),
+      axis.line = element_line(color = "#7F7F7F"),
+      axis.title.x = element_blank(),
+      legend.position = 'bottom', legend.box = 'horizontal',
+      legend.direction = 'horizontal',
+      legend.key.height = unit(0.2, 'cm'),
+      legend.key.width  = unit(0.1, 'cm'),
+      plot.margin = unit(c(0.05, 0.2, 0.2, 0.2), "cm")
+    )
   
   # Legend extractor
   g_legend <- function(a.gplot) {

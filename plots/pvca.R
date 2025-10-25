@@ -22,6 +22,9 @@ method_short_label <- function(x) {
 
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 if (!requireNamespace("lme4", quietly = TRUE)) {
   stop("Package 'lme4' is required. install.packages('lme4')")
 }
@@ -328,11 +331,12 @@ p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
   ) +
   labs(x = "Methods", y = "Explained variance (%)", title = "PVCA (weighted by PC variance)") +
   theme_bw() +
+  theme_plot_axes() +
+  theme_plot_title() +
+  theme_plot_legend() +
   theme(
     legend.position    = "right",
-    legend.title       = element_text(size = 10),
-    legend.text        = element_text(size = 9),
-    axis.text.x        = element_text(angle = 45, hjust = 1),
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
     panel.grid.major.x = element_blank(),
     panel.grid.minor   = element_blank()
   )

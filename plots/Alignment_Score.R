@@ -6,6 +6,9 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # --------- Args / config ---------
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -204,8 +207,10 @@ if (only_baseline) {
     labs(title = "Alignment Score (baseline)",
          x = "Method", y = "AS (0- , higher = better mixing)") +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )
@@ -235,8 +240,10 @@ if (only_baseline) {
     labs(title = "Alignment Score",
          x = "Method", y = "AS (0-1, higher = better mixing)") +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank()
     )

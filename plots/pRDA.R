@@ -24,6 +24,9 @@ method_short_label <- function(x) {
   library(vegan)       # rda, capscale, RsquareAdj
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 # --------- Args / IO ---------
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -274,14 +277,14 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
     labs(x = "Methods", y = "Explained variance (%)",
          title = title_prefix) +
     theme_bw() +
+    theme_plot_axes() +
+    theme_plot_title() +
+    theme_plot_legend() +
     theme(
       legend.position    = "right",
-      legend.title       = element_text(size = 10),
-      legend.text        = element_text(size = 9),
-      axis.text.x        = element_text(angle = 45, hjust = 1),
+      axis.text.x        = element_text(angle = 45, hjust = 1, size = plot_axis_text_size),
       panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "bold")
+      panel.grid.minor   = element_blank()
     )
   
   # Values table

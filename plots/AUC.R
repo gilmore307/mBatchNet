@@ -8,6 +8,9 @@ suppressPackageStartupMessages({
   library(pROC)
 })
 
+# ---- shared styling ----
+source(file.path("plots", "plot_theme.R"))
+
 
 # Map method codes to short labels for figures
 method_short_label <- function(x) {
@@ -255,7 +258,10 @@ if (only_baseline) {
          x = "False Positive Rate (1 - Specificity)",
          y = "True Positive Rate (Sensitivity)",
          color = NULL) +
-    theme_minimal(base_size = 14) +
+    theme_minimal() +
+    theme_plot_axes() +
+    theme_plot_title() +
+    theme_plot_legend() +
     theme(legend.position = "bottom")
   
   fig_dims <- apply_fig_overrides(6.5, 5, 300)
@@ -306,7 +312,10 @@ if (only_baseline) {
          x = "False Positive Rate (1 - Specificity)",
          y = "True Positive Rate (Sensitivity)",
          color = NULL) +
-    theme_minimal(base_size = 14) +
+    theme_minimal() +
+    theme_plot_axes() +
+    theme_plot_title() +
+    theme_plot_legend() +
     theme(legend.position = "bottom")
   
   fig_dims <- apply_fig_overrides(8.8, 6.2, 300)
