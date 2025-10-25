@@ -403,10 +403,10 @@ CB
       theme_void() +
       theme(
         plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-        plot.margin = margin(0, 16, 2, 16)
+        plot.margin = margin(0, 16, 0, 16)
       )
     assembled <- (title_strip / assembled) +
-      plot_layout(heights = c(0.18, 1))
+      plot_layout(heights = c(0.12, 1))
   }
 
   assembled
