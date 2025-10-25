@@ -272,10 +272,12 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.line = element_blank(),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 12, face = "plain"),
+      axis.title.y = element_text(size = 12, face = "plain"),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
+      plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
     )
   p
 }

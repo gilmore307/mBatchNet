@@ -255,6 +255,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
       axis.line = element_blank(),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 12, face = "plain"),
+      axis.title.y = element_text(size = 12, face = "plain"),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
@@ -275,6 +277,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = 'none',
+      axis.title.y = element_text(size = 12, face = "plain"),
       axis.title.x = element_blank(),
       plot.margin = pmar
     )
@@ -295,7 +298,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = "none",
-      axis.title.y = element_blank(),
+      axis.title.x = element_text(size = 12, face = "plain"),
+      axis.title.y = element_text(size = 12, face = "plain"),
       plot.margin = margin(10, 16, 10, 16)
     )
   
@@ -311,7 +315,7 @@ CB
     assembled <- assembled + plot_annotation(
       title = label,
       theme = theme(
-        plot.title = element_text(hjust = 0.5, face = "bold")
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
       )
     )
   }
