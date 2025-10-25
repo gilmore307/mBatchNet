@@ -487,7 +487,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
 
     Group metrics by base (e.g., PCoA, NMDS, R2, pRDA, Dissimilarity heatmaps).
     For groups with multiple geometries (Aitchison/Bray-Curtis), show a single
-    top-level tab with sub-tabs: Aitchison (CLR), Bray-Curtis (TSS), and a third
+    top-level tab with sub-tabs: Aitchison, Bray-Curtis, and a third
     sub-tab that is either Assessment (stage='pre') or Rank (stage='post').
     Single-geometry plots also include the third sub-tab accordingly.
     """
@@ -638,9 +638,9 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         # Build sub-tab definitions first so we can size them evenly later
         sub_defs = []
         if g["ait"]:
-            sub_defs.append(("Aitchison (CLR)", f"{key}-ait", content_for_image(g["ait"])) )
+            sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
         if g["bray"]:
-            sub_defs.append(("Bray-Curtis (TSS)", f"{key}-bray", content_for_image(g["bray"])) )
+            sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
         if g["single"] and not (g["ait"] or g["bray"]):
             sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
@@ -818,9 +818,9 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
     if g["ait"]:
-        sub_defs.append(("Aitchison (CLR)", f"{key}-ait", content_for_image(g["ait"])) )
+        sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
     if g["bray"]:
-        sub_defs.append(("Bray-Curtis (TSS)", f"{key}-bray", content_for_image(g["bray"])) )
+        sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
     if g["single"] and not (g["ait"] or g["bray"]):
         sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
