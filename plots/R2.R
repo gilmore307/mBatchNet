@@ -223,7 +223,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
     scale_fill_manual(values = c(Batch = "#FF7F0E", Treatment = "#BDBDBD"),
                       name = "Effect", drop = FALSE) +
     scale_y_continuous(limits = c(0, 1)) +
-    labs(y = expression("One-way ANOVA "*R^2), x = NULL, title = title) +
+    labs(y = expression("Feature-wise ANOVA "*R^2), x = NULL, title = title) +
     theme_bw() +
     theme(
       axis.text.x  = element_text(angle = 45, hjust = 1, vjust = 1),
@@ -249,7 +249,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
 
 p_clr <- make_boxplot(
   r2_long_clr, method_levels_clr,
-  expression("Per-feature " * R^2 * " (one-way ANOVA) - CLR (Aitchison)")
+  expression("Feature-wise ANOVA " * R^2 * " - CLR (Aitchison)")
 )
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)

@@ -641,6 +641,8 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
             sub_defs.append(("Aitchison (CLR)", f"{key}-ait", content_for_image(g["ait"])) )
         if g["bray"]:
             sub_defs.append(("Bray-Curtis (TSS)", f"{key}-bray", content_for_image(g["bray"])) )
+        if g["single"] and not (g["ait"] or g["bray"]):
+            sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
         # Third sub-tab: Assessment (pre) or Rank (post)
         third_label = "Assessment" if stage == "pre" else "Rank"
