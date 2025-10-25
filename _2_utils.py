@@ -112,9 +112,9 @@ SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
     ("MetaDICT", "MetaDICT"),
     ("SVD", "SVD"),
     ("PN", "PN"),
-    ("FAbatch", "Fabatch"),
+    ("FAbatch", "FAbatch"),
     ("ComBatSeq", "ComBat-seq"),
-    ("DEBIAS", "DEBIAS"),
+    ("DEBIAS", "DEBIAS-M"),
 )
 
 # Map method identifiers (as they may appear in CSVs) to formal display names
