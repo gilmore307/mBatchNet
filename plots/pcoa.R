@@ -305,12 +305,10 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
                 "#8C564B","#C49C94","#F7B6D2","#7F7F7F","#C7C7C7","#DBDB8D",
                 "#17BECF","#9EDAE5")
   var.color <- model.vars[1]
-  var.shape <- ifelse(length(model.vars) >= 2, model.vars[2], NA_character_)
   xcol <- paste0("PCo", axes[1]); ycol <- paste0("PCo", axes[2])
   x.label <- paste0(xcol, ": ", metric.df$var.explained[axes[1]], "% expl.var")
   y.label <- paste0(ycol, ": ", metric.df$var.explained[axes[2]], "% expl.var")
-  if (!is.null(label)) x.label <- paste(label, "-", x.label)
-  
+
   scores <- data.frame(
     AX1 = plot.df[[xcol]],
     AX2 = plot.df[[ycol]],
@@ -320,37 +318,21 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
   eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
   xr <- safe_range(scores$AX1); yr <- safe_range(scores$AX2)
   xlim <- finite_range(xr, eb$x); ylim <- finite_range(yr, eb$y)
-  pad_x <- safe_pad(xlim, 0.06); pad_y <- safe_pad(ylim, 0.06)
+  pad_x <- safe_pad(xlim, 0.12); pad_y <- safe_pad(ylim, 0.12)
   xlim <- c(xlim[1] - pad_x, xlim[2] + pad_x)
   ylim <- c(ylim[1] - pad_y, ylim[2] + pad_y)
   if (!is.null(xlim_override)) xlim <- xlim_override
   if (!is.null(ylim_override)) ylim <- ylim_override
-  
+
   pmar <- margin(10, 16, 10, 16)
-  
+
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_point(aes(shape = !!sym(var.shape)), size = 2, alpha = 0.9)
-      } else {
-        geom_point(size = 2, alpha = 0.9)
-      }
-    } +
+    geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
     scale_color_manual(values = mbecCols, name = palette_name) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        shape_vals <- c(0,1,2,3,6,8,15,16,17,23,25,4,5,9)
-        nshape <- nlevels(plot.df[[var.shape]])
-        if (nshape <= length(shape_vals)) {
-          scale_shape_manual(values = shape_vals[seq_len(nshape)], name = "Phenotype")
-        } else scale_shape_discrete(name = "Phenotype")
-      }
-    } +
-    guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE),
-           shape  = guide_legend(order = 2, nrow = 1)) +
+    guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
     labs(title = NULL) +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
@@ -367,15 +349,8 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
     )
   
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_density(aes(fill = !!sym(var.color), linetype = !!sym(var.shape)),
-                     linewidth = 0.3, alpha = 0.5, show.legend = FALSE)
-      } else {
-        geom_density(aes(fill = !!sym(var.color)),
-                     linewidth = 0.3, alpha = 0.5, show.legend = FALSE)
-      }
-    } +
+    geom_density(aes(fill = !!sym(var.color)),
+                 linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
     ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
@@ -391,19 +366,10 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
     )
   
   pRight <- ggplot(plot.df, aes(y = !!sym(ycol))) +
-    {
-      if (!is.na(var.shape) && var.shape %in% names(plot.df)) {
-        geom_density(
-          aes(x = after_stat(density), fill = !!sym(var.color), linetype = !!sym(var.shape)),
-          linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
-        )
-      } else {
-        geom_density(
-          aes(x = after_stat(density), fill = !!sym(var.color)),
-          linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
-        )
-      }
-    } +
+    geom_density(
+      aes(x = after_stat(density), fill = !!sym(var.color)),
+      linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
+    ) +
     xlab(NULL) + ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
@@ -422,13 +388,24 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
 A#
 CB
 "
-  (pTop + pRight + pMain) + plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
+  assembled <- (pTop + pRight + pMain) +
+    plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
+
+  if (!is.null(label)) {
+    assembled <- assembled + plot_annotation(
+      title = label,
+      theme = theme(
+        plot.title = element_text(hjust = 0.5, face = "bold")
+      )
+    )
+  }
+
+  assembled
 }
 
 # ==== Params ====
 batch_var  <- "batch_id"
-shape_var  <- "phenotype"
-model_vars <- if (is.na(shape_var)) c(batch_var) else c(batch_var, shape_var)
+model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 2
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
@@ -439,9 +416,7 @@ SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 # =========================
 # Set 1: Aitchison (CLR)
 # =========================
-message(sprintf("PCoA (Aitchison on CLR): color=%s%s",
-                batch_var,
-                if (is.na(shape_var)) " (shape: none)" else paste0(", shape=", shape_var)))
+message(sprintf("PCoA (Aitchison on CLR): color=%s (shape: none)", batch_var))
 
 frames_cache_clr <- list()
 global_x_clr <- NULL; global_y_clr <- NULL
@@ -466,7 +441,7 @@ for (nm in names(file_list_clr)) {
   global_y_clr <- if (is.null(global_y_clr)) finite_range(yr, eb$y) else finite_range(global_y_clr, yr, eb$y)
 }
 
-pad_x <- safe_pad(global_x_clr, 0.06); pad_y <- safe_pad(global_y_clr, 0.06)
+pad_x <- safe_pad(global_x_clr, 0.12); pad_y <- safe_pad(global_y_clr, 0.12)
 xlim_global_clr <- c(global_x_clr[1] - pad_x, global_x_clr[2] + pad_x)
 ylim_global_clr <- c(global_y_clr[1] - pad_y, global_y_clr[2] + pad_y)
 if (isTRUE(SYMMETRIC_AXES)) {
@@ -519,9 +494,7 @@ ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
 # =========================
 # Set 2: Bray–Curtis (TSS)
 # =========================
-message(sprintf("PCoA (Bray–Curtis on TSS): color=%s%s",
-                batch_var,
-                if (is.na(shape_var)) " (shape: none)" else paste0(", shape=", shape_var)))
+message(sprintf("PCoA (Bray–Curtis on TSS): color=%s (shape: none)", batch_var))
 
 frames_cache_tss <- list()
 global_x_tss <- NULL; global_y_tss <- NULL
@@ -546,7 +519,7 @@ for (nm in names(file_list_tss)) {
   global_y_tss <- if (is.null(global_y_tss)) finite_range(yr, eb$y) else finite_range(global_y_tss, yr, eb$y)
 }
 
-pad_x <- safe_pad(global_x_tss, 0.06); pad_y <- safe_pad(global_y_tss, 0.06)
+pad_x <- safe_pad(global_x_tss, 0.12); pad_y <- safe_pad(global_y_tss, 0.12)
 xlim_global_tss <- c(global_x_tss[1] - pad_x, global_x_tss[2] + pad_x)
 ylim_global_tss <- c(global_y_tss[1] - pad_y, global_y_tss[2] + pad_y)
 if (isTRUE(SYMMETRIC_AXES)) {
