@@ -275,7 +275,8 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       panel.background = element_blank(),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
-      legend.box = 'vertical'
+      legend.box = 'vertical',
+      plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
     )
   p
 }

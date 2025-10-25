@@ -395,7 +395,9 @@ CB
   if (!is.null(label)) {
     assembled <- assembled + plot_annotation(
       title = label,
-      theme = theme_plot_title()
+      theme = theme(
+        plot.title = element_text(hjust = 0.5, face = "bold")
+      )
     )
   }
 
