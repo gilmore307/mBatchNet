@@ -664,8 +664,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                     for idx, column_name in enumerate(header):
                         source_idx = keep_idx[idx]
                         cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                        numeric_value = _safe_float(cell)
-                        row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
+                        if column_name.lower() == "method":
+                            row_dict[column_name] = method_formal_name(str(cell))
+                        else:
+                            numeric_value = _safe_float(cell)
+                            row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
                     formatted_rows.append(row_dict)
                 numeric_headers = {
                     col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -846,8 +849,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                             record: Dict[str, object] = {}
                             for idx, col_name in enumerate(header):
                                 cell = row[idx] if idx < len(row) else ""
-                                numeric_value = _safe_float(cell)
-                                record[col_name] = numeric_value if numeric_value is not None else cell
+                                if col_name.lower() == "method":
+                                    record[col_name] = method_formal_name(str(cell))
+                                else:
+                                    numeric_value = _safe_float(cell)
+                                    record[col_name] = numeric_value if numeric_value is not None else cell
                             formatted_rows.append(record)
                         numeric_headers = {
                             col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -1624,8 +1630,11 @@ def build_raw_assessments_tab(session_dir: Path):
             for idx, column_name in enumerate(header):
                 source_idx = keep_idx[idx]
                 cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                numeric_value = _safe_float(cell)
-                record[column_name] = numeric_value if numeric_value is not None else cell
+                if column_name.lower() == "method":
+                    record[column_name] = method_formal_name(str(cell))
+                else:
+                    numeric_value = _safe_float(cell)
+                    record[column_name] = numeric_value if numeric_value is not None else cell
             formatted_rows.append(record)
         numeric_headers = {
             col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
