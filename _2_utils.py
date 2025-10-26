@@ -5,6 +5,7 @@ import base64
 import csv
 import json
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -664,6 +665,9 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                     if column_name.lower() == "score":
                         continue
                     display = _display_column_name(column_name)
+                    display_lower = display.lower()
+                    if display_lower == "score" or display_lower.startswith("score ("):
+                        continue
                     if display.lower() == "rank":
                         display = "Average rank"
                     if display in seen_headers:
@@ -1073,10 +1077,36 @@ def _display_column_name(name: str) -> str:
     if name is None:
         return ""
     cleaned = str(name).replace("_", " ")
-    # collapse multiple consecutive spaces that may result from replacements
-    while "  " in cleaned:
-        cleaned = cleaned.replace("  ", " ")
-    return cleaned.strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+
+    ait_pattern = re.compile(r"\b(aitchison|ait|clr)\b", re.IGNORECASE)
+    ait_paren_pattern = re.compile(r"\(\s*(aitchison|ait|clr)\s*(?:geometry)?\s*\)", re.IGNORECASE)
+    bc_pattern = re.compile(r"\b(bray[-\s]*curtis|bc|tss)\b", re.IGNORECASE)
+    bc_paren_pattern = re.compile(r"\(\s*(bray[-\s]*curtis|bc|tss)\s*(?:geometry)?\s*\)", re.IGNORECASE)
+
+    geometry: Optional[str] = None
+    if ait_pattern.search(cleaned) or ait_paren_pattern.search(cleaned):
+        geometry = "Ait"
+    elif bc_pattern.search(cleaned) or bc_paren_pattern.search(cleaned):
+        geometry = "BC"
+
+    for pattern in (ait_paren_pattern, bc_paren_pattern):
+        cleaned = pattern.sub("", cleaned)
+
+    cleaned = ait_pattern.sub("", cleaned)
+    cleaned = bc_pattern.sub("", cleaned)
+
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s*-\s*", " ", cleaned)
+    cleaned = cleaned.strip(" -")
+
+    if geometry:
+        if cleaned:
+            cleaned = f"{cleaned} ({geometry})"
+        else:
+            cleaned = f"({geometry})"
+
+    return cleaned
 
 
 def _format_geometry_value(value: object) -> object:
