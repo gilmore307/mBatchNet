@@ -1,7 +1,7 @@
 # ===============================
 # File: _6_correction.py
 # ===============================
-from typing import Dict, Sequence, List, Set
+from typing import Dict, List, Set
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -13,7 +13,6 @@ from _2_utils import (
     get_session_dir,
     run_methods,
     SUPPORTED_METHODS,
-    DEFAULT_METHODS,
     compute_integrated_summary,
     load_integrated_summary,
     get_completed_methods,
@@ -26,34 +25,23 @@ METHOD_GRID_COLUMNS = [
     {
         "headerName": "Method",
         "field": "method",
-        "checkboxSelection": True,
-        "headerCheckboxSelection": True,
-        "flex": 1,
-        "minWidth": 200,
-        "pinned": "left",
-        "headerTooltip": "Display name of the batch-correction method. Use the checkboxes to select methods.",
+        "headerTooltip": "Display name of the batch-correction method.",
     },
     {
         "headerName": "Runs",
         "field": "runs",
         "type": "numericColumn",
-        "width": 90,
         "headerTooltip": "Number of historical correction runs (excluding example sessions).",
     },
     {
         "headerName": "Avg Time (s)",
         "field": "avg_elapsed_sec",
         "type": "numericColumn",
-        "width": 140,
         "headerTooltip": "Average runtime in seconds, taken from session logs.",
     },
     {
         "headerName": "Status",
         "field": "status_display",
-        "width": 120,
-        "minWidth": 120,
-        "maxWidth": 150,
-        "pinned": "right",
         "suppressMenu": True,
         "sortable": False,
         "filter": False,
@@ -68,10 +56,6 @@ METHOD_GRID_COLUMNS = [
             "className": "btn btn-sm btn-primary",
             "tooltip": "Run this correction method for the current session.",
         },
-        "width": 120,
-        "minWidth": 120,
-        "maxWidth": 160,
-        "pinned": "right",
         "suppressMenu": True,
         "sortable": False,
         "filter": False,
@@ -84,10 +68,6 @@ METHOD_GRID_COLUMNS = [
             "className": "btn btn-sm btn-outline-danger",
             "tooltip": "Delete this method's outputs and reset its status to pending.",
         },
-        "width": 120,
-        "minWidth": 120,
-        "maxWidth": 160,
-        "pinned": "right",
         "suppressMenu": True,
         "sortable": False,
         "filter": False,
@@ -121,15 +101,16 @@ def correction_layout(active_path: str):
                         rowData=[],
                         className="ag-theme-alpine mb-3",
                         dashGridOptions={
-                            "rowSelection": "multiple",
                             "animateRows": False,
-                            "suppressRowClickSelection": False,
                             "ensureDomOrder": True,
+                            "suppressRowClickSelection": True,
                         },
                         defaultColDef={
                             "resizable": True,
                             "sortable": True,
                             "filter": True,
+                            "flex": 1,
+                            "minWidth": 140,
                         },
                         style={"height": "420px", "width": "100%"},
                     ),
@@ -175,16 +156,13 @@ def register_correction_callbacks(app):
 
     @app.callback(
         Output("method-grid", "rowData"),
-        Output("method-grid", "selectedRows"),
         Input("method-summary-store", "data"),
         Input("method-status-store", "data"),
-        State("selected-methods", "data"),
         prevent_initial_call=False,
     )
     def populate_method_grid(
         summary: Dict[str, object] | None,
         status_data: Dict[str, object] | None,
-        selected_codes: Sequence[str] | None,
     ):
         rows: List[Dict[str, object]] = []
         if summary and isinstance(summary, dict):
@@ -220,20 +198,7 @@ def register_correction_callbacks(app):
             row["run_label"] = row.get("run_label") or "Run"
             row["delete_label"] = row.get("delete_label") or "Delete"
             row["run_enabled"] = True
-        selected_set = set(selected_codes or DEFAULT_METHODS)
-        selected_rows = [row for row in rows if row.get("code") in selected_set]
-        return rows, selected_rows
-
-    @app.callback(
-        Output("selected-methods", "data", allow_duplicate=True),
-        Input("method-grid", "selectedRows"),
-        prevent_initial_call=True,
-    )
-    def sync_selected_methods(selected_rows: List[Dict[str, object]] | None):
-        if not selected_rows:
-            return []
-        codes = [row.get("code") for row in selected_rows if row.get("code")]
-        return codes
+        return rows
 
     @app.callback(
         Output("method-status-store", "data"),
