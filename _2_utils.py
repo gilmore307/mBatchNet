@@ -30,23 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "output"
 PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
-METHOD_SCRIPT_MAP: Dict[str, Path] = {
-    "QN": CORRECTION_DIR / "methods" / "QN.R",
-    "BMC": CORRECTION_DIR / "methods" / "BMC.R",
-    "limma": CORRECTION_DIR / "methods" / "limma.R",
-    "ConQuR": CORRECTION_DIR / "methods" / "ConQuR.R",
-    "PLSDA": CORRECTION_DIR / "methods" / "PLSDA.R",
-    "ComBat": CORRECTION_DIR / "methods" / "ComBat.R",
-    "FSQN": CORRECTION_DIR / "methods" / "FSQN.R",
-    "MMUPHin": CORRECTION_DIR / "methods" / "MMUPHin.R",
-    "RUV": CORRECTION_DIR / "methods" / "RUV.R",
-    "MetaDICT": CORRECTION_DIR / "methods" / "MetaDICT.R",
-    "SVD": CORRECTION_DIR / "methods" / "SVD.R",
-    "PN": CORRECTION_DIR / "methods" / "PN.R",
-    "FAbatch": CORRECTION_DIR / "methods" / "FAbatch.R",
-    "ComBatSeq": CORRECTION_DIR / "methods" / "ComBatSeq.R",
-    "DEBIAS": CORRECTION_DIR / "methods" / "DEBIAS.R",
-}
+METHODS_DIR = CORRECTION_DIR / "methods"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
@@ -134,6 +118,35 @@ SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
     ("ComBatSeq", "ComBat-seq"),
     ("DEBIAS", "DEBIAS-M"),
 )
+
+def _normalize_method_code(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _discover_method_scripts() -> Dict[str, Path]:
+    scripts: Dict[str, Path] = {}
+    if not METHODS_DIR.exists():
+        return scripts
+    for script in METHODS_DIR.glob("*.R"):
+        key = _normalize_method_code(script.stem)
+        if key:
+            scripts[key] = script
+    return scripts
+
+
+_METHOD_SCRIPT_INDEX: Dict[str, Path] = _discover_method_scripts()
+
+
+def resolve_method_script(method: str) -> Optional[Path]:
+    if not method:
+        return None
+    return _METHOD_SCRIPT_INDEX.get(_normalize_method_code(method))
+
+
+# Convenience set listing codes whose backing scripts were not found during import.
+MISSING_METHOD_SCRIPTS: Set[str] = {
+    code for code, _ in SUPPORTED_METHODS if resolve_method_script(code) is None
+}
 
 # Map method identifiers (as they may appear in CSVs) to formal display names
 _FORMAL_MAP: Dict[str, str] = {code.lower(): display for code, display in SUPPORTED_METHODS}
@@ -276,6 +289,24 @@ def run_command(command: Sequence[str], cwd: Path) -> Tuple[bool, str]:
         return False, log
 
 
+def _terminate_process(proc: subprocess.Popen, *, timeout: float = 5.0) -> None:
+    """Best-effort helper to terminate a child process."""
+
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+            proc.wait(timeout=timeout)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    except OSError:
+        pass
+
+
 def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> Tuple[bool, str]:
     """Run a command streaming stdout to a log file for real-time viewing.
 
@@ -283,11 +314,12 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
     combined: List[str] = []
+    env = os.environ.copy()
+    env.setdefault("RETICULATE_PYTHON", sys.executable)
+    header = "$ " + " ".join(command) + "\n"
+    proc: Optional[subprocess.Popen] = None
     try:
-        env = os.environ.copy()
-        env.setdefault("RETICULATE_PYTHON", sys.executable)
         with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-            header = "$ " + " ".join(command) + "\n"
             logf.write(header)
             logf.flush()
             proc = subprocess.Popen(
@@ -301,15 +333,30 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
                 env=env,
             )
             assert proc.stdout is not None
-            for line in proc.stdout:
-                logf.write(line)
-                logf.flush()
-                combined.append(line)
+            try:
+                for line in proc.stdout:
+                    logf.write(line)
+                    logf.flush()
+                    combined.append(line)
+            except Exception:
+                if proc is not None:
+                    _terminate_process(proc)
+                raise
+            finally:
+                if proc.stdout is not None:
+                    try:
+                        proc.stdout.close()
+                    except OSError:
+                        pass
             rc = proc.wait()
             success = (rc == 0)
             return success, header + "".join(combined)
     except Exception as exc:
-        return False, f"$ {' '.join(command)}\n{exc}"
+        if proc is not None:
+            _terminate_process(proc)
+        partial = header + "".join(combined)
+        message = f"{partial}\n{exc}" if partial else f"$ {' '.join(command)}\n{exc}"
+        return False, message
 
 
 def run_r_scripts(
@@ -329,7 +376,7 @@ def run_r_scripts(
         if not script_path.exists():
             logs.append(f"Warning: Script not found: {script}")
             continue
-        cmd = ("Rscript", str(script_path), str(output_dir), *args)
+        cmd = ("Rscript", "--vanilla", str(script_path), str(output_dir), *args)
         if log_path is not None:
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -345,9 +392,11 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
 
     Each method is executed by invoking its dedicated R script under
     ``correction/methods`` so that the R process terminates after every run,
-    releasing its memory. The combined log output from all runs is returned.
-    When ``log_path`` is provided the streaming log is appended to the same
-    file for every method.
+    releasing its memory. Script paths are discovered automatically from the
+    available files, ensuring that newly added methods can be picked up without
+    editing the Python source. The combined log output from all runs is
+    returned. When ``log_path`` is provided the streaming log is appended to
+    the same file for every method.
     """
 
     logs: List[str] = []
@@ -356,20 +405,26 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         method_arg = str(method)
         if not method_arg:
             continue
-        script_path = (
-            METHOD_SCRIPT_MAP.get(method_arg)
-            or METHOD_SCRIPT_MAP.get(method_arg.upper())
-            or METHOD_SCRIPT_MAP.get(method_arg.lower())
-        )
+        canonical_code = method_arg
+        script_path = resolve_method_script(canonical_code)
         if script_path is None:
-            logs.append(f"Unknown method: {method_arg}")
+            lookup = DISPLAY_TO_CODE.get(method_arg) or DISPLAY_TO_CODE_LOWER.get(method_arg.lower())
+            if lookup:
+                canonical_code = lookup
+                script_path = resolve_method_script(canonical_code)
+        if script_path is None:
+            message = f"Unknown method: {method_arg}"
+            if MISSING_METHOD_SCRIPTS:
+                missing = ", ".join(sorted(MISSING_METHOD_SCRIPTS))
+                message += f" (missing scripts for: {missing})"
+            logs.append(message)
             overall_success = False
-            break
+            continue
         if not script_path.exists():
-            logs.append(f"Script not found for method {method_arg}: {script_path.name}")
+            logs.append(f"Script not found for method {canonical_code}: {script_path.name}")
             overall_success = False
-            break
-        command = ("Rscript", str(script_path), str(session_dir))
+            continue
+        command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
         if log_path is not None:
             success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -377,7 +432,15 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         logs.append(log)
         if not success:
             overall_success = False
-            break
+            failure_note = f"Method failed: {canonical_code}"
+            if log_path is not None:
+                try:
+                    with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                        logf.write(failure_note + "\n")
+                except OSError:
+                    pass
+            logs.append(failure_note)
+            continue
     return overall_success, "\n\n".join(filter(None, logs))
 
 
@@ -390,7 +453,7 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
     if not PREPROCESS_SCRIPT.exists():
         return False, f"Script not found: {PREPROCESS_SCRIPT.name}"
     matrix_path = session_dir / "raw.csv"
-    command = ("Rscript", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
+    command = ("Rscript", "--vanilla", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)

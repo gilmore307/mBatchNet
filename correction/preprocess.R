@@ -293,26 +293,33 @@ write_tss_clr <- function(method, native, native_type, filename) {
 # ---------------------------
 # Run
 # ---------------------------
-say("▶ Converting to TSS & CLR")
-say("Output folder: ", normalizePath(output_folder, winslash = "/"))
-say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
-
-# Prefer header-less numeric matrix; fall back to headered if needed
-read_matrix_guess <- function(p) {
-  opt1 <- tryCatch(utils::read.csv(p, header = FALSE, check.names = FALSE), error = function(e) NULL)
-  opt2 <- tryCatch(utils::read.csv(p, header = TRUE,  check.names = FALSE), error = function(e) NULL)
-  score <- function(df) { if (is.null(df)) return(-Inf); mean(vapply(df, is.numeric, TRUE)) }
-  if (!is.null(opt1) && score(opt1) >= score(opt2)) return(opt1)
-  if (!is.null(opt2)) return(opt2)
-  stop("Failed to read matrix: ", p)
+run_main <- TRUE
+if (exists("PREPROCESS_SKIP_MAIN", inherits = TRUE)) {
+  run_main <- !isTRUE(get("PREPROCESS_SKIP_MAIN", inherits = TRUE))
 }
 
-uploaded_mat <- read_matrix_guess(matrix_path)
-check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)
-input_form <- detect_input_form(uploaded_mat)
-say("ℹ️ Detected input form: ", input_form)
+if (isTRUE(run_main)) {
+  say("▶ Converting to TSS & CLR")
+  say("Output folder: ", normalizePath(output_folder, winslash = "/"))
+  say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
 
-base_M <- as.matrix(uploaded_mat)
-write_tss_clr("INPUT", base_M, input_form, basename(matrix_path))
+  # Prefer header-less numeric matrix; fall back to headered if needed
+  read_matrix_guess <- function(p) {
+    opt1 <- tryCatch(utils::read.csv(p, header = FALSE, check.names = FALSE), error = function(e) NULL)
+    opt2 <- tryCatch(utils::read.csv(p, header = TRUE,  check.names = FALSE), error = function(e) NULL)
+    score <- function(df) { if (is.null(df)) return(-Inf); mean(vapply(df, is.numeric, TRUE)) }
+    if (!is.null(opt1) && score(opt1) >= score(opt2)) return(opt1)
+    if (!is.null(opt2)) return(opt2)
+    stop("Failed to read matrix: ", p)
+  }
 
-say("🎉 Done. Wrote _tss and _clr files into: ", normalizePath(output_folder, winslash = "/"))
+  uploaded_mat <- read_matrix_guess(matrix_path)
+  check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)
+  input_form <- detect_input_form(uploaded_mat)
+  say("ℹ️ Detected input form: ", input_form)
+
+  base_M <- as.matrix(uploaded_mat)
+  write_tss_clr("INPUT", base_M, input_form, basename(matrix_path))
+
+  say("🎉 Done. Wrote _tss and _clr files into: ", normalizePath(output_folder, winslash = "/"))
+}
