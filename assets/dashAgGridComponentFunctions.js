@@ -24,10 +24,10 @@ function buildButton(props, actionKey) {
             __action: actionKey,
             __action_ts: Date.now(),
         });
-        if (node && typeof node.setData === 'function') {
-            node.setData(next);
-        } else if (typeof setData === 'function') {
+        if (typeof setData === 'function') {
             setData(next);
+        } else if (node && typeof node.setData === 'function') {
+            node.setData(next);
         } else if (props && props.api && typeof props.api.applyTransaction === 'function') {
             props.api.applyTransaction({ update: [next] });
         }
