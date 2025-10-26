@@ -198,6 +198,33 @@ body {
   justify-content: center;
 }
 
+.be-ag-grid .be-ag-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.be-ag-grid .be-ag-header-center .ag-header-cell-label {
+  justify-content: center;
+}
+
+.be-method-grid-loading-parent {
+  position: relative;
+}
+
+.be-method-grid-loading-parent .dash-loading-overlay {
+  position: absolute;
+  inset: 0;
+  left: 50%;
+  width: 50%;
+  pointer-events: auto;
+}
+
+.be-ag-grid .be-ag-center {
+  padding: 0 !important;
+}
+
 .be-ag-grid .ag-cell {
   line-height: 1.3;
   padding-left: 8px !important;

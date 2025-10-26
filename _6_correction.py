@@ -45,7 +45,6 @@ METHOD_GRID_COLUMNS = [
         "suppressMenu": True,
         "sortable": False,
         "filter": False,
-        "cellClass": "text-center",
         "headerTooltip": "Current run status for this method in the active session.",
     },
     {
@@ -55,6 +54,7 @@ METHOD_GRID_COLUMNS = [
         "cellRendererParams": {
             "className": "btn btn-sm btn-primary",
             "tooltip": "Run this correction method for the current session.",
+            "style": {"width": "120px"},
         },
         "suppressMenu": True,
         "sortable": False,
@@ -66,7 +66,8 @@ METHOD_GRID_COLUMNS = [
         "cellRenderer": "DeleteActionButton",
         "cellRendererParams": {
             "className": "btn btn-sm btn-outline-danger",
-            "tooltip": "Delete this method's outputs and reset its status to pending.",
+            "tooltip": "Delete this method's outputs and reset its status to unselected.",
+            "style": {"width": "120px"},
         },
         "suppressMenu": True,
         "sortable": False,
@@ -77,8 +78,8 @@ METHOD_GRID_COLUMNS = [
 METHOD_DISPLAY = {code: name for code, name in SUPPORTED_METHODS}
 
 STATUS_ICONS = {
-    "completed": "✅ Completed",
-    "pending": "⏳ Pending",
+    "finished": "✅ Finished",
+    "unselected": "⭕ Unselected",
 }
 
 
@@ -87,7 +88,7 @@ def correction_layout(active_path: str):
         [
             build_navbar(active_path),
             dcc.Store(id="method-summary-store", data=None),
-            dcc.Store(id="method-status-store", data={"completed": []}),
+            dcc.Store(id="method-status-store", data={"finished": []}),
             dbc.Container(
                 [
                     html.H2("Batch Effect Correction"),
@@ -95,24 +96,53 @@ def correction_layout(active_path: str):
                         "Select the correction methods to run. Historical performance statistics are used to help "
                         "prioritise methods that typically perform well for your datasets."
                     ),
-                    dag.AgGrid(
-                        id="method-grid",
-                        columnDefs=METHOD_GRID_COLUMNS,
-                        rowData=[],
-                        className="ag-theme-alpine mb-3",
-                        dashGridOptions={
-                            "animateRows": False,
-                            "ensureDomOrder": True,
-                            "suppressRowClickSelection": True,
-                        },
-                        defaultColDef={
-                            "resizable": True,
-                            "sortable": True,
-                            "filter": True,
-                            "flex": 1,
-                            "minWidth": 140,
-                        },
-                        style={"height": "420px", "width": "100%"},
+                    dcc.Loading(
+                        id="method-action-loading",
+                        type="default",
+                        className="w-100",
+                        parent_className="be-method-grid-loading-parent",
+                        children=html.Div(
+                            [
+                                dag.AgGrid(
+                                    id="method-grid",
+                                    columnDefs=METHOD_GRID_COLUMNS,
+                                    rowData=[],
+                                    className="ag-theme-alpine be-ag-grid mb-3",
+                                    dashGridOptions={
+                                        "animateRows": False,
+                                        "ensureDomOrder": True,
+                                        "suppressRowClickSelection": True,
+                                        "rowSelection": "none",
+                                        "getRowId": {
+                                            "function": (
+                                                "function(params) {"
+                                                " const data = params && params.data ? params.data : {};"
+                                                " const code = data.code || data.method;"
+                                                " return code ? code : params.rowIndex; }"
+                                            ),
+                                        },
+                                    },
+                                    defaultColDef={
+                                        "resizable": True,
+                                        "sortable": True,
+                                        "filter": True,
+                                        "flex": 1,
+                                        "minWidth": 140,
+                                        "cellClass": "be-ag-center",
+                                        "headerClass": "be-ag-header-center",
+                                        "cellStyle": {
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                            "justifyContent": "center",
+                                            "textAlign": "center",
+                                        },
+                                    },
+                                    style={"height": "420px", "width": "100%"},
+                                ),
+                                html.Div(id="method-action-spinner", style={"display": "none"}),
+                            ],
+                            className="position-relative",
+                        ),
                     ),
                     dbc.Alert(
                         "Results remain private unless you choose to share anonymised summaries using the consent prompt "
@@ -131,8 +161,8 @@ def correction_layout(active_path: str):
 
 def register_correction_callbacks(app):
     def _status_payload(session_dir) -> Dict[str, List[str]]:
-        completed = sorted(get_completed_methods(session_dir)) if session_dir else []
-        return {"completed": completed}
+        finished = sorted(get_completed_methods(session_dir)) if session_dir else []
+        return {"finished": finished}
 
     @app.callback(
         Output("method-summary-store", "data"),
@@ -181,20 +211,24 @@ def register_correction_callbacks(app):
                 }
                 for code, display in SUPPORTED_METHODS
             ]
-        completed_set: Set[str] = set()
+        finished_set: Set[str] = set()
         if isinstance(status_data, dict):
-            completed_raw = status_data.get("completed", [])
-            if isinstance(completed_raw, (list, tuple, set)):
-                for item in completed_raw:
+            finished_raw = status_data.get("finished")
+            if finished_raw is None:
+                finished_raw = status_data.get("completed", [])
+            if isinstance(finished_raw, (list, tuple, set)):
+                for item in finished_raw:
                     normalized = normalize_method_code(str(item))
                     if normalized:
-                        completed_set.add(normalized)
+                        finished_set.add(normalized)
         for row in rows:
             code = row.get("code")
             normalized_code = normalize_method_code(str(code)) if code else ""
-            is_completed = normalized_code in completed_set
-            row["status_display"] = STATUS_ICONS["completed"] if is_completed else STATUS_ICONS["pending"]
-            row["delete_enabled"] = is_completed
+            is_finished = normalized_code in finished_set
+            row["status_display"] = (
+                STATUS_ICONS["finished"] if is_finished else STATUS_ICONS["unselected"]
+            )
+            row["delete_enabled"] = is_finished
             row["run_label"] = row.get("run_label") or "Run"
             row["delete_label"] = row.get("delete_label") or "Delete"
             row["run_enabled"] = True
@@ -207,7 +241,7 @@ def register_correction_callbacks(app):
     )
     def refresh_method_status(session_id: str | None):
         if not session_id:
-            return {"completed": []}
+            return {"finished": []}
         session_dir = get_session_dir(session_id)
         return _status_payload(session_dir)
 
@@ -219,6 +253,7 @@ def register_correction_callbacks(app):
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
         Output("method-status-store", "data", allow_duplicate=True),
+        Output("method-action-spinner", "children", allow_duplicate=True),
         Input("method-grid", "cellRendererData"),
         State("session-id", "data"),
         prevent_initial_call=True,
@@ -262,6 +297,7 @@ def register_correction_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 status_store_update,
+                dash.no_update,
             )
         session_dir = get_session_dir(session_id)
         if is_run_action and (
@@ -275,6 +311,7 @@ def register_correction_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 status_store_update,
+                dash.no_update,
             )
         log_path = session_dir / "run.log"
         display_name = METHOD_DISPLAY.get(method_code, method_code)
@@ -282,7 +319,7 @@ def register_correction_callbacks(app):
             success, message = clear_method_outputs(session_dir, method_code)
             detail = f" ({message})" if message else ""
             status_msg = (
-                f"Removed outputs for {display_name} and reset status to pending.{detail}"
+                f"Removed outputs for {display_name} and reset status to unselected.{detail}"
                 if success
                 else f"Failed to delete outputs for {display_name}: {message}"
             )
@@ -296,6 +333,7 @@ def register_correction_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 status_store_update,
+                "",
             )
 
         success, log = run_methods(session_dir, [method_code], log_path=log_path)
@@ -314,4 +352,5 @@ def register_correction_callbacks(app):
             dash.no_update,
             dash.no_update,
             status_store_update,
+            "",
         )
