@@ -32,6 +32,7 @@ PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
 METHODS_DIR = CORRECTION_DIR / "methods"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
+COMPLETED_METHODS_FILENAME = "completed_methods.json"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
@@ -438,19 +439,80 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     return False, combined
 
 
+def _completed_methods_path(session_dir: Path) -> Path:
+    return session_dir / COMPLETED_METHODS_FILENAME
+
+
+def _load_completed_methods(session_dir: Path) -> Set[str]:
+    path = _completed_methods_path(session_dir)
+    if not path.exists():
+        return set()
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return set()
+    items: Iterable[str]
+    if isinstance(data, dict):
+        items = data.get("completed", [])  # legacy-friendly
+    else:
+        items = data if isinstance(data, list) else []
+    normalized: Set[str] = set()
+    for item in items:
+        code = _normalize_method_code(str(item))
+        if code:
+            normalized.add(code)
+    return normalized
+
+
+def _save_completed_methods(session_dir: Path, completed: Set[str]) -> None:
+    path = _completed_methods_path(session_dir)
+    try:
+        with path.open("w", encoding="utf-8") as fh:
+            json.dump(sorted(completed), fh, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def _append_log_message(log_path: Path, message: str) -> None:
+    try:
+        with log_path.open("a", encoding="utf-8", errors="replace") as fh:
+            fh.write(message + "\n")
+    except OSError:
+        pass
+
+
 def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
     """Run correction methods sequentially, one R subprocess per method."""
 
     logs: List[str] = []
     overall_success = True
+    completed_codes = _load_completed_methods(session_dir)
+
     for method in methods:
         if not method:
             continue
+
+        canonical_code, _ = _normalize_method_name(method)
+        if canonical_code:
+            if canonical_code in completed_codes:
+                display = CODE_TO_DISPLAY.get(canonical_code, canonical_code)
+                message = f"Skipping {display}: already completed."
+                logs.append(message)
+                if log_path is not None:
+                    _append_log_message(log_path, message)
+                continue
+
         success, log = run_single_method(session_dir, method, log_path=log_path)
         if log:
             logs.append(log)
-        if not success:
+        if success:
+            if canonical_code:
+                completed_codes.add(canonical_code)
+                _save_completed_methods(session_dir, completed_codes)
+        else:
             overall_success = False
+
     return overall_success, "\n\n".join(filter(None, logs))
 
 
