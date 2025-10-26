@@ -224,16 +224,6 @@ def gate_nav_buttons(preprocess_done, pre_started, pre_done, correction_done, po
     )
 
 
-@app.callback(
-    Output("run-correction", "disabled"),
-    Output("run-correction", "color"),
-    Input("upload-complete", "data"),
-)
-def toggle_correction_button(upload_complete: bool):
-    enabled = bool(upload_complete)
-    return (not enabled), ("success" if enabled else "secondary")
-
-
 # ---- Intercept Home/Upload nav to confirm restart ----
 @app.callback(
     Output("confirm-restart-modal", "is_open"),

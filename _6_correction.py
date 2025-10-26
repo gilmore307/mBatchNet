@@ -65,7 +65,27 @@ METHOD_GRID_COLUMNS = [
         "minWidth": 160,
         "headerTooltip": "Metric where the method performed the weakest on average.",
     },
+    {
+        "headerName": "",
+        "field": "run_action",
+        "cellRenderer": "ButtonRenderer",
+        "cellRendererParams": {
+            "label": "Run",
+            "className": "btn btn-sm btn-primary",
+            "tooltip": "Run this correction method for the current session.",
+            "onClick": {"function": "function(e){return {code: e.data.code};}"},
+        },
+        "width": 120,
+        "minWidth": 120,
+        "maxWidth": 160,
+        "pinned": "right",
+        "suppressMenu": True,
+        "sortable": False,
+        "filter": False,
+    },
 ]
+
+METHOD_DISPLAY = {code: name for code, name in SUPPORTED_METHODS}
 
 
 def correction_layout(active_path: str):
@@ -105,21 +125,7 @@ def correction_layout(active_path: str):
                         dismissable=False,
                         className="mb-3",
                     ),
-                    dcc.Loading(
-                        [
-                            dbc.Button(
-                                "Run correction",
-                                id="run-correction",
-                                color="secondary",
-                                className="mb-2",
-                                disabled=True,
-                                size="sm",
-                                style={"width": "250px"},
-                            ),
-                            html.Div(id="correction-status", className="text-muted mb-3"),
-                        ],
-                        type="default",
-                    ),
+                    html.Div(id="correction-status", className="text-muted mb-3"),
                 ],
                 fluid=True,
             ),
@@ -199,26 +205,65 @@ def register_correction_callbacks(app):
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
-        Input("run-correction", "n_clicks"),
-        State("selected-methods", "data"),
+        Input("method-grid", "cellRendererData"),
         State("session-id", "data"),
         prevent_initial_call=True,
     )
-    def perform_correction(n_clicks: int, methods: Sequence[str], session_id: str):
-        if not n_clicks:
+    def perform_correction(cell_event: Dict[str, object] | List[Dict[str, object]], session_id: str):
+        if not cell_event:
+            raise dash.exceptions.PreventUpdate
+        # Support both the dict (single event) and list (history) payload shapes
+        if isinstance(cell_event, list):
+            if not cell_event:
+                raise dash.exceptions.PreventUpdate
+            event = cell_event[-1]
+        else:
+            event = cell_event
+        if not isinstance(event, dict):
+            raise dash.exceptions.PreventUpdate
+        column_id = (
+            event.get("colId")
+            or event.get("columnId")
+            or event.get("col")
+            or (event.get("column") or {}).get("colId")
+        )
+        if column_id and "run" not in str(column_id).lower():
+            raise dash.exceptions.PreventUpdate
+        method_code = (
+            (event.get("code") if isinstance(event.get("code"), str) else None)
+            or (event.get("value") if isinstance(event.get("value"), str) else None)
+            or ((event.get("rowData") or event.get("data") or {}).get("code") if isinstance(event.get("rowData") or event.get("data"), dict) else None)
+        )
+        if not method_code:
+            raise dash.exceptions.PreventUpdate
+        method_code = method_code.strip()
+        if not method_code:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            return (
+                "Upload data before running corrections.",
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-        methods = methods or []
-        if not methods:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-
-        # Append all correction logs to a single session-wide log file
+            return (
+                "Upload data before running corrections.",
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
         log_path = session_dir / "run.log"
-        success, log = run_methods(session_dir, methods, log_path=log_path)
-        # Do not auto-open logs modal; user can open manually
-        status_msg = "Correction complete." if success else "Correction failed. Check Logs."
+        success, log = run_methods(session_dir, [method_code], log_path=log_path)
+        display_name = METHOD_DISPLAY.get(method_code, method_code)
+        status_msg = (
+            f"Method {display_name} completed successfully."
+            if success
+            else f"Method {display_name} failed. Check logs for details."
+        )
         return status_msg, bool(success), str(log_path), None, dash.no_update, dash.no_update
