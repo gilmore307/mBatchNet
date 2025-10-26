@@ -657,15 +657,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                 header, data = _read_csv_rows(found)
                 if not header:
                     break
-                lower = [h.lower() for h in header]
-                keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-                header = [header[i] for i in keep_idx]
                 formatted_rows: List[Dict[str, object]] = []
                 for raw_row in data:
                     row_dict: Dict[str, object] = {}
                     for idx, column_name in enumerate(header):
-                        source_idx = keep_idx[idx]
-                        cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
+                        cell = raw_row[idx] if idx < len(raw_row) else ""
                         if column_name.lower() == "method":
                             row_dict[column_name] = method_formal_name(str(cell))
                         else:
@@ -838,14 +834,12 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                     header, data = _read_csv_rows(found)
                     if header:
                         lower = [h.lower() for h in header]
-                        keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-                        header = [header[i] for i in keep_idx]
                         def _fmt3(v):
                             try:
                                 return f"{float(v):.3f}"
                             except Exception:
                                 return v
-                        data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
+                        data = [[_fmt3(cell) for cell in row] for row in data]
                         formatted_rows: List[Dict[str, object]] = []
                         for row in data:
                             record: Dict[str, object] = {}
@@ -871,7 +865,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                                 col_def["pinned"] = "left"
                                 col_def["flex"] = 0
                             if col in numeric_headers:
-                                col_def["type"] = "numericColumn"
                                 col_def["type"] = "numericColumn"
                             column_defs.append(col_def)
                         third_content = _make_ag_grid(
@@ -1082,9 +1075,9 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
     "lisi": ScoreSpec(field="absolute score"),
-    "nmds": ScoreSpec(field="absolute score"),
-    "pca": ScoreSpec(field="absolute score"),
-    "pcoa": ScoreSpec(field="absolute score"),
+    "nmds": ScoreSpec(),
+    "pca": ScoreSpec(),
+    "pcoa": ScoreSpec(),
     "prda": ScoreSpec(field="absolute score"),
     "pvca": ScoreSpec(field="absolute score"),
     "r2": ScoreSpec(field="absolute score"),
@@ -1211,31 +1204,45 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
 def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     if not data.entries:
         return None
-    base_columns = ["Method", "Rank", "Absolute score", "Relative score"]
+    has_rank = any(entry.rank is not None for entry in data.entries)
+    has_absolute = any(entry.absolute is not None for entry in data.entries)
+    has_relative = any(entry.relative is not None for entry in data.entries)
+
+    base_columns: List[str] = ["Method"]
+    if has_rank:
+        base_columns.append("Rank")
+    if has_absolute:
+        base_columns.append("Absolute score")
+    if has_relative:
+        base_columns.append("Relative score")
+
+    excluded = {"method", "rank", "absolute score", "relative score"}
+    excluded.update(col.lower() for col in base_columns)
     extra_cols = [
         col for col in data.columns
-        if col and col.lower() not in {"method", "rank", "absolute score", "relative score"}
+        if col and col.lower() not in excluded
     ]
     header = base_columns + extra_cols
 
     row_data: List[Dict[str, object]] = []
-    numeric_candidates: Dict[str, bool] = {col: False for col in base_columns + extra_cols}
+    numeric_candidates: Dict[str, bool] = {col: False for col in header}
     for entry in data.entries:
         rank_val = _rounded(entry.rank)
         absolute_val = _rounded(entry.absolute)
         relative_val = _rounded(entry.relative)
-        row: Dict[str, object] = {
-            "Method": entry.method,
-            "Rank": rank_val,
-            "Absolute score": absolute_val,
-            "Relative score": relative_val,
-        }
-        if rank_val is not None:
-            numeric_candidates["Rank"] = True
-        if absolute_val is not None:
-            numeric_candidates["Absolute score"] = True
-        if relative_val is not None:
-            numeric_candidates["Relative score"] = True
+        row: Dict[str, object] = {"Method": entry.method}
+        if "Rank" in base_columns:
+            row["Rank"] = rank_val
+            if rank_val is not None:
+                numeric_candidates["Rank"] = True
+        if "Absolute score" in base_columns:
+            row["Absolute score"] = absolute_val
+            if absolute_val is not None:
+                numeric_candidates["Absolute score"] = True
+        if "Relative score" in base_columns:
+            row["Relative score"] = relative_val
+            if relative_val is not None:
+                numeric_candidates["Relative score"] = True
         for col in extra_cols:
             raw_value = entry.raw.get(col, "")
             numeric_value = _safe_float(raw_value)
@@ -1472,16 +1479,10 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
         crit = "-"
         if "criteria" in [h.lower() for h in header]:
             crit = row[[h.lower() for h in header].index("criteria")]
-        # Comment from Needs_Correction if available
-        comment = "-"
-        if "needs_correction" in [h.lower() for h in header]:
-            val = row[[h.lower() for h in header].index("needs_correction")]
-            comment = "Need correction" if str(val).strip().upper() in ("TRUE", "1") else "No correction"
         rows.append({
             "Test": test_name,
             "Criteria": crit,
             "Test Result": pick_value(header, row),
-            "Comment": comment,
         })
 
     column_defs = [
@@ -1499,11 +1500,6 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
             "headerName": "Test Result",
             "field": "Test Result",
             "minWidth": 160,
-        },
-        {
-            "headerName": "Comment",
-            "field": "Comment",
-            "minWidth": 180,
         },
     ]
     return _make_ag_grid(
@@ -1622,16 +1618,12 @@ def build_raw_assessments_tab(session_dir: Path):
         header, data = _read_csv_rows(path)
         if not header:
             continue
-        # Drop Needs_Correction and format numerics to 3 decimals
-        lower = [h.lower() for h in header]
-        keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-        header = [header[i] for i in keep_idx]
+        # Format numerics to 3 decimals
         formatted_rows: List[Dict[str, object]] = []
         for raw_row in data:
             record: Dict[str, object] = {}
             for idx, column_name in enumerate(header):
-                source_idx = keep_idx[idx]
-                cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
+                cell = raw_row[idx] if idx < len(raw_row) else ""
                 if column_name.lower() == "method":
                     record[column_name] = method_formal_name(str(cell))
                 else:

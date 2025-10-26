@@ -421,49 +421,9 @@ ggsave(file.path(output_folder, "nmds_braycurtis.tif"),
 # NMDS ranking (with baseline-only assessment)
 # =========================
 
-# --- helpers ---
-compute_centroids_nmds <- function(scores, batch_var = "batch_id") {
-  scores %>%
-    dplyr::group_by(!!rlang::sym(batch_var)) %>%
-    dplyr::summarise(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2), .groups = "drop")
-}
-compute_centroid_distances <- function(centroids) {
-  if (nrow(centroids) < 2) return(NA_real_)
-  as.numeric(mean(dist(centroids[, c("NMDS1", "NMDS2")], method = "euclidean")))
-}
-compute_within_dispersion_nmds <- function(scores, batch_var = "batch_id") {
-  if (!all(c("NMDS1","NMDS2", batch_var) %in% names(scores))) return(NA_real_)
-  levs <- levels(scores[[batch_var]]); if (is.null(levs)) levs <- unique(scores[[batch_var]])
-  ws <- c(); ns <- c()
-  for (lev in levs) {
-    sub <- scores[scores[[batch_var]] == lev, c("NMDS1","NMDS2"), drop = FALSE]
-    n <- nrow(sub)
-    if (n < 2) next
-    d <- stats::dist(sub, method = "euclidean")
-    ws <- c(ws, mean(d)); ns <- c(ns, n)
-  }
-  if (!length(ws)) return(NA_real_)
-  stats::weighted.mean(ws, w = ns)
-}
-
-# then combine via geometric mean (higher = better).
-nmds_metric_score <- function(batch_distance, stress, within_dispersion = NA_real_, stress_cap = 0.30) {
-  if (is.na(batch_distance) || is.na(stress)) return(NA_real_)
-  S_batch <- NA_real_
-  if (!is.na(within_dispersion) && within_dispersion >= 0) {
-    if (batch_distance == 0 && within_dispersion == 0) {
-      S_batch <- 1
-    } else if (!is.finite(batch_distance)) {
-      S_batch <- NA_real_
-    } else {
-      S_batch <- within_dispersion / (within_dispersion + batch_distance)
-    }
-  } else if (!is.na(batch_distance)) {
-    S_batch <- 1 / (1 + batch_distance)
-  }
-  if (is.na(S_batch)) return(NA_real_)
-  S_stress <- pmax(0, 1 - pmin(stress, stress_cap) / stress_cap)
-  sqrt(S_batch * S_stress)
+nmds_metric_score <- function(stress) {
+  if (is.na(stress)) return(NA_real_)
+  stress
 }
 
 methods_clr <- names(frames_cache_clr)
@@ -478,71 +438,48 @@ if (only_baseline) {
   
   if ("Before correction" %in% methods_clr) {
     fr <- frames_cache_clr[["Before correction"]]
-    md <- metadata[match(fr$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-    scores <- fr$plot.df %>%
-      dplyr::select(sample_id, NMDS1, NMDS2) %>%
-      dplyr::mutate(batch_id = factor(md$batch_id))
-    cents <- compute_centroids_nmds(scores, "batch_id")
-    D_between <- compute_centroid_distances(cents)
-    W_within  <- compute_within_dispersion_nmds(scores, "batch_id")
-    stress    <- fr$stress
-    score     <- nmds_metric_score(D_between, stress, W_within)
-    needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
-    
-    assess_rows[["CLR"]] <- tibble::tibble(
+    stress <- fr$stress
+    score  <- nmds_metric_score(stress)
+
+    assess_rows[["Ait"]] <- tibble::tibble(
       Method            = "Before correction",
-      Geometry          = "Aitchison (CLR)",
-      Batch_Distance    = D_between,
-      Within_Dispersion = W_within,
+      Geometry          = "Ait",
       NMDS_Stress       = stress,
-      Score             = score,
-      Needs_Correction  = needs_correction
+      Score             = score
     )
   }
-  
+
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
-    md <- metadata[match(fr$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-    scores <- fr$plot.df %>%
-      dplyr::select(sample_id, NMDS1, NMDS2) %>%
-      dplyr::mutate(batch_id = factor(md$batch_id))
-    cents <- compute_centroids_nmds(scores, "batch_id")
-    D_between <- compute_centroid_distances(cents)
-    W_within  <- compute_within_dispersion_nmds(scores, "batch_id")
-    stress    <- fr$stress
-    score     <- nmds_metric_score(D_between, stress, W_within)
-    needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
-    
-    assess_rows[["TSS"]] <- tibble::tibble(
+    stress <- fr$stress
+    score  <- nmds_metric_score(stress)
+
+    assess_rows[["BC"]] <- tibble::tibble(
       Method            = "Before correction",
-      Geometry          = "Bray-Curtis (TSS)",
-      Batch_Distance    = D_between,
-      Within_Dispersion = W_within,
+      Geometry          = "BC",
       NMDS_Stress       = stress,
-      Score             = score,
-      Needs_Correction  = needs_correction
+      Score             = score
     )
   }
-  
+
   assess_df <- dplyr::bind_rows(assess_rows)
-  
-  # Combined view (geometric mean of available scores; OR on correction flags)
-  comb_score <- dplyr::case_when(
-    nrow(assess_df) >= 2 && all(is.finite(assess_df$Score)) ~ sqrt(prod(assess_df$Score)),
-    TRUE                                                    ~ max(assess_df$Score, na.rm = TRUE)
-  )
-  needs_corr_any <- any(assess_df$Needs_Correction, na.rm = TRUE)
-  
+
+  finite_stress <- assess_df$NMDS_Stress[is.finite(assess_df$NMDS_Stress)]
+  comb_stress <- if (length(finite_stress) >= 2) {
+    mean(finite_stress)
+  } else if (length(finite_stress) == 1) {
+    finite_stress
+  } else {
+    NA_real_
+  }
+
   assess_df <- dplyr::bind_rows(
     assess_df,
     tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Combined",
-      Batch_Distance    = NA_real_,
-      Within_Dispersion = NA_real_,
-      NMDS_Stress       = NA_real_,
-      Score             = comb_score,
-      Needs_Correction  = needs_corr_any
+      NMDS_Stress       = comb_stress,
+      Score             = comb_stress
     )
   )
   
@@ -555,82 +492,87 @@ if (only_baseline) {
   # ===== Multi-method ranking =====
   rank_tbl <- dplyr::tibble(
     Method = character(),
-    Batch_Distance_CLR = numeric(),
-    Within_Dispersion_CLR = numeric(),
-    Batch_Distance_TSS = numeric(),
-    Within_Dispersion_TSS = numeric(),
-    NMDS_Stress_CLR    = numeric(),
-    NMDS_Stress_TSS    = numeric(),
-    Score_CLR          = numeric(),
-    Score_TSS          = numeric(),
-    `Absolute score`   = numeric()
+    NMDS_Stress_Ait = numeric(),
+    NMDS_Stress_BC  = numeric()
   )
-  
+
   for (m in all_methods) {
     # CLR NMDS
-    D_a <- NA_real_; W_a <- NA_real_; S_a <- NA_real_; stress_a <- NA_real_
+    stress_a <- NA_real_
     if (m %in% methods_clr) {
       fr_a <- frames_cache_clr[[m]]
-      md_a <- metadata[match(fr_a$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-      scores_a <- fr_a$plot.df %>%
-        dplyr::select(sample_id, NMDS1, NMDS2) %>%
-        dplyr::mutate(batch_id = factor(md_a$batch_id))
-      cents_a <- compute_centroids_nmds(scores_a, "batch_id")
-      D_a <- compute_centroid_distances(cents_a)
-      W_a <- compute_within_dispersion_nmds(scores_a, "batch_id")
       stress_a <- fr_a$stress
-      S_a <- nmds_metric_score(D_a, stress_a, W_a)
     }
 
     # TSS NMDS
-    D_b <- NA_real_; W_b <- NA_real_; S_b <- NA_real_; stress_b <- NA_real_
+    stress_b <- NA_real_
     if (m %in% methods_tss) {
       fr_b <- frames_cache_tss[[m]]
-      md_b <- metadata[match(fr_b$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-      scores_b <- fr_b$plot.df %>%
-        dplyr::select(sample_id, NMDS1, NMDS2) %>%
-        dplyr::mutate(batch_id = factor(md_b$batch_id))
-      cents_b <- compute_centroids_nmds(scores_b, "batch_id")
-      D_b <- compute_centroid_distances(cents_b)
-      W_b <- compute_within_dispersion_nmds(scores_b, "batch_id")
       stress_b <- fr_b$stress
-      S_b <- nmds_metric_score(D_b, stress_b, W_b)
     }
-    
-    # Combine available NMDS metric scores (geometric mean; higher = better)
-    Combined <- dplyr::case_when(
-      !is.na(S_a) && !is.na(S_b) ~ sqrt(S_a * S_b),
-      !is.na(S_a)                ~ S_a,
-      !is.na(S_b)                ~ S_b,
-      TRUE                       ~ NA_real_
-    )
-    
+
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
-      Batch_Distance_CLR = D_a,
-      Within_Dispersion_CLR = W_a,
-      Batch_Distance_TSS = D_b,
-      Within_Dispersion_TSS = W_b,
-      NMDS_Stress_CLR    = stress_a,
-      NMDS_Stress_TSS    = stress_b,
-      Score_CLR          = S_a,
-      Score_TSS          = S_b,
-      `Absolute score`   = Combined
+      NMDS_Stress_Ait = stress_a,
+      NMDS_Stress_BC  = stress_b
     ))
   }
 
-  baseline_abs <- rank_tbl$`Absolute score`[rank_tbl$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  baseline_clr <- rank_tbl$NMDS_Stress_Ait[rank_tbl$Method == "Before correction"][1]
+  baseline_tss <- rank_tbl$NMDS_Stress_BC[rank_tbl$Method == "Before correction"][1]
+
+  rel_clr <- rep(NA_real_, nrow(rank_tbl))
+  if (length(baseline_clr) && is.finite(baseline_clr) && baseline_clr != 0) {
+    rel_clr <- rank_tbl$NMDS_Stress_Ait / baseline_clr
+  }
+  rel_tss <- rep(NA_real_, nrow(rank_tbl))
+  if (length(baseline_tss) && is.finite(baseline_tss) && baseline_tss != 0) {
+    rel_tss <- rank_tbl$NMDS_Stress_BC / baseline_tss
+  }
+
+  baseline_idx <- which(rank_tbl$Method == "Before correction")[1]
+  if (length(baseline_idx) == 1L) {
+    if (is.finite(rank_tbl$NMDS_Stress_Ait[baseline_idx])) rel_clr[baseline_idx] <- 1
+    if (is.finite(rank_tbl$NMDS_Stress_BC[baseline_idx])) rel_tss[baseline_idx] <- 1
+  }
+
+  rank_clr <- rep(NA_real_, nrow(rank_tbl))
+  valid_clr <- which(is.finite(rank_tbl$NMDS_Stress_Ait))
+  if (length(valid_clr)) {
+    rank_clr[valid_clr] <- rank(rank_tbl$NMDS_Stress_Ait[valid_clr], ties.method = "average")
+  }
+
+  rank_tss <- rep(NA_real_, nrow(rank_tbl))
+  valid_tss <- which(is.finite(rank_tbl$NMDS_Stress_BC))
+  if (length(valid_tss)) {
+    rank_tss[valid_tss] <- rank(rank_tbl$NMDS_Stress_BC[valid_tss], ties.method = "average")
+  }
+
+  avg_rank <- vapply(seq_len(nrow(rank_tbl)), function(i) {
+    vals <- c(rank_clr[i], rank_tss[i])
+    vals <- vals[is.finite(vals)]
+    if (!length(vals)) NA_real_ else mean(vals)
+  }, numeric(1))
 
   ranked_nmds_only <- rank_tbl %>%
     dplyr::mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+      `Relative score (Ait)` = rel_clr,
+      `Relative score (BC)` = rel_tss,
+      Rank_Ait = rank_clr,
+      Rank_BC  = rank_tss,
+      Rank = avg_rank
     ) %>%
-    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
-    dplyr::mutate(Rank = dplyr::row_number()) %>%
-    dplyr::relocate(`Absolute score`, .after = Method) %>%
-    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
-    dplyr::relocate(Rank, .after = `Relative score`)
+    dplyr::arrange(is.na(Rank), Rank, Method) %>%
+    dplyr::select(
+      Method,
+      NMDS_Stress_Ait,
+      `Relative score (Ait)`,
+      Rank_Ait,
+      NMDS_Stress_BC,
+      `Relative score (BC)`,
+      Rank_BC,
+      Rank
+    )
 
   print(ranked_nmds_only, n = nrow(ranked_nmds_only))
   readr::write_csv(ranked_nmds_only, file.path(output_folder, "nmds_ranking.csv"))
