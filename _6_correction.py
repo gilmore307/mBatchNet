@@ -2,6 +2,7 @@
 # File: _6_correction.py
 # ===============================
 from typing import Dict, List, Set
+from datetime import datetime
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -335,6 +336,19 @@ def register_correction_callbacks(app):
                 status_store_update,
                 "",
             )
+
+        try:
+            with open(log_path, "a", encoding="utf-8") as handle:
+                timestamp = datetime.now().isoformat(timespec="seconds")
+                handle.write(
+                    f"[{timestamp}] Run button clicked for method {method_code}\n"
+                )
+        except OSError:
+            pass
+
+        print(
+            f"[Correction] Run button triggered for {method_code} (action={action_key})"
+        )
 
         success, log = run_methods(session_dir, [method_code], log_path=log_path)
         status_msg = (
