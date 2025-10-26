@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 
 args <- commandArgs(trailingOnly = TRUE)
-# Allow caller (e.g., methods.R) to predefine destinations to avoid mis-parsing
+# Allow caller (e.g., per-method scripts) to predefine destinations to avoid mis-parsing
 if (exists("PREPROC_OUTPUT_DIR", inherits = TRUE)) {
   output_folder <- get("PREPROC_OUTPUT_DIR", inherits = TRUE)
 } else {
@@ -290,13 +290,29 @@ write_tss_clr <- function(method, native, native_type, filename) {
   ok_step(paste0("Write ", nm_clr), t0)
 }
 
+ensure_raw_baseline <- function(base_M, base_form, matrix_path, force = TRUE) {
+  if (missing(base_M) || missing(base_form) || missing(matrix_path)) {
+    stop("ensure_raw_baseline requires base_M, base_form, and matrix_path")
+  }
+  base <- sub("\\.csv$", "", basename(matrix_path), ignore.case = TRUE)
+  dest_tss <- file.path(output_folder, paste0(base, "_tss.csv"))
+  dest_clr <- file.path(output_folder, paste0(base, "_clr.csv"))
+
+  already_exists <- file.exists(dest_tss) && file.exists(dest_clr)
+  if (already_exists && !force) {
+    say("⏭️ Skip baseline conversion — existing raw_tss/raw_clr detected.")
+    return(invisible(list(tss = dest_tss, clr = dest_clr)))
+  }
+
+  say("▶ Regenerating baseline raw matrices (TSS & CLR)")
+  write_tss_clr("INPUT", base_M, base_form, paste0(base, ".csv"))
+  say("🎉 Baseline regeneration completed: ", basename(dest_tss), ", ", basename(dest_clr))
+  invisible(list(tss = dest_tss, clr = dest_clr))
+}
+
 # ---------------------------
 # Run
 # ---------------------------
-say("▶ Converting to TSS & CLR")
-say("Output folder: ", normalizePath(output_folder, winslash = "/"))
-say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
-
 # Prefer header-less numeric matrix; fall back to headered if needed
 read_matrix_guess <- function(p) {
   opt1 <- tryCatch(utils::read.csv(p, header = FALSE, check.names = FALSE), error = function(e) NULL)
@@ -307,12 +323,25 @@ read_matrix_guess <- function(p) {
   stop("Failed to read matrix: ", p)
 }
 
-uploaded_mat <- read_matrix_guess(matrix_path)
-check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)
-input_form <- detect_input_form(uploaded_mat)
-say("ℹ️ Detected input form: ", input_form)
+preprocess_main <- function(out_dir = output_folder, mat_path = matrix_path, force = TRUE) {
+  say("▶ Converting to TSS & CLR")
+  say("Output folder: ", normalizePath(out_dir, winslash = "/"))
+  say("Input matrix : ", normalizePath(mat_path,  winslash = "/"))
 
-base_M <- as.matrix(uploaded_mat)
-write_tss_clr("INPUT", base_M, input_form, basename(matrix_path))
+  uploaded_mat <- read_matrix_guess(mat_path)
+  check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)
+  input_form <- detect_input_form(uploaded_mat)
+  say("ℹ️ Detected input form: ", input_form)
 
-say("🎉 Done. Wrote _tss and _clr files into: ", normalizePath(output_folder, winslash = "/"))
+  base_M <- as.matrix(uploaded_mat)
+  ensure_raw_baseline(base_M, input_form, mat_path, force = force)
+
+  say("🎉 Done. Wrote _tss and _clr files into: ", normalizePath(out_dir, winslash = "/"))
+  invisible(list(base_M = base_M, input_form = input_form))
+}
+
+skip_main <- FALSE
+try({ skip_main <- isTRUE(get("PREPROCESS_SKIP_MAIN", inherits = TRUE)) }, silent = TRUE)
+if (!skip_main) {
+  preprocess_main(output_folder, matrix_path, force = TRUE)
+}

@@ -29,8 +29,8 @@ from _7_description import RANKING_SCORE_DESCRIPTIONS
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "output"
 PLOTS_DIR = BASE_DIR / "plots"
-METHODS_SCRIPT = BASE_DIR / "methods.R"
-PREPROCESS_SCRIPT = BASE_DIR / "preprocess.R"
+CORRECTION_DIR = BASE_DIR / "correction"
+PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
@@ -324,8 +324,19 @@ def run_r_scripts(
 
 
 def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
-    method_arg = ",".join(methods)
-    command = ("Rscript", str(METHODS_SCRIPT), method_arg, str(session_dir))
+    """Invoke the consolidated correction dispatcher for the requested methods."""
+
+    method_args = [str(m) for m in methods if str(m)]
+    if not method_args:
+        return False, "No correction methods were selected."
+
+    command: Tuple[str, ...] = (
+        "Rscript",
+        str(CORRECTION_DIR / "correction.R"),
+        str(session_dir),
+        "--methods",
+        *method_args,
+    )
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)
