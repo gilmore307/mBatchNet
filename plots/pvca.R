@@ -445,8 +445,7 @@ if (only_baseline) {
       .groups = "drop"
     ) %>%
     mutate(
-      Score = Treatment / (Treatment + Batch + 1e-12),
-      Needs_Correction = (Batch >= Treatment) | (Batch > 0.05)
+      Score = Treatment / (Treatment + Batch + 1e-12)
     )
   
   print(base_df)

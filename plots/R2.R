@@ -281,12 +281,10 @@ if (only_baseline) {
     med_tbl <- r2_long_clr %>% group_by(Effect) %>% summarise(median_R2 = median(R2), .groups = "drop")
     mb <- med_tbl$median_R2[med_tbl$Effect == "Batch"]
     mt <- med_tbl$median_R2[med_tbl$Effect == "Treatment"]
-    needs_corr <- is.finite(mb) && (mb > mt || mb > 0.05)
-    assess_rows[["CLR"]] <- tibble::tibble(
-      Geometry = "Aitchison (CLR)",
+    assess_rows[["Ait"]] <- tibble::tibble(
+      Geometry = "Ait",
       Median_R2_Batch = mb,
-      Median_R2_Treatment = mt,
-      Needs_Correction = needs_corr
+      Median_R2_Treatment = mt
     )
   }
   assess_df <- dplyr::bind_rows(assess_rows)
