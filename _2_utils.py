@@ -29,8 +29,25 @@ from _7_description import RANKING_SCORE_DESCRIPTIONS
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "output"
 PLOTS_DIR = BASE_DIR / "plots"
-METHODS_SCRIPT = BASE_DIR / "methods.R"
-PREPROCESS_SCRIPT = BASE_DIR / "preprocess.R"
+CORRECTION_DIR = BASE_DIR / "correction"
+METHOD_SCRIPT_MAP: Dict[str, Path] = {
+    "QN": CORRECTION_DIR / "methods" / "QN.R",
+    "BMC": CORRECTION_DIR / "methods" / "BMC.R",
+    "limma": CORRECTION_DIR / "methods" / "limma.R",
+    "ConQuR": CORRECTION_DIR / "methods" / "ConQuR.R",
+    "PLSDA": CORRECTION_DIR / "methods" / "PLSDA.R",
+    "ComBat": CORRECTION_DIR / "methods" / "ComBat.R",
+    "FSQN": CORRECTION_DIR / "methods" / "FSQN.R",
+    "MMUPHin": CORRECTION_DIR / "methods" / "MMUPHin.R",
+    "RUV": CORRECTION_DIR / "methods" / "RUV.R",
+    "MetaDICT": CORRECTION_DIR / "methods" / "MetaDICT.R",
+    "SVD": CORRECTION_DIR / "methods" / "SVD.R",
+    "PN": CORRECTION_DIR / "methods" / "PN.R",
+    "FAbatch": CORRECTION_DIR / "methods" / "FAbatch.R",
+    "ComBatSeq": CORRECTION_DIR / "methods" / "ComBatSeq.R",
+    "DEBIAS": CORRECTION_DIR / "methods" / "DEBIAS.R",
+}
+PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
@@ -324,11 +341,44 @@ def run_r_scripts(
 
 
 def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
-    method_arg = ",".join(methods)
-    command = ("Rscript", str(METHODS_SCRIPT), method_arg, str(session_dir))
-    if log_path is not None:
-        return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
-    return run_command(command, cwd=BASE_DIR)
+    """Run correction methods in isolated R sessions.
+
+    Each method is executed by invoking its dedicated R script under
+    ``correction/methods`` so that the R process terminates after every run,
+    releasing its memory. The combined log output from all runs is returned.
+    When ``log_path`` is provided the streaming log is appended to the same
+    file for every method.
+    """
+
+    logs: List[str] = []
+    overall_success = True
+    for method in methods:
+        method_arg = str(method)
+        if not method_arg:
+            continue
+        script_path = (
+            METHOD_SCRIPT_MAP.get(method_arg)
+            or METHOD_SCRIPT_MAP.get(method_arg.upper())
+            or METHOD_SCRIPT_MAP.get(method_arg.lower())
+        )
+        if script_path is None:
+            logs.append(f"Unknown method: {method_arg}")
+            overall_success = False
+            break
+        if not script_path.exists():
+            logs.append(f"Script not found for method {method_arg}: {script_path.name}")
+            overall_success = False
+            break
+        command = ("Rscript", str(script_path), str(session_dir))
+        if log_path is not None:
+            success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
+        else:
+            success, log = run_command(command, cwd=BASE_DIR)
+        logs.append(log)
+        if not success:
+            overall_success = False
+            break
+    return overall_success, "\n\n".join(filter(None, logs))
 
 
 def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[bool, str]:

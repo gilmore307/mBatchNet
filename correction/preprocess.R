@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 
 args <- commandArgs(trailingOnly = TRUE)
-# Allow caller (e.g., methods.R) to predefine destinations to avoid mis-parsing
+# Allow caller (e.g., per-method scripts) to predefine destinations to avoid mis-parsing
 if (exists("PREPROC_OUTPUT_DIR", inherits = TRUE)) {
   output_folder <- get("PREPROC_OUTPUT_DIR", inherits = TRUE)
 } else {
