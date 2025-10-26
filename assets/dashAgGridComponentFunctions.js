@@ -13,6 +13,21 @@ function buildButton(props, actionKey) {
         style.width = '120px';
     }
 
+    var setProps = null;
+    if (props) {
+        if (typeof props.setProps === 'function') {
+            setProps = props.setProps;
+        } else if (props.context && typeof props.context.setProps === 'function') {
+            setProps = props.context.setProps;
+        } else if (
+            props.agGridReact &&
+            props.agGridReact.props &&
+            typeof props.agGridReact.props.setProps === 'function'
+        ) {
+            setProps = props.agGridReact.props.setProps;
+        }
+    }
+
     function onClick(event) {
         if (event) {
             event.stopPropagation();
@@ -20,9 +35,10 @@ function buildButton(props, actionKey) {
         if (!data) {
             return;
         }
+        var timestamp = Date.now();
         var next = Object.assign({}, data, {
             __action: actionKey,
-            __action_ts: Date.now(),
+            __action_ts: timestamp,
         });
         if (typeof setData === 'function') {
             setData(next);
@@ -30,6 +46,21 @@ function buildButton(props, actionKey) {
             node.setData(next);
         } else if (props && props.api && typeof props.api.applyTransaction === 'function') {
             props.api.applyTransaction({ update: [next] });
+        }
+        if (setProps) {
+            var payload = {
+                action: actionKey,
+                timestamp: timestamp,
+                code: next.code || next.method || null,
+                data: next,
+            };
+            try {
+                setProps({ cellRendererData: payload });
+            } catch (err) {
+                if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
+                    console.warn('Failed to send cellRendererData', err);
+                }
+            }
         }
     }
 
