@@ -91,8 +91,18 @@ if (!exists("say", mode = "function")) {
 # ---------------------------
 # Helper to run a step with logging
 # ---------------------------
+cleanup_method_memory <- function(name = NULL) {
+  try({
+    gc(verbose = FALSE, reset = FALSE, full = TRUE)
+  }, silent = TRUE)
+  invisible()
+}
+
 run_method <- function(name, expr){
   t0 <- start_step(name)
+  on.exit({
+    cleanup_method_memory(name)
+  }, add = TRUE)
   out <- withCallingHandlers(
     tryCatch({
       val <- force(expr)
