@@ -385,11 +385,11 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
                 message += f" (missing scripts for: {missing})"
             logs.append(message)
             overall_success = False
-            break
+            continue
         if not script_path.exists():
             logs.append(f"Script not found for method {canonical_code}: {script_path.name}")
             overall_success = False
-            break
+            continue
         command = ("Rscript", str(script_path), str(session_dir))
         if log_path is not None:
             success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
@@ -398,7 +398,15 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         logs.append(log)
         if not success:
             overall_success = False
-            break
+            failure_note = f"Method failed: {canonical_code}"
+            if log_path is not None:
+                try:
+                    with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                        logf.write(failure_note + "\n")
+                except OSError:
+                    pass
+            logs.append(failure_note)
+            continue
     return overall_success, "\n\n".join(filter(None, logs))
 
 
