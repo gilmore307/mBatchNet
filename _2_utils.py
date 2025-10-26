@@ -289,6 +289,24 @@ def run_command(command: Sequence[str], cwd: Path) -> Tuple[bool, str]:
         return False, log
 
 
+def _terminate_process(proc: subprocess.Popen, *, timeout: float = 5.0) -> None:
+    """Best-effort helper to terminate a child process."""
+
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+            proc.wait(timeout=timeout)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    except OSError:
+        pass
+
+
 def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> Tuple[bool, str]:
     """Run a command streaming stdout to a log file for real-time viewing.
 
@@ -296,11 +314,12 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
     combined: List[str] = []
+    env = os.environ.copy()
+    env.setdefault("RETICULATE_PYTHON", sys.executable)
+    header = "$ " + " ".join(command) + "\n"
+    proc: Optional[subprocess.Popen] = None
     try:
-        env = os.environ.copy()
-        env.setdefault("RETICULATE_PYTHON", sys.executable)
         with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-            header = "$ " + " ".join(command) + "\n"
             logf.write(header)
             logf.flush()
             proc = subprocess.Popen(
@@ -314,15 +333,30 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
                 env=env,
             )
             assert proc.stdout is not None
-            for line in proc.stdout:
-                logf.write(line)
-                logf.flush()
-                combined.append(line)
+            try:
+                for line in proc.stdout:
+                    logf.write(line)
+                    logf.flush()
+                    combined.append(line)
+            except Exception:
+                if proc is not None:
+                    _terminate_process(proc)
+                raise
+            finally:
+                if proc.stdout is not None:
+                    try:
+                        proc.stdout.close()
+                    except OSError:
+                        pass
             rc = proc.wait()
             success = (rc == 0)
             return success, header + "".join(combined)
     except Exception as exc:
-        return False, f"$ {' '.join(command)}\n{exc}"
+        if proc is not None:
+            _terminate_process(proc)
+        partial = header + "".join(combined)
+        message = f"{partial}\n{exc}" if partial else f"$ {' '.join(command)}\n{exc}"
+        return False, message
 
 
 def run_r_scripts(
@@ -342,7 +376,7 @@ def run_r_scripts(
         if not script_path.exists():
             logs.append(f"Warning: Script not found: {script}")
             continue
-        cmd = ("Rscript", str(script_path), str(output_dir), *args)
+        cmd = ("Rscript", "--vanilla", str(script_path), str(output_dir), *args)
         if log_path is not None:
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -390,7 +424,7 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
             logs.append(f"Script not found for method {canonical_code}: {script_path.name}")
             overall_success = False
             continue
-        command = ("Rscript", str(script_path), str(session_dir))
+        command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
         if log_path is not None:
             success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -419,7 +453,7 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
     if not PREPROCESS_SCRIPT.exists():
         return False, f"Script not found: {PREPROCESS_SCRIPT.name}"
     matrix_path = session_dir / "raw.csv"
-    command = ("Rscript", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
+    command = ("Rscript", "--vanilla", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)
