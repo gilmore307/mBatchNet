@@ -48,7 +48,7 @@ METHOD_GRID_COLUMNS = [
         "headerTooltip": "Average runtime in seconds, taken from session logs.",
     },
     {
-        "headerName": "状态",
+        "headerName": "Status",
         "field": "status_display",
         "width": 120,
         "minWidth": 120,
@@ -58,10 +58,10 @@ METHOD_GRID_COLUMNS = [
         "sortable": False,
         "filter": False,
         "cellClass": "text-center",
-        "headerTooltip": "当前会话中该方法的运行状态。",
+        "headerTooltip": "Current run status for this method in the active session.",
     },
     {
-        "headerName": "",
+        "headerName": "Run",
         "field": "run_label",
         "cellRenderer": "RunActionButton",
         "cellRendererParams": {
@@ -77,12 +77,12 @@ METHOD_GRID_COLUMNS = [
         "filter": False,
     },
     {
-        "headerName": "",
+        "headerName": "Delete",
         "field": "delete_label",
         "cellRenderer": "DeleteActionButton",
         "cellRendererParams": {
             "className": "btn btn-sm btn-outline-danger",
-            "tooltip": "删除该方法的结果并将状态重置为待定。",
+            "tooltip": "Delete this method's outputs and reset its status to pending.",
         },
         "width": 120,
         "minWidth": 120,
@@ -97,8 +97,8 @@ METHOD_GRID_COLUMNS = [
 METHOD_DISPLAY = {code: name for code, name in SUPPORTED_METHODS}
 
 STATUS_ICONS = {
-    "completed": "✅ 已完成",
-    "pending": "⏳ 待定",
+    "completed": "✅ Completed",
+    "pending": "⏳ Pending",
 }
 
 
@@ -217,8 +217,8 @@ def register_correction_callbacks(app):
             is_completed = normalized_code in completed_set
             row["status_display"] = STATUS_ICONS["completed"] if is_completed else STATUS_ICONS["pending"]
             row["delete_enabled"] = is_completed
-            row["run_label"] = row.get("run_label") or "运行"
-            row["delete_label"] = row.get("delete_label") or "删除"
+            row["run_label"] = row.get("run_label") or "Run"
+            row["delete_label"] = row.get("delete_label") or "Delete"
             row["run_enabled"] = True
         selected_set = set(selected_codes or DEFAULT_METHODS)
         selected_rows = [row for row in rows if row.get("code") in selected_set]
@@ -317,9 +317,9 @@ def register_correction_callbacks(app):
             success, message = clear_method_outputs(session_dir, method_code)
             detail = f" ({message})" if message else ""
             status_msg = (
-                f"已删除 {display_name} 的输出，并将状态重置为待定。{detail}"
+                f"Removed outputs for {display_name} and reset status to pending.{detail}"
                 if success
-                else f"删除 {display_name} 输出失败：{message}"
+                else f"Failed to delete outputs for {display_name}: {message}"
             )
             if success:
                 status_store_update = _status_payload(session_dir)
