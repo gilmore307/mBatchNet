@@ -117,6 +117,7 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
 }
 
 batch_var <- "batch_id"
+has_dual_geometries <- length(file_list_clr) > 0 && length(file_list_tss) > 0
 
 # ==== Helpers ====
 sort_levels_numeric <- function(x) {
@@ -327,8 +328,8 @@ for (nm in names(mat_list_ait)) {
   plots_ait[[nm]] <- upper_heatmap_panel(
     Db = mat_list_ait[[nm]],
     ord = ord_list_ait[[nm]],
-    title_label = paste0("Dissimilarity Heatmap - RMSE (Aitchison/CLR) - ", nm),
-    fill_label = "RMSE (Aitchison/CLR)",
+    title_label = if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm,
+    fill_label = "Batch Similarity",
     global_min = gmin_ait,
     global_max = gmax_ait,
     label_digits = label_digits,
@@ -378,8 +379,8 @@ for (nm in names(mat_list_bc)) {
   plots_bc[[nm]] <- upper_heatmap_panel(
     Db = mat_list_bc[[nm]],
     ord = ord_list_bc[[nm]],
-    title_label = paste0("Dissimilarity Heatmap - RMSR (Bray-Curtis/TSS) - ", nm),
-    fill_label = "RMSR (Bray-Curtis/TSS)",
+    title_label = if (has_dual_geometries) sprintf("%s - Bray–Curtis", nm) else nm,
+    fill_label = "Batch Similarity",
     global_min = gmin_bc,
     global_max = gmax_bc,
     label_digits = label_digits,
