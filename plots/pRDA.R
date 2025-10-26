@@ -372,26 +372,16 @@ if (only_baseline) {
     bt <- sum(pf$Fraction[pf$Component == "Batch"],     na.rm = TRUE)
     it <- sum(pf$Fraction[pf$Component == "Intersection"], na.rm = TRUE)
     rs <- sum(pf$Fraction[pf$Component == "Residuals"],    na.rm = TRUE)
-    needs <- (is.finite(bt) && is.finite(tr) && (bt >= tr)) || (bt > 0.05)
-    assess_rows[["Aitchison (CLR)"]] <- tibble::tibble(
-      Geometry = "Aitchison (CLR)",
+    assess_rows[["Ait"]] <- tibble::tibble(
+      Geometry = "Ait",
       Treatment = tr, Batch = bt, Intersection = it, Residuals = rs,
-      Score = if (is.finite(tr) && is.finite(bt)) tr / (tr + bt + 1e-12) else NA_real_,
-      Needs_Correction = needs
+      Score = if (is.finite(tr) && is.finite(bt)) tr / (tr + bt + 1e-12) else NA_real_
     )
   }
 
   assess_df <- dplyr::bind_rows(assess_rows)
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, "pRDA_raw_assessment.csv"))
-
-  suppressMessages({
-    if (any(assess_df$Needs_Correction, na.rm = TRUE)) {
-      message("pRDA baseline: Batch fraction ≥ Treatment (and/or Batch > 0.05) — correction recommended.")
-    } else {
-      message("pRDA baseline: Batch fraction appears modest relative to Treatment — correction may not be necessary.")
-    }
-  })
 
 } else {
   # ---- Normal multi-method ranking ----

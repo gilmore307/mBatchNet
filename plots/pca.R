@@ -407,40 +407,9 @@ compute_centroid_distances <- function(centroids) {
   if (nrow(centroids) < 2) return(NA_real_)
   as.numeric(mean(dist(centroids[, c("PC1","PC2")], method = "euclidean")))
 }
-# Weighted average within-batch dispersion on PC1–PC2 (higher = batches internally more spread)
-compute_within_dispersion <- function(scores, batch_var = "batch_id") {
-  if (!all(c("PC1","PC2", batch_var) %in% names(scores))) return(NA_real_)
-  levs <- levels(scores[[batch_var]])
-  if (is.null(levs)) levs <- unique(scores[[batch_var]])
-  ws <- c(); ns <- c()
-  for (lev in levs) {
-    sub <- scores[scores[[batch_var]] == lev, c("PC1","PC2"), drop = FALSE]
-    n <- nrow(sub)
-    if (n < 2) next
-    d <- stats::dist(sub, method = "euclidean")
-    ws <- c(ws, mean(d))
-    ns <- c(ns, n)
-  }
-  if (!length(ws)) return(NA_real_)
-  stats::weighted.mean(ws, w = ns)
-}
-pca_metric_score <- function(batch_distance, coverage, within_dispersion = NA_real_) {
-  if (is.na(batch_distance) || is.na(coverage)) return(NA_real_)
-  coverage <- max(0, min(1, coverage))
-  mix_term <- NA_real_
-  if (!is.na(within_dispersion) && within_dispersion >= 0) {
-    if (batch_distance == 0 && within_dispersion == 0) {
-      mix_term <- 1
-    } else if (!is.finite(batch_distance)) {
-      mix_term <- NA_real_
-    } else {
-      mix_term <- within_dispersion / (within_dispersion + batch_distance)
-    }
-  } else if (!is.na(batch_distance)) {
-    mix_term <- 1 / (1 + batch_distance)
-  }
-  if (is.na(mix_term)) return(NA_real_)
-  coverage * mix_term  # higher = better
+pca_metric_score <- function(batch_distance) {
+  if (is.na(batch_distance)) return(NA_real_)
+  batch_distance
 }
 
 only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
@@ -459,43 +428,21 @@ if (only_baseline) {
 
   cents <- compute_centroids_pca(scores, "batch_id")
   D_between <- compute_centroid_distances(cents)
-  W_within  <- compute_within_dispersion(scores, "batch_id")
-  
-  ve <- fr$metric.df$var.explained
-  coverage2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-  score <- pca_metric_score(D_between, coverage2, W_within)
-  
-  # Simple, data-driven decision rule:
-  # If batches are separated more than their average within-batch spread -> likely batch effect.
-  needs_correction <- is.finite(D_between) && is.finite(W_within) && (D_between > W_within)
-  
+  score <- pca_metric_score(D_between)
   assess_df <- tibble::tibble(
     Method            = m,
     Batch_Distance    = D_between,
-    Within_Dispersion = W_within,
-    Coverage_PC1_PC2  = coverage2,
-    Score             = score,
-    Needs_Correction  = needs_correction
+    Score             = score
   )
-  
+
   print(assess_df)
   readr::write_csv(assess_df, file.path(output_folder, "pca_raw_assessment.csv"))
-  
-  msg <- if (isTRUE(needs_correction)) {
-    "Assessment: Batch separation exceeds within-batch spread — correction recommended."
-  } else {
-    "Assessment: Batch separation does not exceed within-batch spread — correction may not be necessary."
-  }
-  # message(msg)  # disabled: no correction suggestions
-  
+
 } else {
   # ---- Rank multiple matrices (as before) ----
   rank_tbl <- dplyr::tibble(
     Method = character(),
-    Batch_Distance = numeric(),
-    Within_Dispersion = numeric(),
-    Coverage = numeric(),
-    `Absolute score` = numeric()
+    Batch_Distance = numeric()
   )
   
   for (m in names(frames_cache)) {
@@ -507,32 +454,40 @@ if (only_baseline) {
       dplyr::mutate(batch_id = factor(md$batch_id))
     cents <- compute_centroids_pca(scores, "batch_id")
     D <- compute_centroid_distances(cents)
-    W <- compute_within_dispersion(scores, "batch_id")
-    ve <- fr$metric.df$var.explained
-    cov2 <- sum(ve[1:min(2, length(ve))], na.rm = TRUE) / 100
-
-    abs_score <- pca_metric_score(D, cov2, W)
     rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
       Method = m,
-      Batch_Distance = D,
-      Within_Dispersion = W,
-      Coverage = cov2,
-      `Absolute score` = abs_score
+      Batch_Distance = D
     ))
   }
 
-  baseline_abs <- rank_tbl$`Absolute score`[rank_tbl$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  baseline_distance <- rank_tbl$Batch_Distance[rank_tbl$Method == "Before correction"][1]
+  rel_values <- rep(NA_real_, nrow(rank_tbl))
+  if (length(baseline_distance) && is.finite(baseline_distance) && baseline_distance != 0) {
+    rel_values <- rank_tbl$Batch_Distance / baseline_distance
+  }
+  baseline_idx <- which(rank_tbl$Method == "Before correction")[1]
+  if (length(baseline_idx) == 1L && is.finite(rank_tbl$Batch_Distance[baseline_idx])) {
+    rel_values[baseline_idx] <- 1
+  }
+
+  rank_values <- rep(NA_real_, nrow(rank_tbl))
+  finite_idx <- which(is.finite(rank_tbl$Batch_Distance))
+  if (length(finite_idx)) {
+    rank_values[finite_idx] <- rank(rank_tbl$Batch_Distance[finite_idx], ties.method = "average")
+  }
 
   ranked_pca <- rank_tbl %>%
     dplyr::mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+      `Relative score` = rel_values,
+      Rank = rank_values
     ) %>%
-    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
-    dplyr::mutate(Rank = dplyr::row_number()) %>%
-    dplyr::relocate(`Absolute score`, .after = Method) %>%
-    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
-    dplyr::relocate(Rank, .after = `Relative score`)
+    dplyr::arrange(is.na(Rank), Rank, Method) %>%
+    dplyr::select(
+      Method,
+      Batch_Distance,
+      `Relative score`,
+      Rank
+    )
 
   print(ranked_pca, n = nrow(ranked_pca))
   readr::write_csv(ranked_pca, file.path(output_folder, "pca_ranking.csv"))

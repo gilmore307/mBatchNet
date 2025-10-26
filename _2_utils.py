@@ -5,6 +5,7 @@ import base64
 import csv
 import json
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -657,34 +658,51 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
                 header, data = _read_csv_rows(found)
                 if not header:
                     break
-                lower = [h.lower() for h in header]
-                keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-                header = [header[i] for i in keep_idx]
+                column_info: List[Tuple[int, str]] = []
+                display_headers: List[str] = []
+                seen_headers: Set[str] = set()
+                for idx, column_name in enumerate(header):
+                    if column_name.lower() == "score":
+                        continue
+                    display = _display_column_name(column_name)
+                    display_lower = display.lower()
+                    if display_lower == "score" or display_lower.startswith("score ("):
+                        continue
+                    if display.lower() == "rank":
+                        display = "Average rank"
+                    if display in seen_headers:
+                        continue
+                    seen_headers.add(display)
+                    column_info.append((idx, display))
+                    display_headers.append(display)
+
                 formatted_rows: List[Dict[str, object]] = []
                 for raw_row in data:
                     row_dict: Dict[str, object] = {}
-                    for idx, column_name in enumerate(header):
-                        source_idx = keep_idx[idx]
-                        cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                        if column_name.lower() == "method":
-                            row_dict[column_name] = method_formal_name(str(cell))
+                    for idx, display in column_info:
+                        cell = raw_row[idx] if idx < len(raw_row) else ""
+                        key_lower = display.lower()
+                        if key_lower == "method":
+                            row_dict[display] = method_formal_name(str(cell))
+                        elif key_lower == "geometry":
+                            row_dict[display] = _format_geometry_value(cell)
                         else:
                             numeric_value = _safe_float(cell)
-                            row_dict[column_name] = _rounded(numeric_value) if numeric_value is not None else cell
+                            row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
                     formatted_rows.append(row_dict)
                 numeric_headers = {
-                    col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+                    col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
                 }
                 column_defs: List[Dict[str, object]] = []
-                for col in header:
+                for display in display_headers:
                     col_def: Dict[str, object] = {
-                        "headerName": col,
-                        "field": col,
-                        "minWidth": 160 if col.lower() != "method" else 200,
+                        "headerName": display,
+                        "field": display,
+                        "minWidth": 160 if display.lower() != "method" else 200,
                     }
-                    if col.lower() == "method":
+                    if display.lower() == "method":
                         col_def["pinned"] = "left"
-                    if col in numeric_headers:
+                    if display in numeric_headers:
                         col_def["type"] = "numericColumn"
                     column_defs.append(col_def)
                 third_content = _make_ag_grid(
@@ -838,14 +856,12 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                     header, data = _read_csv_rows(found)
                     if header:
                         lower = [h.lower() for h in header]
-                        keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-                        header = [header[i] for i in keep_idx]
                         def _fmt3(v):
                             try:
                                 return f"{float(v):.3f}"
                             except Exception:
                                 return v
-                        data = [[_fmt3(row[i]) for i in keep_idx] for row in data]
+                        data = [[_fmt3(cell) for cell in row] for row in data]
                         formatted_rows: List[Dict[str, object]] = []
                         for row in data:
                             record: Dict[str, object] = {}
@@ -871,7 +887,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                                 col_def["pinned"] = "left"
                                 col_def["flex"] = 0
                             if col in numeric_headers:
-                                col_def["type"] = "numericColumn"
                                 col_def["type"] = "numericColumn"
                             column_defs.append(col_def)
                         third_content = _make_ag_grid(
@@ -1058,6 +1073,54 @@ def _safe_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _display_column_name(name: str) -> str:
+    if name is None:
+        return ""
+    cleaned = str(name).replace("_", " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+
+    ait_pattern = re.compile(r"\b(aitchison|ait|clr)\b", re.IGNORECASE)
+    ait_paren_pattern = re.compile(r"\(\s*(aitchison|ait|clr)\s*(?:geometry)?\s*\)", re.IGNORECASE)
+    bc_pattern = re.compile(r"\b(bray[-\s]*curtis|bc|tss)\b", re.IGNORECASE)
+    bc_paren_pattern = re.compile(r"\(\s*(bray[-\s]*curtis|bc|tss)\s*(?:geometry)?\s*\)", re.IGNORECASE)
+
+    geometry: Optional[str] = None
+    if ait_pattern.search(cleaned) or ait_paren_pattern.search(cleaned):
+        geometry = "Ait"
+    elif bc_pattern.search(cleaned) or bc_paren_pattern.search(cleaned):
+        geometry = "BC"
+
+    for pattern in (ait_paren_pattern, bc_paren_pattern):
+        cleaned = pattern.sub("", cleaned)
+
+    cleaned = ait_pattern.sub("", cleaned)
+    cleaned = bc_pattern.sub("", cleaned)
+
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s*-\s*", " ", cleaned)
+    cleaned = cleaned.strip(" -")
+
+    if geometry:
+        if cleaned:
+            cleaned = f"{cleaned} ({geometry})"
+        else:
+            cleaned = f"({geometry})"
+
+    return cleaned
+
+
+def _format_geometry_value(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    cleaned = value.strip()
+    lower = cleaned.lower()
+    if lower in {"ait", "aitch", "aitchison", "clr"}:
+        return "Aitchison"
+    if lower in {"bc", "bray", "braycurtis", "bray-curtis", "tss"}:
+        return "Bray-Curtis"
+    return cleaned
+
+
 def _rounded(value: Optional[float], digits: int = 3) -> Optional[float]:
     if value is None:
         return None
@@ -1082,9 +1145,9 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
     "lisi": ScoreSpec(field="absolute score"),
-    "nmds": ScoreSpec(field="absolute score"),
-    "pca": ScoreSpec(field="absolute score"),
-    "pcoa": ScoreSpec(field="absolute score"),
+    "nmds": ScoreSpec(),
+    "pca": ScoreSpec(),
+    "pcoa": ScoreSpec(),
     "prda": ScoreSpec(field="absolute score"),
     "pvca": ScoreSpec(field="absolute score"),
     "r2": ScoreSpec(field="absolute score"),
@@ -1154,14 +1217,28 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
         reader = csv.DictReader(handle)
         if not reader.fieldnames:
             return RankingData(metric_key, display_name, [], [])
-        columns = list(reader.fieldnames)
-        field_map = {name.lower(): name for name in reader.fieldnames}
+        original_columns = list(reader.fieldnames)
+        field_map = {name.lower(): name for name in original_columns}
         method_col = field_map.get("method")
         rank_col = field_map.get("rank")
         absolute_col = field_map.get("absolute score")
         relative_col = field_map.get("relative score")
         spec = RANKING_SCORE_SPECS.get(metric_key)
         baseline_label = (spec.baseline_label if spec else "Before correction").lower()
+
+        column_display_map: Dict[str, str] = {}
+        seen_display: Set[str] = set()
+        columns = []
+        for name in original_columns:
+            display = _display_column_name(name)
+            if display.lower() == "rank":
+                display = "Average rank"
+            if display in seen_display:
+                # skip duplicate display headers
+                continue
+            seen_display.add(display)
+            column_display_map[name] = display
+            columns.append(display)
 
         for raw_row in reader:
             if method_col is None:
@@ -1183,7 +1260,7 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
                 rank=rank_value,
                 absolute=absolute,
                 relative=relative_value,
-                raw={k: raw_row.get(k, "") for k in columns},
+                raw={column_display_map[k]: raw_row.get(k, "") for k in original_columns if column_display_map.get(k)},
                 is_baseline=is_baseline,
             ))
 
@@ -1211,31 +1288,45 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
 def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     if not data.entries:
         return None
-    base_columns = ["Method", "Rank", "Absolute score", "Relative score"]
+    has_rank = any(entry.rank is not None for entry in data.entries)
+    has_absolute = any(entry.absolute is not None for entry in data.entries)
+    has_relative = any(entry.relative is not None for entry in data.entries)
+
+    base_columns: List[str] = ["Method"]
+    if has_rank:
+        base_columns.append("Average rank")
+    if has_absolute:
+        base_columns.append("Absolute score")
+    if has_relative:
+        base_columns.append("Relative score")
+
+    excluded = {"method", "average rank", "absolute score", "relative score"}
+    excluded.update(col.lower() for col in base_columns)
     extra_cols = [
         col for col in data.columns
-        if col and col.lower() not in {"method", "rank", "absolute score", "relative score"}
+        if col and col.lower() not in excluded
     ]
     header = base_columns + extra_cols
 
     row_data: List[Dict[str, object]] = []
-    numeric_candidates: Dict[str, bool] = {col: False for col in base_columns + extra_cols}
+    numeric_candidates: Dict[str, bool] = {col: False for col in header}
     for entry in data.entries:
         rank_val = _rounded(entry.rank)
         absolute_val = _rounded(entry.absolute)
         relative_val = _rounded(entry.relative)
-        row: Dict[str, object] = {
-            "Method": entry.method,
-            "Rank": rank_val,
-            "Absolute score": absolute_val,
-            "Relative score": relative_val,
-        }
-        if rank_val is not None:
-            numeric_candidates["Rank"] = True
-        if absolute_val is not None:
-            numeric_candidates["Absolute score"] = True
-        if relative_val is not None:
-            numeric_candidates["Relative score"] = True
+        row: Dict[str, object] = {"Method": entry.method}
+        if "Average rank" in base_columns:
+            row["Average rank"] = rank_val
+            if rank_val is not None:
+                numeric_candidates["Average rank"] = True
+        if "Absolute score" in base_columns:
+            row["Absolute score"] = absolute_val
+            if absolute_val is not None:
+                numeric_candidates["Absolute score"] = True
+        if "Relative score" in base_columns:
+            row["Relative score"] = relative_val
+            if relative_val is not None:
+                numeric_candidates["Relative score"] = True
         for col in extra_cols:
             raw_value = entry.raw.get(col, "")
             numeric_value = _safe_float(raw_value)
@@ -1255,13 +1346,13 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         if col == "Method":
             col_def["minWidth"] = 220
             col_def["flex"] = 0
-        elif col == "Rank":
+        elif col == "Average rank":
             col_def["width"] = 110
         else:
             col_def["minWidth"] = 160
         if numeric_candidates.get(col):
             col_def["type"] = "numericColumn"
-            if col == "Rank":
+            if col == "Average rank":
                 col_def["type"] = "numericColumn"
             elif col == "Relative score":
                 col_def["type"] = "numericColumn"
@@ -1472,16 +1563,10 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
         crit = "-"
         if "criteria" in [h.lower() for h in header]:
             crit = row[[h.lower() for h in header].index("criteria")]
-        # Comment from Needs_Correction if available
-        comment = "-"
-        if "needs_correction" in [h.lower() for h in header]:
-            val = row[[h.lower() for h in header].index("needs_correction")]
-            comment = "Need correction" if str(val).strip().upper() in ("TRUE", "1") else "No correction"
         rows.append({
             "Test": test_name,
             "Criteria": crit,
             "Test Result": pick_value(header, row),
-            "Comment": comment,
         })
 
     column_defs = [
@@ -1499,11 +1584,6 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
             "headerName": "Test Result",
             "field": "Test Result",
             "minWidth": 160,
-        },
-        {
-            "headerName": "Comment",
-            "field": "Comment",
-            "minWidth": 180,
         },
     ]
     return _make_ag_grid(
@@ -1622,37 +1702,48 @@ def build_raw_assessments_tab(session_dir: Path):
         header, data = _read_csv_rows(path)
         if not header:
             continue
-        # Drop Needs_Correction and format numerics to 3 decimals
-        lower = [h.lower() for h in header]
-        keep_idx = [i for i, h in enumerate(lower) if h != "needs_correction"]
-        header = [header[i] for i in keep_idx]
+        # Format numerics to 3 decimals
+        column_info: List[Tuple[int, str]] = []
+        display_headers: List[str] = []
+        seen_headers: Set[str] = set()
+        for idx, column_name in enumerate(header):
+            display = _display_column_name(column_name)
+            if display.lower() == "rank":
+                display = "Average rank"
+            if display in seen_headers:
+                continue
+            seen_headers.add(display)
+            column_info.append((idx, display))
+            display_headers.append(display)
+
         formatted_rows: List[Dict[str, object]] = []
         for raw_row in data:
             record: Dict[str, object] = {}
-            for idx, column_name in enumerate(header):
-                source_idx = keep_idx[idx]
-                cell = raw_row[source_idx] if source_idx < len(raw_row) else ""
-                if column_name.lower() == "method":
-                    record[column_name] = method_formal_name(str(cell))
+            for idx, display in column_info:
+                cell = raw_row[idx] if idx < len(raw_row) else ""
+                key_lower = display.lower()
+                if key_lower == "method":
+                    record[display] = method_formal_name(str(cell))
+                elif key_lower == "geometry":
+                    record[display] = _format_geometry_value(cell)
                 else:
                     numeric_value = _safe_float(cell)
-                    record[column_name] = numeric_value if numeric_value is not None else cell
+                    record[display] = numeric_value if numeric_value is not None else cell
             formatted_rows.append(record)
         numeric_headers = {
-            col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+            col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
         }
         column_defs: List[Dict[str, object]] = []
-        for col in header:
+        for display in display_headers:
             col_def: Dict[str, object] = {
-                "headerName": col,
-                "field": col,
-                "minWidth": 170 if col.lower() != "method" else 220,
+                "headerName": display,
+                "field": display,
+                "minWidth": 170 if display.lower() != "method" else 220,
             }
-            if col.lower() == "method":
+            if display.lower() == "method":
                 col_def["flex"] = 0
                 col_def["pinned"] = "left"
-            if col in numeric_headers:
-                col_def["type"] = "numericColumn"
+            if display in numeric_headers:
                 col_def["type"] = "numericColumn"
             column_defs.append(col_def)
         slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in metric)
