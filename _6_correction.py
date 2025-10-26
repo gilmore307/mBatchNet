@@ -62,13 +62,11 @@ METHOD_GRID_COLUMNS = [
     },
     {
         "headerName": "",
-        "field": "run_action",
-        "cellRenderer": "ButtonRenderer",
+        "field": "run_label",
+        "cellRenderer": "RunActionButton",
         "cellRendererParams": {
-            "label": "Run",
             "className": "btn btn-sm btn-primary",
             "tooltip": "Run this correction method for the current session.",
-            "onClick": {"function": "function(e){return {code: e.data.code};}"},
         },
         "width": 120,
         "minWidth": 120,
@@ -80,16 +78,11 @@ METHOD_GRID_COLUMNS = [
     },
     {
         "headerName": "",
-        "field": "delete_action",
-        "cellRenderer": "ButtonRenderer",
+        "field": "delete_label",
+        "cellRenderer": "DeleteActionButton",
         "cellRendererParams": {
-            "label": "删除",
             "className": "btn btn-sm btn-outline-danger",
             "tooltip": "删除该方法的结果并将状态重置为待定。",
-            "onClick": {"function": "function(e){return {code: e.data.code};}"},
-            "disabled": {
-                "function": "function(e){return !(e && e.data && e.data.delete_enabled);}",
-            },
         },
         "width": 120,
         "minWidth": 120,
@@ -224,6 +217,9 @@ def register_correction_callbacks(app):
             is_completed = normalized_code in completed_set
             row["status_display"] = STATUS_ICONS["completed"] if is_completed else STATUS_ICONS["pending"]
             row["delete_enabled"] = is_completed
+            row["run_label"] = row.get("run_label") or "运行"
+            row["delete_label"] = row.get("delete_label") or "删除"
+            row["run_enabled"] = True
         selected_set = set(selected_codes or DEFAULT_METHODS)
         selected_rows = [row for row in rows if row.get("code") in selected_set]
         return rows, selected_rows
@@ -274,25 +270,19 @@ def register_correction_callbacks(app):
             event = cell_event
         if not isinstance(event, dict):
             raise dash.exceptions.PreventUpdate
-        column_id = (
-            event.get("colId")
-            or event.get("columnId")
-            or event.get("col")
-            or (event.get("column") or {}).get("colId")
-        )
-        if not column_id:
+        event_data = event.get("data") if isinstance(event.get("data"), dict) else event
+        if not isinstance(event_data, dict):
             raise dash.exceptions.PreventUpdate
-        column_id_lower = str(column_id).lower()
-        is_run_action = "run" in column_id_lower
-        is_delete_action = "delete" in column_id_lower
+        action = event_data.get("__action") or event_data.get("action")
+        if not isinstance(action, str):
+            raise dash.exceptions.PreventUpdate
+        action_key = action.strip().lower()
+        is_run_action = action_key == "run"
+        is_delete_action = action_key == "delete"
         if not (is_run_action or is_delete_action):
             raise dash.exceptions.PreventUpdate
-        method_code = (
-            (event.get("code") if isinstance(event.get("code"), str) else None)
-            or (event.get("value") if isinstance(event.get("value"), str) else None)
-            or ((event.get("rowData") or event.get("data") or {}).get("code") if isinstance(event.get("rowData") or event.get("data"), dict) else None)
-        )
-        if not method_code:
+        method_code = event_data.get("code")
+        if not isinstance(method_code, str):
             raise dash.exceptions.PreventUpdate
         method_code = method_code.strip()
         if not method_code:
