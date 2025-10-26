@@ -32,6 +32,7 @@ PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
 METHODS_DIR = CORRECTION_DIR / "methods"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
+COMPLETED_METHODS_FILENAME = "completed_methods.json"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
@@ -387,60 +388,131 @@ def run_r_scripts(
     return True, "\n\n".join(logs)
 
 
-def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
-    """Run correction methods in isolated R sessions.
+def _normalize_method_name(method: str) -> Tuple[Optional[str], Optional[Path]]:
+    """Resolve a user-supplied identifier to a canonical code and script path."""
 
-    Each method is executed by invoking its dedicated R script under
-    ``correction/methods`` so that the R process terminates after every run,
-    releasing its memory. Script paths are discovered automatically from the
-    available files, ensuring that newly added methods can be picked up without
-    editing the Python source. The combined log output from all runs is
-    returned. When ``log_path`` is provided the streaming log is appended to
-    the same file for every method.
-    """
+    method_arg = str(method)
+    if not method_arg:
+        return None, None
+    canonical_code = method_arg
+    script_path = resolve_method_script(canonical_code)
+    if script_path is not None:
+        return canonical_code, script_path
+    lookup = DISPLAY_TO_CODE.get(method_arg) or DISPLAY_TO_CODE_LOWER.get(method_arg.lower())
+    if lookup:
+        canonical_code = lookup
+        script_path = resolve_method_script(canonical_code)
+        if script_path is not None:
+            return canonical_code, script_path
+    return None, None
+
+
+def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] = None) -> Tuple[bool, str]:
+    """Execute a single correction method via its dedicated R script."""
+
+    canonical_code, script_path = _normalize_method_name(method)
+    if canonical_code is None or script_path is None:
+        message = f"Unknown method: {method}"
+        if MISSING_METHOD_SCRIPTS:
+            missing = ", ".join(sorted(MISSING_METHOD_SCRIPTS))
+            message += f" (missing scripts for: {missing})"
+        return False, message
+    if not script_path.exists():
+        return False, f"Script not found for method {canonical_code}: {script_path.name}"
+
+    command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
+    if log_path is not None:
+        success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
+    else:
+        success, log = run_command(command, cwd=BASE_DIR)
+    if success:
+        return True, log
+
+    failure_note = f"Method failed: {canonical_code}"
+    if log_path is not None:
+        try:
+            with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                logf.write(failure_note + "\n")
+        except OSError:
+            pass
+    combined = "\n".join(filter(None, [log, failure_note]))
+    return False, combined
+
+
+def _completed_methods_path(session_dir: Path) -> Path:
+    return session_dir / COMPLETED_METHODS_FILENAME
+
+
+def _load_completed_methods(session_dir: Path) -> Set[str]:
+    path = _completed_methods_path(session_dir)
+    if not path.exists():
+        return set()
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return set()
+    items: Iterable[str]
+    if isinstance(data, dict):
+        items = data.get("completed", [])  # legacy-friendly
+    else:
+        items = data if isinstance(data, list) else []
+    normalized: Set[str] = set()
+    for item in items:
+        code = _normalize_method_code(str(item))
+        if code:
+            normalized.add(code)
+    return normalized
+
+
+def _save_completed_methods(session_dir: Path, completed: Set[str]) -> None:
+    path = _completed_methods_path(session_dir)
+    try:
+        with path.open("w", encoding="utf-8") as fh:
+            json.dump(sorted(completed), fh, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def _append_log_message(log_path: Path, message: str) -> None:
+    try:
+        with log_path.open("a", encoding="utf-8", errors="replace") as fh:
+            fh.write(message + "\n")
+    except OSError:
+        pass
+
+
+def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
+    """Run correction methods sequentially, one R subprocess per method."""
 
     logs: List[str] = []
     overall_success = True
+    completed_codes = _load_completed_methods(session_dir)
+
     for method in methods:
-        method_arg = str(method)
-        if not method_arg:
+        if not method:
             continue
-        canonical_code = method_arg
-        script_path = resolve_method_script(canonical_code)
-        if script_path is None:
-            lookup = DISPLAY_TO_CODE.get(method_arg) or DISPLAY_TO_CODE_LOWER.get(method_arg.lower())
-            if lookup:
-                canonical_code = lookup
-                script_path = resolve_method_script(canonical_code)
-        if script_path is None:
-            message = f"Unknown method: {method_arg}"
-            if MISSING_METHOD_SCRIPTS:
-                missing = ", ".join(sorted(MISSING_METHOD_SCRIPTS))
-                message += f" (missing scripts for: {missing})"
-            logs.append(message)
-            overall_success = False
-            continue
-        if not script_path.exists():
-            logs.append(f"Script not found for method {canonical_code}: {script_path.name}")
-            overall_success = False
-            continue
-        command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
-        if log_path is not None:
-            success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
+
+        canonical_code, _ = _normalize_method_name(method)
+        if canonical_code:
+            if canonical_code in completed_codes:
+                display = CODE_TO_DISPLAY.get(canonical_code, canonical_code)
+                message = f"Skipping {display}: already completed."
+                logs.append(message)
+                if log_path is not None:
+                    _append_log_message(log_path, message)
+                continue
+
+        success, log = run_single_method(session_dir, method, log_path=log_path)
+        if log:
+            logs.append(log)
+        if success:
+            if canonical_code:
+                completed_codes.add(canonical_code)
+                _save_completed_methods(session_dir, completed_codes)
         else:
-            success, log = run_command(command, cwd=BASE_DIR)
-        logs.append(log)
-        if not success:
             overall_success = False
-            failure_note = f"Method failed: {canonical_code}"
-            if log_path is not None:
-                try:
-                    with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                        logf.write(failure_note + "\n")
-                except OSError:
-                    pass
-            logs.append(failure_note)
-            continue
+
     return overall_success, "\n\n".join(filter(None, logs))
 
 
