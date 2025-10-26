@@ -124,6 +124,12 @@ def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
 
+def normalize_method_code(value: str) -> str:
+    """Public wrapper that returns a normalized, lowercase method code."""
+
+    return _normalize_method_code(value)
+
+
 def _discover_method_scripts() -> Dict[str, Path]:
     scripts: Dict[str, Path] = {}
     if not METHODS_DIR.exists():
@@ -474,6 +480,47 @@ def _save_completed_methods(session_dir: Path, completed: Set[str]) -> None:
         pass
 
 
+def get_completed_methods(session_dir: Path) -> Set[str]:
+    """Return the set of normalized method codes that have completed for a session."""
+
+    return set(_load_completed_methods(session_dir))
+
+
+def clear_method_outputs(session_dir: Path, method: str) -> Tuple[bool, str]:
+    """Remove normalized output files for a method and reset its completion flag."""
+
+    if not session_dir:
+        return False, "Missing session directory."
+    session_dir = Path(session_dir)
+    canonical_code, _ = _normalize_method_name(method)
+    if canonical_code is None:
+        return False, f"Unknown method: {method}"
+    normalized_code = _normalize_method_code(canonical_code)
+    targets = [
+        session_dir / f"normalized_{normalized_code}.csv",
+        session_dir / f"normalized_{normalized_code}_tss.csv",
+        session_dir / f"normalized_{normalized_code}_clr.csv",
+    ]
+    removed: List[str] = []
+    errors: List[str] = []
+    for path in targets:
+        try:
+            if path.exists():
+                path.unlink()
+                removed.append(path.name)
+        except OSError as exc:
+            errors.append(f"Failed to delete {path.name}: {exc}")
+    completed_codes = _load_completed_methods(session_dir)
+    if normalized_code in completed_codes:
+        completed_codes.discard(normalized_code)
+        _save_completed_methods(session_dir, completed_codes)
+    if errors:
+        return False, " ; ".join(errors)
+    if removed:
+        return True, f"Removed files: {', '.join(removed)}"
+    return True, "No outputs found to delete."
+
+
 def _append_log_message(log_path: Path, message: str) -> None:
     try:
         with log_path.open("a", encoding="utf-8", errors="replace") as fh:
@@ -494,9 +541,10 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
             continue
 
         canonical_code, _ = _normalize_method_name(method)
-        if canonical_code:
-            if canonical_code in completed_codes:
-                display = CODE_TO_DISPLAY.get(canonical_code, canonical_code)
+        normalized_code = _normalize_method_code(canonical_code) if canonical_code else None
+        if normalized_code:
+            if normalized_code in completed_codes:
+                display = CODE_TO_DISPLAY.get(canonical_code or normalized_code, canonical_code or method)
                 message = f"Skipping {display}: already completed."
                 logs.append(message)
                 if log_path is not None:
@@ -507,8 +555,8 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         if log:
             logs.append(log)
         if success:
-            if canonical_code:
-                completed_codes.add(canonical_code)
+            if normalized_code:
+                completed_codes.add(normalized_code)
                 _save_completed_methods(session_dir, completed_codes)
         else:
             overall_success = False

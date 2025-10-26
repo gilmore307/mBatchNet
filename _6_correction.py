@@ -1,7 +1,7 @@
 # ===============================
 # File: _6_correction.py
 # ===============================
-from typing import Dict, Sequence, List
+from typing import Dict, Sequence, List, Set
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -16,6 +16,9 @@ from _2_utils import (
     DEFAULT_METHODS,
     compute_integrated_summary,
     load_integrated_summary,
+    get_completed_methods,
+    clear_method_outputs,
+    normalize_method_code,
 )
 
 
@@ -66,6 +69,19 @@ METHOD_GRID_COLUMNS = [
         "headerTooltip": "Metric where the method performed the weakest on average.",
     },
     {
+        "headerName": "状态",
+        "field": "status_display",
+        "width": 120,
+        "minWidth": 120,
+        "maxWidth": 150,
+        "pinned": "right",
+        "suppressMenu": True,
+        "sortable": False,
+        "filter": False,
+        "cellClass": "text-center",
+        "headerTooltip": "当前会话中该方法的运行状态。",
+    },
+    {
         "headerName": "",
         "field": "run_action",
         "cellRenderer": "ButtonRenderer",
@@ -83,9 +99,35 @@ METHOD_GRID_COLUMNS = [
         "sortable": False,
         "filter": False,
     },
+    {
+        "headerName": "",
+        "field": "delete_action",
+        "cellRenderer": "ButtonRenderer",
+        "cellRendererParams": {
+            "label": "删除",
+            "className": "btn btn-sm btn-outline-danger",
+            "tooltip": "删除该方法的结果并将状态重置为待定。",
+            "onClick": {"function": "function(e){return {code: e.data.code};}"},
+            "disabled": {
+                "function": "function(e){return !(e && e.data && e.data.delete_enabled);}",
+            },
+        },
+        "width": 120,
+        "minWidth": 120,
+        "maxWidth": 160,
+        "pinned": "right",
+        "suppressMenu": True,
+        "sortable": False,
+        "filter": False,
+    },
 ]
 
 METHOD_DISPLAY = {code: name for code, name in SUPPORTED_METHODS}
+
+STATUS_ICONS = {
+    "completed": "✅ 已完成",
+    "pending": "⏳ 待定",
+}
 
 
 def correction_layout(active_path: str):
@@ -93,6 +135,7 @@ def correction_layout(active_path: str):
         [
             build_navbar(active_path),
             dcc.Store(id="method-summary-store", data=None),
+            dcc.Store(id="method-status-store", data={"completed": []}),
             dbc.Container(
                 [
                     html.H2("Batch Effect Correction"),
@@ -134,6 +177,10 @@ def correction_layout(active_path: str):
 
 
 def register_correction_callbacks(app):
+    def _status_payload(session_dir) -> Dict[str, List[str]]:
+        completed = sorted(get_completed_methods(session_dir)) if session_dir else []
+        return {"completed": completed}
+
     @app.callback(
         Output("method-summary-store", "data"),
         Input("page-url", "pathname"),
@@ -158,10 +205,15 @@ def register_correction_callbacks(app):
         Output("method-grid", "rowData"),
         Output("method-grid", "selectedRows"),
         Input("method-summary-store", "data"),
+        Input("method-status-store", "data"),
         State("selected-methods", "data"),
         prevent_initial_call=False,
     )
-    def populate_method_grid(summary: Dict[str, object] | None, selected_codes: Sequence[str] | None):
+    def populate_method_grid(
+        summary: Dict[str, object] | None,
+        status_data: Dict[str, object] | None,
+        selected_codes: Sequence[str] | None,
+    ):
         rows: List[Dict[str, object]] = []
         if summary and isinstance(summary, dict):
             rows = list(summary.get("table_rows", []))  # type: ignore[arg-type]
@@ -183,6 +235,20 @@ def register_correction_callbacks(app):
                 }
                 for code, display in SUPPORTED_METHODS
             ]
+        completed_set: Set[str] = set()
+        if isinstance(status_data, dict):
+            completed_raw = status_data.get("completed", [])
+            if isinstance(completed_raw, (list, tuple, set)):
+                for item in completed_raw:
+                    normalized = normalize_method_code(str(item))
+                    if normalized:
+                        completed_set.add(normalized)
+        for row in rows:
+            code = row.get("code")
+            normalized_code = normalize_method_code(str(code)) if code else ""
+            is_completed = normalized_code in completed_set
+            row["status_display"] = STATUS_ICONS["completed"] if is_completed else STATUS_ICONS["pending"]
+            row["delete_enabled"] = is_completed
         selected_set = set(selected_codes or DEFAULT_METHODS)
         selected_rows = [row for row in rows if row.get("code") in selected_set]
         return rows, selected_rows
@@ -199,12 +265,24 @@ def register_correction_callbacks(app):
         return codes
 
     @app.callback(
+        Output("method-status-store", "data"),
+        Input("session-id", "data"),
+        prevent_initial_call=False,
+    )
+    def refresh_method_status(session_id: str | None):
+        if not session_id:
+            return {"completed": []}
+        session_dir = get_session_dir(session_id)
+        return _status_payload(session_dir)
+
+    @app.callback(
         Output("correction-status", "children"),
         Output("correction-complete", "data"),
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
+        Output("method-status-store", "data", allow_duplicate=True),
         Input("method-grid", "cellRendererData"),
         State("session-id", "data"),
         prevent_initial_call=True,
@@ -227,7 +305,12 @@ def register_correction_callbacks(app):
             or event.get("col")
             or (event.get("column") or {}).get("colId")
         )
-        if column_id and "run" not in str(column_id).lower():
+        if not column_id:
+            raise dash.exceptions.PreventUpdate
+        column_id_lower = str(column_id).lower()
+        is_run_action = "run" in column_id_lower
+        is_delete_action = "delete" in column_id_lower
+        if not (is_run_action or is_delete_action):
             raise dash.exceptions.PreventUpdate
         method_code = (
             (event.get("code") if isinstance(event.get("code"), str) else None)
@@ -239,6 +322,7 @@ def register_correction_callbacks(app):
         method_code = method_code.strip()
         if not method_code:
             raise dash.exceptions.PreventUpdate
+        status_store_update = dash.no_update
         if not session_id:
             return (
                 "Upload data before running corrections.",
@@ -247,9 +331,12 @@ def register_correction_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 dash.no_update,
+                status_store_update,
             )
         session_dir = get_session_dir(session_id)
-        if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
+        if is_run_action and (
+            not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists()
+        ):
             return (
                 "Upload data before running corrections.",
                 False,
@@ -257,13 +344,44 @@ def register_correction_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 dash.no_update,
+                status_store_update,
             )
         log_path = session_dir / "run.log"
-        success, log = run_methods(session_dir, [method_code], log_path=log_path)
         display_name = METHOD_DISPLAY.get(method_code, method_code)
+        if is_delete_action:
+            success, message = clear_method_outputs(session_dir, method_code)
+            detail = f" ({message})" if message else ""
+            status_msg = (
+                f"已删除 {display_name} 的输出，并将状态重置为待定。{detail}"
+                if success
+                else f"删除 {display_name} 输出失败：{message}"
+            )
+            if success:
+                status_store_update = _status_payload(session_dir)
+            return (
+                status_msg,
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                status_store_update,
+            )
+
+        success, log = run_methods(session_dir, [method_code], log_path=log_path)
         status_msg = (
             f"Method {display_name} completed successfully."
             if success
             else f"Method {display_name} failed. Check logs for details."
         )
-        return status_msg, bool(success), str(log_path), None, dash.no_update, dash.no_update
+        if success:
+            status_store_update = _status_payload(session_dir)
+        return (
+            status_msg,
+            bool(success),
+            str(log_path),
+            None,
+            dash.no_update,
+            dash.no_update,
+            status_store_update,
+        )
