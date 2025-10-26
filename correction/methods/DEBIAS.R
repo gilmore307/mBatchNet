@@ -1,4 +1,4 @@
-source(file.path("correction", "methods", "common.R"))
+source(file.path("correction", "correction.R"))
 
 prepare_method("DEBIAS")
 
