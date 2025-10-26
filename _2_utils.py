@@ -2170,8 +2170,6 @@ def compute_integrated_summary() -> Dict[str, object]:
             "display": CODE_TO_DISPLAY.get(code, code),
             "runs": 0,
             "elapsed": [],
-            "deltas": [],
-            "metric_deltas": defaultdict(list),
             "sessions": set(),
         }
         for code, _ in SUPPORTED_METHODS
@@ -2185,13 +2183,9 @@ def compute_integrated_summary() -> Dict[str, object]:
             if signature in known_signatures or signature in seen_signatures:
                 continue
         summary = _load_session_summary(session_dir)
-        ranking = _load_ranking_deltas(session_dir)
-        metrics_seen = _collect_ranking_metric_keys(session_dir)
-        if not summary or not ranking:
+        if not summary:
             continue
         if not _all_methods_selected(summary):
-            continue
-        if not REQUIRED_RANKING_KEYS.issubset(metrics_seen):
             continue
         if signature:
             seen_signatures.add(signature)
@@ -2216,43 +2210,18 @@ def compute_integrated_summary() -> Dict[str, object]:
                 elapsed_float = None
             if elapsed_float is not None:
                 stat["elapsed"].append(elapsed_float)
-        if ranking:
-            for code, metric_map in ranking.items():
-                if code not in method_stats:
-                    continue
-                stat = method_stats[code]
-                stat["sessions"].add(session_id)
-                for metric_name, delta in metric_map.items():
-                    stat["deltas"].append(delta)
-                    stat["metric_deltas"][metric_name].append(delta)
 
     rows: List[Dict[str, object]] = []
     methods_payload: Dict[str, Dict[str, object]] = {}
     for code, payload in method_stats.items():
         elapsed_vals: List[float] = payload["elapsed"]  # type: ignore[assignment]
-        delta_vals: List[float] = payload["deltas"]  # type: ignore[assignment]
-        metric_map = payload["metric_deltas"]  # type: ignore[assignment]
         avg_elapsed = mean(elapsed_vals) if elapsed_vals else None
-        avg_delta = mean(delta_vals) if delta_vals else None
-        metric_avgs = {metric: mean(vals) for metric, vals in metric_map.items() if vals}
-        best_metric = max(metric_avgs, key=metric_avgs.get) if metric_avgs else None
-        worst_metric = min(metric_avgs, key=metric_avgs.get) if metric_avgs else None
         methods_payload[code] = {
             "code": code,
             "display": payload["display"],
             "runs": int(payload["runs"]),
             "sessions": sorted(payload["sessions"]),
             "avg_elapsed_sec": avg_elapsed,
-            "avg_score_delta": avg_delta,
-            "best_metric": best_metric,
-            "worst_metric": worst_metric,
-            "metrics": {
-                metric: {
-                    "avg_delta": metric_avgs[metric],
-                    "count": len(metric_map[metric]),
-                }
-                for metric in metric_avgs
-            },
         }
         rows.append(
             {
@@ -2260,18 +2229,15 @@ def compute_integrated_summary() -> Dict[str, object]:
                 "method": payload["display"],
                 "runs": int(payload["runs"]),
                 "avg_elapsed_sec": round(avg_elapsed, 3) if avg_elapsed is not None else None,
-                "avg_score_delta": round(avg_delta, 3) if avg_delta is not None else None,
-                "best_metric": best_metric or "-",
-                "worst_metric": worst_metric or "-",
             }
         )
-    rows.sort(key=lambda item: (-(item["avg_score_delta"] or 0.0), item["method"]))
+    rows.sort(key=lambda item: item["method"])
     summary = {
         "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         "sessions": included_sessions,
         "methods": methods_payload,
         "table_rows": rows,
-        "notes": "Normalized score ratios use the uncorrected baseline (Before correction) as 1.0.",
+        "notes": "Runtime averages are computed from successful historical runs only.",
     }
     try:
         integrated_path = OUTPUT_ROOT / "integrated_summary.json"

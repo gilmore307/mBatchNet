@@ -48,27 +48,6 @@ METHOD_GRID_COLUMNS = [
         "headerTooltip": "Average runtime in seconds, taken from session logs.",
     },
     {
-        "headerName": "Avg Δ (normalized)",
-        "field": "avg_score_delta",
-        "type": "numericColumn",
-        "width": 150,
-        "headerTooltip": "Average normalized score change relative to the uncorrected baseline (1.0).",
-    },
-    {
-        "headerName": "Best Metric",
-        "field": "best_metric",
-        "flex": 1,
-        "minWidth": 160,
-        "headerTooltip": "Metric for which the method achieved its highest average improvement.",
-    },
-    {
-        "headerName": "Worst Metric",
-        "field": "worst_metric",
-        "flex": 1,
-        "minWidth": 160,
-        "headerTooltip": "Metric where the method performed the weakest on average.",
-    },
-    {
         "headerName": "状态",
         "field": "status_display",
         "width": 120,
@@ -218,10 +197,9 @@ def register_correction_callbacks(app):
         if summary and isinstance(summary, dict):
             rows = list(summary.get("table_rows", []))  # type: ignore[arg-type]
         for row in rows:
-            for key in ("avg_elapsed_sec", "avg_score_delta"):
-                val = row.get(key)
-                if isinstance(val, (int, float)):
-                    row[key] = round(val, 3)
+            val = row.get("avg_elapsed_sec")
+            if isinstance(val, (int, float)):
+                row["avg_elapsed_sec"] = round(val, 3)
         if not rows:
             rows = [
                 {
@@ -229,9 +207,6 @@ def register_correction_callbacks(app):
                     "method": display,
                     "runs": 0,
                     "avg_elapsed_sec": None,
-                    "avg_score_delta": None,
-                    "best_metric": "-",
-                    "worst_metric": "-",
                 }
                 for code, display in SUPPORTED_METHODS
             ]
