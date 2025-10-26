@@ -90,6 +90,7 @@ try({
 # ---------------------------
 assign("PREPROC_OUTPUT_DIR", output_folder, envir = .GlobalEnv)
 assign("PREPROC_MATRIX_PATH", file.path(output_folder, "raw.csv"), envir = .GlobalEnv)
+assign("PREPROCESS_SKIP_MAIN", TRUE, envir = .GlobalEnv)
 source(file.path("correction", "preprocess.R"))
 
 if (!exists("say", mode = "function")) {
