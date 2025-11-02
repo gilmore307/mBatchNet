@@ -128,7 +128,6 @@ SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
     ("MMUPHin", "MMUPHin"),
     ("RUV", "RUV-III-NB"),
     ("MetaDICT", "MetaDICT"),
-    ("SVD", "SVD"),
     ("PN", "PN"),
     ("FAbatch", "FAbatch"),
     ("ComBatSeq", "ComBat-seq"),
@@ -182,7 +181,6 @@ _FORMAL_ALIASES: Dict[str, str] = {
     "ruviiinb": _FORMAL_MAP["ruv"],
     "metadict": _FORMAL_MAP["metadict"],
     "meta-dict": _FORMAL_MAP["metadict"],
-    "svd": _FORMAL_MAP["svd"],
     "pn": _FORMAL_MAP["pn"],
     "percentilenormalization": _FORMAL_MAP["pn"],
     "fabatch": _FORMAL_MAP["fabatch"],
@@ -204,8 +202,8 @@ def method_formal_name(name: str) -> str:
 
 # Default correction methods (codes corresponding to SUPPORTED_METHODS)
 # Quantile normalization, Batch mean centering, Limma removeBatchEffect,
-# Surrogate variable decomposition, Percentile normalization
-DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "SVD", "PN")
+# Percentile normalization
+DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "PN")
 
 CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
@@ -222,7 +220,6 @@ METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
     _normalize_method_code("MMUPHin"): "normalized_mmuphin",
     _normalize_method_code("RUV"): "normalized_ruv",
     _normalize_method_code("MetaDICT"): "normalized_metadict",
-    _normalize_method_code("SVD"): "normalized_svd",
     _normalize_method_code("PN"): "normalized_pn",
     _normalize_method_code("FAbatch"): "normalized_fabatch",
     _normalize_method_code("ComBatSeq"): "normalized_combatseq",

@@ -23,7 +23,6 @@ method_short_label <- function(x) {
     mmuphin = "MMUPHin",
     ruv = "RUV-III-NB",
     metadict = "MetaDICT",
-    svd = "SVD",
     pn = "PN",
     fabatch = "FAbatch",
     combatseq = "ComBat-seq",
