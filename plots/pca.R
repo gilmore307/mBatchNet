@@ -50,7 +50,9 @@ ellipse_union_bounds <- function(df_scores, group_var, level = 0.95, n = 240) {
   if (!nrow(df_scores)) return(list(x = c(0,0), y = c(0,0)))
   chi <- sqrt(qchisq(level, df = 2))
   xmins <- c(); xmaxs <- c(); ymins <- c(); ymaxs <- c()
-  for (lev in levels(df_scores[[group_var]])) {
+  levs <- levels(df_scores[[group_var]])
+  if (is.null(levs)) levs <- unique(df_scores[[group_var]])
+  for (lev in levs) {
     sub <- df_scores[df_scores[[group_var]] == lev, c("PCX","PCY"), drop = FALSE]
     if (nrow(sub) < 3 || any(!is.finite(as.matrix(sub)))) next
     S <- tryCatch(stats::cov(sub, use = "complete.obs"), error = function(e) NULL)
@@ -74,6 +76,36 @@ ellipse_union_bounds <- function(df_scores, group_var, level = 0.95, n = 240) {
   }
   list(x = c(min(xmins, na.rm = TRUE), max(xmaxs, na.rm = TRUE)),
        y = c(min(ymins, na.rm = TRUE), max(ymaxs, na.rm = TRUE)))
+}
+
+safe_range <- function(v) {
+  v <- v[is.finite(v)]
+  if (!length(v)) c(0, 0) else range(v, na.rm = TRUE)
+}
+
+finite_range <- function(...) {
+  v <- unlist(list(...))
+  v <- v[is.finite(v)]
+  if (!length(v)) c(0, 0) else range(v, na.rm = TRUE)
+}
+
+safe_pad <- function(r, frac = 0.12) {
+  dx <- diff(r)
+  if (!is.finite(dx) || dx <= 0) return(1e-6) else dx * frac
+}
+
+panel_limits_for_scores <- function(scores, group_var = "batch", level = 0.95) {
+  ell_bounds <- ellipse_union_bounds(scores, group_var, level = level, n = 240)
+  xr <- safe_range(scores$PCX)
+  yr <- safe_range(scores$PCY)
+  xlim <- finite_range(xr, ell_bounds$x)
+  ylim <- finite_range(yr, ell_bounds$y)
+  pad_x <- safe_pad(xlim)
+  pad_y <- safe_pad(ylim)
+  list(
+    xlim = c(xlim[1] - pad_x, xlim[2] + pad_x),
+    ylim = c(ylim[1] - pad_y, ylim[2] + pad_y)
+  )
 }
 
 # ==== Read UID argument ====
@@ -224,20 +256,15 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
   x.label <- paste0(xcol, ": ", metric.df$var.explained[pca.axes[1]], "% expl.var")
   y.label <- paste0(ycol, ": ", metric.df$var.explained[pca.axes[2]], "% expl.var")
 
-  # compute zoomed-out limits using ellipse bounds + points
+  # compute per-panel limits using ellipse/point extents (no global synchronisation)
   scores <- data.frame(
     PCX = plot.df[[xcol]],
     PCY = plot.df[[ycol]],
     batch = if (var.color %in% names(plot.df)) droplevels(plot.df[[var.color]]) else factor(1)
   )
-  ell_bounds <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-  xr <- range(scores$PCX, na.rm = TRUE); yr <- range(scores$PCY, na.rm = TRUE)
-  xlim <- range(c(xr, ell_bounds$x)); ylim <- range(c(yr, ell_bounds$y))
-  dx <- diff(xlim); dy <- diff(ylim)
-  pad_x <- if (is.finite(dx) && dx > 0) dx * 0.12 else 1e-6
-  pad_y <- if (is.finite(dy) && dy > 0) dy * 0.12 else 1e-6
-  xlim <- c(xlim[1] - pad_x, xlim[2] + pad_x)
-  ylim <- c(ylim[1] - pad_y, ylim[2] + pad_y)
+  limits <- panel_limits_for_scores(scores, group_var = "batch", level = 0.95)
+  xlim <- limits$xlim
+  ylim <- limits$ylim
 
   pmar <- margin(10, 16, 10, 16)
 
