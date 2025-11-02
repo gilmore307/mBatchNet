@@ -249,7 +249,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
 
 p_clr <- make_boxplot(
   r2_long_clr, method_levels_clr,
-  expression("Feature-wise ANOVA " * R^2 * " - CLR (Aitchison)")
+  expression("Feature-wise ANOVA " * R^2 )
 )
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)

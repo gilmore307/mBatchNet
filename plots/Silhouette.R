@@ -222,7 +222,7 @@ if (only_baseline) {
       title = "Silhouette (UMAP) - baseline",
       subtitle = sprintf("Labels=%s - UMAP(metric=%s, n_neighbors=%d, min_dist=%.2f)",
                          LABEL_COL_NAME, pretty_metric(UMAP_METRIC), UMAP_NEIGHB, UMAP_MIN_DIST),
-      x = "Method", y = "Silhouette (0-1, higher = tighter class separation)"
+      x = "Method", y = "Silhouette"
     ) +
     theme_bw() +
     theme(

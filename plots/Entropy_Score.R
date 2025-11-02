@@ -338,7 +338,7 @@ if (only_baseline) {
         LABEL_COL, pretty_metric(UMAP_METRIC), UMAP_NEIGHB, UMAP_MIN_DIST
       ),
       x = "Method",
-      y = "EBM (0-1, higher = better mixing)"
+      y = "EBM"
     ) +
     theme_bw() +
     theme(

@@ -326,7 +326,7 @@ p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
     limits = c(0, 1.05),             # 105% headroom
     expand = expansion(mult = c(0, 0))
   ) +
-  labs(x = "Methods", y = "Explained variance (%)", title = "PVCA (weighted by PC variance)") +
+  labs(x = "Methods", y = "Explained variance (%)", title = "PVCA") +
   theme_bw() +
   theme(
     legend.position    = "right",
