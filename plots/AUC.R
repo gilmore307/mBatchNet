@@ -1,4 +1,4 @@
-# ================= AUROC curves (CLR only) - per method, with AUC ranking =================
+# ================= AUROC curves (CLR only) - per method =================
 suppressPackageStartupMessages({
   library(readr)
   library(dplyr)
@@ -234,12 +234,14 @@ if (!nrow(auc_tbl)) stop("No AUROC results could be computed.")
 
 # --------- Baseline-only path (no ranking) ---------
 only_baseline <- (length(method_levels) == 1L && identical(method_levels, "Before correction"))
+output_name <- if (only_baseline) "auroc_raw_assessment_pre.csv" else "auroc_raw_assessment_post.csv"
 if (only_baseline) {
   base_auc <- auc_tbl %>% filter(Method == "Before correction")
   if (!nrow(base_auc)) stop("No AUROC computed for 'Before correction'.")
-  base_auc <- base_auc
-  readr::write_csv(base_auc, file.path(output_folder, "auroc_raw_assessment.csv"))
-  print(base_auc)
+  base_summary <- base_auc %>%
+    mutate(Relative_to_Baseline = ifelse(is.finite(AUC) & AUC != 0, 1, NA_real_))
+  readr::write_csv(base_summary, file.path(output_folder, output_name))
+  print(base_summary)
   
   # Plot single ROC, keep original labeling/order
   label_map <- setNames(sprintf("%s (AUC=%.3f)", base_auc$Method, base_auc$AUC),
@@ -268,24 +270,11 @@ if (only_baseline) {
   
 } else {
   # --------- Multi-method: keep legend order as file_list (no re-ranking in plot) ---------
-  # Save AUC ranking CSV, but DO NOT reorder legend/lines in the plot
-  auc_ranked <- auc_tbl %>%
-    mutate(`Absolute score` = AUC)
-
-  baseline_abs <- auc_ranked$`Absolute score`[auc_ranked$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
-
-  auc_ranked <- auc_ranked %>%
-    mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
-  readr::write_csv(auc_ranked, file.path(output_folder, "auroc_ranking.csv"))
-  print(auc_ranked)
+  baseline_auc <- auc_tbl$AUC[auc_tbl$Method == "Before correction"][1]
+  auc_summary <- auc_tbl %>%
+    mutate(Relative_to_Baseline = if (!is.finite(baseline_auc) || baseline_auc == 0) NA_real_ else AUC / baseline_auc)
+  readr::write_csv(auc_summary, file.path(output_folder, output_name))
+  print(auc_summary)
   
   # Keep only methods that actually produced ROC coords, in original discovery order
   methods_plotted <- intersect(method_levels, unique(roc_df$Method))
@@ -316,6 +305,6 @@ if (only_baseline) {
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   
   # quick console summary
-  auc_annot <- auc_ranked %>% mutate(Label = sprintf("%s (AUC=%.3f)", Method, AUC)) %>% pull(Label)
-  cat("AUC ranking:\n", paste(sprintf("%2d. %s", seq_along(auc_annot), auc_annot), collapse = "\n"), "\n")
+  auc_annot <- auc_summary %>% mutate(Label = sprintf("%s (AUC=%.3f)", Method, AUC)) %>% pull(Label)
+  cat("AUC summary:\n", paste(auc_annot, collapse = "\n"), "\n")
 }

@@ -1,4 +1,4 @@
-# ================= Alignment Score (AS) - CLR only, with ranking =================
+# ================= Alignment Score (AS) - CLR only =================
 suppressPackageStartupMessages({
   library(FNN)
   library(readr)
@@ -134,23 +134,15 @@ compute_alignment_score <- function(X, batch, k = 10, var_prop = 0.95, max_pcs =
   mean(si, na.rm = TRUE)
 }
 
-# Simple ranking (for CSV only; plotting keeps original order)
-rank_alignment_methods <- function(as_table) {
-  scored <- as_table %>%
-    filter(is.finite(AS)) %>%
-    transmute(Method, `Absolute score` = AS)
+# Simple summary (for CSV only; plotting keeps original order)
+summarise_alignment_methods <- function(as_table) {
+  baseline_row <- as_table %>% filter(Method == "Before correction")
+  baseline_as <- if (nrow(baseline_row)) baseline_row$AS[1] else NA_real_
 
-  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
-
-  scored %>%
+  as_table %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
+      Relative_to_Baseline = if (!is.finite(baseline_as) || baseline_as == 0) NA_real_ else AS / baseline_as
+    )
 }
 
 # --------- Compute AS per method ---------
@@ -179,8 +171,9 @@ for (nm in names(file_list)) {
   as_tbl <- bind_rows(as_tbl, tibble(Method = nm, AS = ascore))
 }
 
-# --------- Rank (if applicable) + Save + Plot in original order ---------
+# --------- Summaries (if applicable) + Save + Plot in original order ---------
 only_baseline <- length(method_levels) == 1L && identical(method_levels, "Before correction")
+output_name <- if (only_baseline) "alignment_score_raw_assessment_pre.csv" else "alignment_score_raw_assessment_post.csv"
 
 if (only_baseline) {
   # ---- Baseline-only assessment (no ranking) ----
@@ -191,8 +184,9 @@ if (only_baseline) {
   base_row <- base_row
   
   # save + print assessment
-  readr::write_csv(base_row, file.path(output_folder, "alignment_score_raw_assessment.csv"))
-  print(base_row)
+  base_summary <- summarise_alignment_methods(base_row)
+  readr::write_csv(base_summary, file.path(output_folder, output_name))
+  print(base_summary)
   
   # single-bar plot in original order
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
@@ -219,10 +213,10 @@ if (only_baseline) {
   # No correction recommendation messages
   
 } else {
-  # ---- Multiple methods: keep bar order as in file_list; still produce ranking CSV ----
-  as_ranked <- rank_alignment_methods(as_tbl)
-  readr::write_csv(as_ranked, file.path(output_folder, "alignment_score_ranking.csv"))
-  print(as_ranked)
+  # ---- Multiple methods: keep bar order as in file_list; summarise without ranking ----
+  as_summary <- summarise_alignment_methods(as_tbl)
+  readr::write_csv(as_summary, file.path(output_folder, output_name))
+  print(as_summary)
   
   # Plot bars in original method order (DO NOT reorder by AS)
   plot_df <- as_tbl %>%

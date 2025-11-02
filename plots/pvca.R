@@ -397,63 +397,42 @@ ggsave(file.path(output_folder, "PVCA.png"),
 ggsave(file.path(output_folder, "PVCA.tif"),
        plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 
-# --------- Rank the methods (or baseline-only assessment) ----------
-rank_pvca_methods <- function(df_long) {
-  scored <- df_long %>%
+# --------- Summaries for PVCA components ----------
+summarise_pvca_methods <- function(df_long) {
+  summary_tbl <- df_long %>%
     group_by(Method) %>%
     summarise(
-      Treatment = sum(Fraction[Component == "Treatment"], na.rm = TRUE),
-      Batch     = sum(Fraction[Component == "Batch"],     na.rm = TRUE),
+      Treatment = sum(Fraction[Component == "Treatment"],   na.rm = TRUE),
+      Batch     = sum(Fraction[Component == "Batch"],       na.rm = TRUE),
       Intersection = sum(Fraction[Component == "Intersection"], na.rm = TRUE),
       Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
       .groups = "drop"
-    ) %>%
-    mutate(
-      `Absolute score` = dplyr::if_else(
-        (Treatment + Batch) > 0,
-        pmin(pmax(Treatment / (Treatment + Batch), 0), 1),
-        NA_real_
-      )
     )
 
-  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  baseline_row <- summary_tbl %>% filter(Method == "Before correction")
+  baseline_treat <- if (nrow(baseline_row)) baseline_row$Treatment[1] else NA_real_
+  baseline_batch <- if (nrow(baseline_row)) baseline_row$Batch[1] else NA_real_
 
-  scored %>%
+  summary_tbl %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), desc(Treatment), Batch, Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
+      Relative_Treatment_to_Baseline = if (!is.finite(baseline_treat) || baseline_treat == 0) NA_real_ else Treatment / baseline_treat,
+      Relative_Batch_to_Baseline = if (!is.finite(baseline_batch) || baseline_batch == 0) NA_real_ else Batch / baseline_batch
+    )
 }
 
 methods_present <- levels(pvca_plot_df$Method)
 only_baseline   <- length(methods_present) == 1L && identical(methods_present, "Before correction")
+output_name <- if (only_baseline) "PVCA_raw_assessment_pre.csv" else "PVCA_raw_assessment_post.csv"
 
 if (only_baseline) {
-  # ---- Baseline-only: evaluate and tell if correction is needed; NO ranking ----
-  base_df <- pvca_plot_df %>%
-    group_by(Method) %>%
-    summarise(
-      Treatment   = sum(Fraction[Component == "Treatment"],   na.rm = TRUE),
-      Intersection= sum(Fraction[Component == "Intersection"],na.rm = TRUE),
-      Batch       = sum(Fraction[Component == "Batch"],       na.rm = TRUE),
-      Residuals   = sum(Fraction[Component == "Residuals"],   na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Score = Treatment / (Treatment + Batch + 1e-12)
-    )
-  
+  # ---- Baseline-only: summary without ranking ----
+  base_df <- summarise_pvca_methods(pvca_plot_df)
   print(base_df)
-  readr::write_csv(base_df, file.path(output_folder, "PVCA_raw_assessment.csv"))
-  
+  readr::write_csv(base_df, file.path(output_folder, output_name))
+
   # No correction recommendation messages
 } else {
-  ranked_pvca_methods <- rank_pvca_methods(pvca_plot_df)
-  print(ranked_pvca_methods)
-readr::write_csv(ranked_pvca_methods, file.path(output_folder, "PVCA_ranking.csv"))
+  summary_tbl <- summarise_pvca_methods(pvca_plot_df)
+  print(summary_tbl)
+  readr::write_csv(summary_tbl, file.path(output_folder, output_name))
 }

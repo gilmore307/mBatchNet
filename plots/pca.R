@@ -365,7 +365,7 @@ message(sprintf("Using color=%s (shape: none)", batch_var))
 
 # ==== build + save PCA panels for each matrix (single legend across ALL) ====
 pcs_to_plot <- c(1, 2)
-frames_cache <- list()   # <--- build this for ranking
+frames_cache <- list()   # <--- build this for assessment summaries
 plots <- list()
 
 for (nm in names(file_list)) {
@@ -427,7 +427,7 @@ ggsave(file.path(output_folder, "pca.tif"),
        plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 
 # =========================
-# PCA ranking / assessment
+# PCA assessment summaries
 # =========================
 
 compute_centroids_pca <- function(scores, batch_var = "batch_id") {
@@ -439,12 +439,8 @@ compute_centroid_distances <- function(centroids) {
   if (nrow(centroids) < 2) return(NA_real_)
   as.numeric(mean(dist(centroids[, c("PC1","PC2")], method = "euclidean")))
 }
-pca_metric_score <- function(batch_distance) {
-  if (is.na(batch_distance)) return(NA_real_)
-  batch_distance
-}
-
 only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
+output_name <- if (only_baseline) "pca_raw_assessment_pre.csv" else "pca_raw_assessment_post.csv"
 
 if (only_baseline) {
   # ---- Assess RAW only (no ranking) ----
@@ -460,18 +456,21 @@ if (only_baseline) {
 
   cents <- compute_centroids_pca(scores, "batch_id")
   D_between <- compute_centroid_distances(cents)
-  score <- pca_metric_score(D_between)
   assess_df <- tibble::tibble(
-    Method            = m,
-    Batch_Distance    = D_between,
-    Score             = score
+    Method         = m,
+    Batch_Distance = D_between
   )
 
+  assess_df <- assess_df %>%
+    dplyr::mutate(
+      Relative_to_Baseline = ifelse(is.finite(Batch_Distance) & Batch_Distance != 0, 1, NA_real_)
+    )
+
   print(assess_df)
-  readr::write_csv(assess_df, file.path(output_folder, "pca_raw_assessment.csv"))
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
 
 } else {
-  # ---- Rank multiple matrices (as before) ----
+  # ---- Summarise multiple matrices without ranking ----
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance = numeric()
@@ -502,25 +501,12 @@ if (only_baseline) {
     rel_values[baseline_idx] <- 1
   }
 
-  rank_values <- rep(NA_real_, nrow(rank_tbl))
-  finite_idx <- which(is.finite(rank_tbl$Batch_Distance))
-  if (length(finite_idx)) {
-    rank_values[finite_idx] <- rank(rank_tbl$Batch_Distance[finite_idx], ties.method = "average")
-  }
-
-  ranked_pca <- rank_tbl %>%
+  assessment_tbl <- rank_tbl %>%
     dplyr::mutate(
-      `Relative score` = rel_values,
-      Rank = rank_values
+      Relative_to_Baseline = rel_values
     ) %>%
-    dplyr::arrange(is.na(Rank), Rank, Method) %>%
-    dplyr::select(
-      Method,
-      Batch_Distance,
-      `Relative score`,
-      Rank
-    )
+    dplyr::arrange(Method)
 
-  print(ranked_pca, n = nrow(ranked_pca))
-  readr::write_csv(ranked_pca, file.path(output_folder, "pca_ranking.csv"))
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }

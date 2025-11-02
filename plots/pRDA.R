@@ -315,7 +315,7 @@ if (length(file_list_clr)) {
 
 # ==== pRDA scoring (Aitchison) =========================
 # Per-method score (higher = better):
-#   Score = Treatment / (Treatment + Batch + 1e-12)
+#   Proportion = Treatment / (Treatment + Batch + 1e-12)
 
 component_order <- c("Treatment","Intersection","Batch","Residuals")
 
@@ -334,33 +334,25 @@ ensure_components <- function(parts_df) {
   parts_df
 }
 
-extract_TB <- function(parts_df) {
+component_breakdown <- function(parts_df) {
   parts_df %>%
     ensure_components() %>%
     group_by(Method) %>%
     summarise(
-      Treatment = sum(Fraction[Component == "Treatment"], na.rm = TRUE),
-      Batch     = sum(Fraction[Component == "Batch"],     na.rm = TRUE),
-      .groups   = "drop"
+      Treatment   = sum(Fraction[Component == "Treatment"],   na.rm = TRUE),
+      Batch       = sum(Fraction[Component == "Batch"],       na.rm = TRUE),
+      Intersection = sum(Fraction[Component == "Intersection"], na.rm = TRUE),
+      Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
+      .groups     = "drop"
     )
 }
 
-score_tb <- function(tb) {
-  eps <- 1e-12
-  tb %>%
-    mutate(Score = Treatment / (Treatment + Batch + eps))
-}
-
-tb_clr <- if (exists("parts_df_aitch")) score_tb(extract_TB(parts_df_aitch)) %>%
-  rename(
-    Treatment_CLR = Treatment,
-    Batch_CLR     = Batch,
-    Score_CLR     = Score
-  ) else NULL
+tb_clr <- if (exists("parts_df_aitch")) component_breakdown(parts_df_aitch) else NULL
 
 # Determine if we only have the baseline ("Before correction")
 avail_methods <- if (exists("parts_df_aitch")) unique(parts_df_aitch$Method) else character()
 only_baseline <- length(avail_methods) == 1L && identical(avail_methods, "Before correction")
+output_name <- if (only_baseline) "pRDA_raw_assessment_pre.csv" else "pRDA_raw_assessment_post.csv"
 
 if (only_baseline) {
   # ---- Baseline-only assessment (no ranking) ----
@@ -374,37 +366,33 @@ if (only_baseline) {
     rs <- sum(pf$Fraction[pf$Component == "Residuals"],    na.rm = TRUE)
     assess_rows[["Ait"]] <- tibble::tibble(
       Geometry = "Ait",
-      Treatment = tr, Batch = bt, Intersection = it, Residuals = rs,
-      Score = if (is.finite(tr) && is.finite(bt)) tr / (tr + bt + 1e-12) else NA_real_
+      Treatment = tr, Batch = bt, Intersection = it, Residuals = rs
     )
   }
 
   assess_df <- dplyr::bind_rows(assess_rows)
+  assess_df <- assess_df %>%
+    dplyr::mutate(
+      Relative_Treatment_to_Baseline = ifelse(is.finite(Treatment) & Treatment != 0, 1, NA_real_),
+      Relative_Batch_to_Baseline = ifelse(is.finite(Batch) & Batch != 0, 1, NA_real_)
+    )
   print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, "pRDA_raw_assessment.csv"))
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
 
 } else {
-  # ---- Normal multi-method ranking ----
+  # ---- Normal multi-method summary ----
   unified <- tibble::as_tibble(tb_clr)
 
-  if (nrow(unified)) {
-    unified <- unified %>%
-      dplyr::mutate(`Absolute score` = Score_CLR)
+  baseline_row <- unified %>% filter(Method == "Before correction")
+  baseline_tr <- baseline_row$Treatment[1]
+  baseline_bt <- baseline_row$Batch[1]
 
-    baseline_abs <- unified$`Absolute score`[unified$Method == "Before correction"][1]
-    rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
-
-    unified <- unified %>%
-      dplyr::mutate(
-        `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-      ) %>%
-      dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
-      dplyr::mutate(Rank = dplyr::row_number()) %>%
-      dplyr::relocate(`Absolute score`, .after = Method) %>%
-      dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
-      dplyr::relocate(Rank, .after = `Relative score`)
-  }
+  unified <- unified %>%
+    mutate(
+      Relative_Treatment_to_Baseline = if (!is.finite(baseline_tr) || baseline_tr == 0) NA_real_ else Treatment / baseline_tr,
+      Relative_Batch_to_Baseline = if (!is.finite(baseline_bt) || baseline_bt == 0) NA_real_ else Batch / baseline_bt
+    )
 
   print(unified, n = nrow(unified))
-  readr::write_csv(unified, file.path(output_folder, "pRDA_ranking.csv"))
+  readr::write_csv(unified, file.path(output_folder, output_name))
 }

@@ -312,12 +312,15 @@ if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
 
 mat_list_ait <- list()
 ord_list_ait <- list()
+within_means_ait <- numeric()
 for (nm in names(file_list_clr)) {
   cat("Computing Aitchison RMSE batch matrix:", nm, "\n")
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
   comp <- rmse_batch_matrix_aitchison(df, metadata, batch_var = batch_var, diag_mode = diag_mode)
   mat_list_ait[[nm]] <- comp$Db
   ord_list_ait[[nm]] <- comp$order
+  comp_mean <- rmse_batch_matrix_aitchison(df, metadata, batch_var = batch_var, diag_mode = "mean")
+  within_means_ait[[nm]] <- mean(diag(comp_mean$Db), na.rm = TRUE)
 }
 vals_ait <- unlist(lapply(mat_list_ait, function(M) M[upper.tri(M, diag = FALSE)]))
 gmin_ait <- ifelse(is.finite(min(vals_ait, na.rm = TRUE)), min(vals_ait, na.rm = TRUE), 0)
@@ -363,12 +366,15 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
 # ==== B) Bray-Curtis heatmaps ====
 mat_list_bc <- list()
 ord_list_bc <- list()
+within_means_bc <- numeric()
 for (nm in names(file_list_tss)) {
   cat("Computing Bray-Curtis batch matrix:", nm, "\n")
   df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
   comp <- dissim_batch_matrix_bray(df, metadata, batch_var = batch_var, diag_mode = diag_mode)
   mat_list_bc[[nm]] <- comp$Db
   ord_list_bc[[nm]] <- comp$order
+  comp_mean <- dissim_batch_matrix_bray(df, metadata, batch_var = batch_var, diag_mode = "mean")
+  within_means_bc[[nm]] <- mean(diag(comp_mean$Db), na.rm = TRUE)
 }
 vals_bc <- unlist(lapply(mat_list_bc, function(M) M[upper.tri(M, diag = FALSE)]))
 gmin_bc <- ifelse(is.finite(min(vals_bc, na.rm = TRUE)), min(vals_bc, na.rm = TRUE), 0)
@@ -411,12 +417,13 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
 
-# ==== Unified ranking (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
+# ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
 mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else numeric()
 
 all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
+output_name <- if (only_baseline) "dissimilarity_raw_assessment_pre.csv" else "dissimilarity_raw_assessment_post.csv"
 
 if (only_baseline) {
   assess_rows <- list()
@@ -428,13 +435,11 @@ if (only_baseline) {
     comp_mean  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "mean")
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    score      <- 1 / (1 + between)
     assess_rows[["Ait"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Ait",
       Mean_Between      = between,
-      Mean_Within       = within,
-      Score             = score
+      Mean_Within       = within
     )
   }
   
@@ -445,90 +450,100 @@ if (only_baseline) {
     comp_mean  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "mean")
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    score      <- 1 / (1 + between)
     assess_rows[["BC"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "BC",
       Mean_Between      = between,
-      Mean_Within       = within,
-      Score             = score
+      Mean_Within       = within
     )
   }
 
   assess_df <- dplyr::bind_rows(assess_rows)
 
-  # Combined summary (geometric mean of available scores; OR on correction flags)
-  comb_score <- dplyr::case_when(
-    nrow(assess_df) >= 2 && all(is.finite(assess_df$Score)) ~ sqrt(prod(assess_df$Score)),
-    TRUE                                                    ~ max(assess_df$Score, na.rm = TRUE)
-  )
+  finite_between <- assess_df$Mean_Between[is.finite(assess_df$Mean_Between)]
+  comb_between <- if (length(finite_between)) mean(finite_between) else NA_real_
 
   assess_df <- dplyr::bind_rows(
     assess_df,
     tibble::tibble(
       Method           = "Before correction",
       Geometry         = "Combined",
-      Mean_Between     = NA_real_,
-      Mean_Within      = NA_real_,
-      Score            = comb_score
+      Mean_Between     = comb_between,
+      Mean_Within      = NA_real_
     )
   )
-  
+
+  assess_df <- assess_df %>%
+    dplyr::mutate(
+      Relative_Between_to_Baseline = ifelse(is.finite(Mean_Between), 1, NA_real_)
+    )
+
   print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, "dissimilarity_raw_assessment.csv"))
-  
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
+
   # No correction recommendation messages
-  
+
 } else {
-  # ---- Ranking (multiple methods) ----
+  # ---- Summaries for multiple methods (no ranking) ----
   weights <- c(aitchison = 0.5, bray = 0.5)
   wa <- weights["aitchison"]; wb <- weights["bray"]
   if (is.na(wa)) wa <- 0.5
   if (is.na(wb)) wb <- 0.5
   wsum <- wa + wb; wa <- wa / wsum; wb <- wb / wsum
-  
-  unified_rows <- lapply(all_methods, function(m) {
-    m_ait <- if (m %in% names(mean_ait)) mean_ait[[m]] else NA_real_
-    m_bc  <- if (m %in% names(mean_bc))  mean_bc[[m]]  else NA_real_
-    S_ait <- if (is.na(m_ait)) NA_real_ else 1 / (1 + m_ait)
-    S_bc  <- if (is.na(m_bc))  NA_real_ else 1 / (1 + m_bc)
-    S_comb <- if (!is.na(S_ait) && !is.na(S_bc)) {
-      (S_ait ^ wa) * (S_bc ^ wb)
-    } else if (!is.na(S_ait)) {
-      S_ait
-    } else if (!is.na(S_bc)) {
-      S_bc
-    } else {
-      NA_real_
+
+  make_rows <- function(means_between, means_within, geometry_label, baseline_between) {
+    if (!length(means_between)) return(NULL)
+    rel_vals <- rep(NA_real_, length(means_between))
+    if (length(baseline_between) && is.finite(baseline_between) && baseline_between != 0) {
+      rel_vals <- means_between / baseline_between
     }
-    data.frame(
-      Method                = m,
-      MeanUpper_Ait_RMSE    = m_ait,
-      MeanUpper_BC_RMSE     = m_bc,
-      Score_Ait             = S_ait,
-      Score_BC              = S_bc,
-      `Absolute score`      = S_comb,
-      stringsAsFactors      = FALSE,
-      check.names           = FALSE
+    names(rel_vals) <- names(means_between)
+    tibble::tibble(
+      Method = names(means_between),
+      Geometry = geometry_label,
+      Mean_Between = unname(means_between),
+      Mean_Within = unname(means_within[names(means_between)]),
+      Relative_Between_to_Baseline = unname(rel_vals)
     )
-  })
+  }
 
-  ranking_unified <- dplyr::bind_rows(unified_rows) %>%
-    dplyr::filter(!is.na(`Absolute score`))
+  baseline_between_ait <- mean_ait[["Before correction"]]
+  baseline_between_bc  <- mean_bc[["Before correction"]]
 
-  baseline_abs <- ranking_unified$`Absolute score`[ranking_unified$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  combined_between <- mapply(function(a, b) {
+    vals <- c(a, b)
+    wts  <- c(wa, wb)
+    keep <- is.finite(vals)
+    if (!any(keep)) return(NA_real_)
+    sum(vals[keep] * wts[keep]) / sum(wts[keep])
+  },
+  a = mean_ait[all_methods],
+  b = mean_bc[all_methods])
 
-  ranking_unified <- ranking_unified %>%
-    dplyr::mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    dplyr::arrange(dplyr::desc(`Absolute score`), Method) %>%
-    dplyr::mutate(Rank = dplyr::row_number()) %>%
-    dplyr::relocate(`Absolute score`, .after = Method) %>%
-    dplyr::relocate(`Relative score`, .after = `Absolute score`) %>%
-    dplyr::relocate(Rank, .after = `Relative score`)
+  baseline_combined <- combined_between["Before correction"]
+  rel_combined <- rep(NA_real_, length(combined_between))
+  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
+    rel_combined <- combined_between / baseline_combined
+  }
 
-  print(as.data.frame(ranking_unified), row.names = FALSE)
-  readr::write_csv(ranking_unified, file.path(output_folder, "dissimilarity_ranking.csv"))
+  combined_rows <- tibble::tibble(
+    Method = names(combined_between),
+    Geometry = "Combined",
+    Mean_Between = unname(combined_between),
+    Mean_Within = NA_real_,
+    Relative_Between_to_Baseline = unname(rel_combined)
+  )
+
+  rows <- list(
+    make_rows(mean_ait, within_means_ait, "Ait", baseline_between_ait),
+    make_rows(mean_bc, within_means_bc, "BC", baseline_between_bc),
+    combined_rows
+  )
+
+  assessment_tbl <- dplyr::bind_rows(rows)
+  assessment_tbl <- assessment_tbl %>%
+    dplyr::arrange(Geometry, Method)
+
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }
