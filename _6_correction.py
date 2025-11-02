@@ -99,6 +99,9 @@ def register_correction_callbacks(app):
         )
         body_rows: List[html.Tr] = []
         row_stores: List[dcc.Store] = []
+
+        def button_color(disabled: bool) -> str:
+            return "secondary" if disabled else "success"
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
             selections = 0
@@ -131,7 +134,7 @@ def register_correction_callbacks(app):
             run_button = dbc.Button(
                 "Run Correction",
                 id={"type": "method-run-button", "code": code},
-                color="secondary",
+                color=button_color(run_disabled),
                 size="sm",
                 style={"width": "250px"},
                 disabled=run_disabled,
@@ -144,7 +147,7 @@ def register_correction_callbacks(app):
             delete_button = dbc.Button(
                 "Delete",
                 id={"type": "method-delete-button", "code": code},
-                color="secondary",
+                color=button_color(delete_disabled),
                 size="sm",
                 style={"width": "250px"},
                 disabled=delete_disabled,
@@ -174,10 +177,12 @@ def register_correction_callbacks(app):
         return table
 
     @app.callback(
-        Output({"type": "method-status-label", "code": MATCH}, "children"),
-        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-operation-result", "code": MATCH}, "data"),
+        Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -198,7 +203,9 @@ def register_correction_callbacks(app):
             return (
                 "Not selected",
                 True,
+                "secondary",
                 True,
+                "secondary",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -208,7 +215,9 @@ def register_correction_callbacks(app):
             return (
                 "Not selected",
                 True,
+                "secondary",
                 True,
+                "secondary",
                 payload,
             )
         log_path = session_dir / "run.log"
@@ -234,10 +243,14 @@ def register_correction_callbacks(app):
             "log_path": str(log_path),
             "log_meta": None,
         }
+        run_color = "secondary" if run_disabled else "success"
+        delete_color = "secondary" if delete_disabled else "success"
         return (
             status_text,
             run_disabled,
+            run_color,
             delete_disabled,
+            delete_color,
             payload,
         )
 
@@ -298,10 +311,12 @@ def register_correction_callbacks(app):
         )
 
     @app.callback(
-        Output({"type": "method-status-label", "code": MATCH}, "children"),
-        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-operation-result", "code": MATCH}, "data"),
+        Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -322,7 +337,9 @@ def register_correction_callbacks(app):
             return (
                 "Not selected",
                 True,
+                "secondary",
                 True,
+                "secondary",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -338,9 +355,13 @@ def register_correction_callbacks(app):
             "complete": bool(complete_flag),
             "refresh": refresh_value + 1,
         }
+        run_color = "secondary" if run_disabled else "success"
+        delete_color = "secondary" if delete_disabled else "success"
         return (
             status_text,
             run_disabled,
+            run_color,
             delete_disabled,
+            delete_color,
             payload,
         )
