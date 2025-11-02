@@ -536,10 +536,19 @@ def register_upload_callbacks(app):
         State("study-control-label", "value"),
         State("study-reference-batch", "value"),
         State("session-id", "data"),
+        State("page-url", "pathname"),
         prevent_initial_call=True,
     )
-    def apply_study_settings(n_clicks: int, control_label: str, reference_batch: str, session_id: str):
+    def apply_study_settings(
+        n_clicks: int,
+        control_label: str,
+        reference_batch: str,
+        session_id: str,
+        pathname: str,
+    ):
         if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        if (pathname or "/").split("?", 1)[0] != "/upload":
             raise dash.exceptions.PreventUpdate
         if not session_id:
             return html.Span("Session not initialised.", className="text-danger"), dash.no_update, dash.no_update

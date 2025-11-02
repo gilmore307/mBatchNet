@@ -210,11 +210,8 @@ if (only_baseline) {
   # Baseline-only assessment: no ranking, just evaluate value and recommend correction if low
   base_row <- sil_tbl %>% filter(Method == "Before correction")
   if (nrow(base_row) == 0) stop("No Silhouette computed for 'Before correction'.")
-  base_summary <- base_row %>%
-    mutate(Relative_to_Baseline = ifelse(is.finite(Silhouette) & Silhouette != 0, 1, NA_real_))
-
-  readr::write_csv(base_summary, file.path(output_folder, output_name))
-  print(base_summary)
+  readr::write_csv(base_row, file.path(output_folder, output_name))
+  print(base_row)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
@@ -242,14 +239,8 @@ if (only_baseline) {
   
 } else {
   # Multiple methods - summarise but KEEP ORIGINAL ORDER IN THE PLOT
-  baseline_val <- sil_tbl$Silhouette[sil_tbl$Method == "Before correction"][1]
-  sil_summary <- sil_tbl %>%
-    mutate(
-      Relative_to_Baseline = if (!is.finite(baseline_val) || baseline_val == 0) NA_real_ else Silhouette / baseline_val
-    )
-
-  readr::write_csv(sil_summary, file.path(output_folder, output_name))
-  print(sil_summary, n = nrow(sil_summary))
+  readr::write_csv(sil_tbl, file.path(output_folder, output_name))
+  print(sil_tbl, n = nrow(sil_tbl))
   
   plot_df <- sil_tbl %>% mutate(Method = factor(Method, levels = method_levels))
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +

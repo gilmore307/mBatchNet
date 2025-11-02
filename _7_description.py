@@ -7,14 +7,10 @@ HELP_MODAL_SECTIONS: List = []
 
 # Parameter tooltips for assessment configuration controls.
 ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
-    "auc": {
-        "cv_folds": "Number of cross-validation folds (repeated CV).",
-        "cv_reps": "Number of repetitions for repeated cross-validation.",
-    },
     "alignment": {
-        "k_neighbors": "k for k-NN graph in PCA space.",
-        "var_prop_min": "Min cumulative variance for PCA retention (0–1).",
-        "max_pcs": "Maximum number of principal components to use.",
+        "k_neighbors": "k for k-NN graph when computing Alignment Score.",
+        "var_prop_min": "Minimum cumulative variance proportion to retain when selecting PCs.",
+        "max_pcs": "Maximum number of PCs considered when computing Alignment Score.",
     },
     "ebm": {
         "umap_neighbors": "UMAP: Number of neighbors (local connectivity).",
@@ -44,6 +40,10 @@ FIGURE_DPI_TOOLTIP = "Dots per inch used when saving figures."
 FIGURE_SUBPLOTS_TOOLTIP = "Number of method panels per row (where applicable)."
 
 RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
+    "alignment": (
+        "**Score formula:** $S = \\overline{1 - p_{\\text{same-batch}}}$ where $p_{\\text{same-batch}}$ is the fraction of each sample's k-NN drawn from its own batch.\\n\\n"
+        "**Interpretation:** Higher scores indicate stronger batch mixing after correction, as fewer neighbours belong to the original batch."
+    ),
     "pca": (
         "**Score formula:** $S = c_{1:2} \\times \\frac{w_{\\text{batch}}}{w_{\\text{batch}} + d_{\\text{batch}}}$\n\n"
         "**Symbols:** $c_{1:2}$ = variance coverage of PC1 and PC2; $w_{\\text{batch}}$ = mean within-batch dispersion on PC1-2; "
@@ -79,14 +79,6 @@ RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
     "pvca": (
         "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\frac{T}{T + B}$\n\n"
         "**Symbols:** $T$ = PVCA-estimated treatment variance fraction; $B$ = PVCA-estimated batch variance fraction.\n\nLeverages PVCA variance components to favour low batch contribution."
-    ),
-    "alignment": (
-        "**Score formula:** $S = \\frac{1}{N} \\sum_{i=1}^{N} \\Big(1 - \\frac{\\#\\text{same-batch NN}_i}{k}\\Big)$\n\n"
-        "**Symbols:** $N$ = number of samples; $k$ = k-NN size; $\\#\\text{same-batch NN}_i$ = count of neighbors sharing sample $i$'s batch.\n\n"
-        "Counts how often k-NN in PCA space come from other batches."
-    ),
-    "auc": (
-        "**Score formula:** $S = \\text{AUROC}$\n\nTracks phenotype separability using repeated-cross-validation random forests."
     ),
     "lisi": (
         "**Score formula:** $S = \\tfrac{1}{2}\\big(\\tilde{\\text{iLISI}} + 1 - \\tilde{\\text{cLISI}}\\big)$\n\n"

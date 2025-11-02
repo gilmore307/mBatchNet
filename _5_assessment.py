@@ -27,11 +27,11 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
-    build_overall_div,
 )
 
 
 FIGURE_DEFAULTS = {
+    "alignment": {"width": 2550, "height": 1560, "dpi": 300},
     "pca": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
@@ -39,8 +39,6 @@ FIGURE_DEFAULTS = {
     "r2": {"width": 3000, "height": 1560, "dpi": 300},
     "prda": {"width": 2280, "height": 2070, "dpi": 300},
     "pvca": {"width": 2160, "height": 2040, "dpi": 300},
-    "alignment": {"width": 1950, "height": 1380, "dpi": 300},
-    "auc": {"width": 2640, "height": 1860, "dpi": 300},
     "lisi": {"width": 2700, "height": 2400, "dpi": 300},
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
@@ -106,55 +104,7 @@ def _param_controls(stage: str, key: str):
     sid = f"{stage}-{key}"
     tooltips = ASSESSMENT_PARAM_TOOLTIPS.get(key, {})
 
-    if key == "auc":
-        # AUC.R parameters
-        controls = [
-            num_input(
-                f"{sid}-param-cv-folds",
-                "CV_FOLDS",
-                5,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("cv_folds", ""),
-            ),
-            num_input(
-                f"{sid}-param-cv-reps",
-                "CV_REPS",
-                5,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("cv_reps", ""),
-            ),
-        ]
-    elif key == "alignment":
-        controls = [
-            num_input(
-                f"{sid}-param-k",
-                "K_NEIGHBORS",
-                10,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("k_neighbors", ""),
-            ),
-            num_input(
-                f"{sid}-param-var-prop",
-                "VAR_PROP_MIN",
-                0.95,
-                step=0.01,
-                min_=0.1,
-                max_=1.0,
-                tooltip=tooltips.get("var_prop_min", ""),
-            ),
-            num_input(
-                f"{sid}-param-max-pcs",
-                "MAX_PCS",
-                10,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("max_pcs", ""),
-            ),
-        ]
-    elif key == "ebm":
+    if key == "ebm":
         controls = [
             num_input(
                 f"{sid}-param-umap-nn",
@@ -203,6 +153,34 @@ def _param_controls(stage: str, key: str):
                 step=1,
                 min_=1,
                 tooltip=tooltips.get("knn_per_label", ""),
+            ),
+        ]
+    elif key == "alignment":
+        controls = [
+            num_input(
+                f"{sid}-param-k",
+                "k (neighbors)",
+                10,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("k_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-var-prop-min",
+                "Variance proportion",
+                0.95,
+                step=0.01,
+                min_=0.1,
+                max_=1.0,
+                tooltip=tooltips.get("var_prop_min", ""),
+            ),
+            num_input(
+                f"{sid}-param-max-pcs",
+                "Max PCs",
+                10,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("max_pcs", ""),
             ),
         ]
     elif key == "lisi":
@@ -359,10 +337,9 @@ def assessment_layout(active_path: str, stage: str):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
     post_extra = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
@@ -427,18 +404,6 @@ def assessment_layout(active_path: str, stage: str):
             )
         )
 
-    # Overall tab only for post stage
-    if stage == "post":
-        tab_items.append(
-            dcc.Tab(
-                label="Overall",
-                value="tab-overall",
-                style=TOP_TAB_STYLE,
-                selected_style=TOP_TAB_SELECTED_STYLE,
-                children=html.Div(id=f"{stage}-overall-content", children=html.Div("No results yet.")),
-            )
-        )
-
     tabs = dcc.Tabs(
         children=tab_items,
         value=(tab_items[0].value if tab_items else None),
@@ -474,10 +439,9 @@ def register_pre_post_callbacks(app):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
     post_extra = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
@@ -500,32 +464,20 @@ def register_pre_post_callbacks(app):
             Output("runlog-modal", "is_open", allow_duplicate=True),
             Output("runlog-interval", "disabled", allow_duplicate=True),
         ])
-        # Only post stage updates an Overall tab
-        if stage == "post":
-            outputs.append(Output(f"{stage}-overall-content", "children", allow_duplicate=True))
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
 
         # Parameter States by group
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
-        if key == "auc":
-            param_state_ids.extend([
-                f"{sid}-param-cv-folds",
-                f"{sid}-param-cv-reps",
-            ])
-            states += [
-                State(f"{sid}-param-cv-folds", "value"),
-                State(f"{sid}-param-cv-reps", "value"),
-            ]
-        elif key == "alignment":
+        if key == "alignment":
             param_state_ids.extend([
                 f"{sid}-param-k",
-                f"{sid}-param-var-prop",
+                f"{sid}-param-var-prop-min",
                 f"{sid}-param-max-pcs",
             ])
             states += [
                 State(f"{sid}-param-k", "value"),
-                State(f"{sid}-param-var-prop", "value"),
+                State(f"{sid}-param-var-prop-min", "value"),
                 State(f"{sid}-param-max-pcs", "value"),
             ]
         elif key == "ebm":
@@ -673,13 +625,7 @@ def register_pre_post_callbacks(app):
 
             pv = param_vals
             idx = 0
-            if _key == "auc":
-                # order: cv-folds, cv-reps
-                _add("cv_folds", pv[idx], int)
-                idx += 1
-                _add("cv_reps", pv[idx], int)
-                idx += 1
-            elif _key == "alignment":
+            if _key == "alignment":
                 _add("k", pv[idx], int)
                 idx += 1
                 _add("var_prop_min", pv[idx], float)
@@ -746,8 +692,6 @@ def register_pre_post_callbacks(app):
                     persisted_payload,
                 )
             else:
-                # post: update Overall
-                overall = build_overall_div(session_dir, _stage)
                 return (
                     content,
                     True,
@@ -755,7 +699,6 @@ def register_pre_post_callbacks(app):
                     None,
                     dash.no_update,
                     dash.no_update,
-                    overall,
                     persisted_payload,
                 )
 

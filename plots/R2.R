@@ -275,11 +275,7 @@ if (only_baseline) {
       Median_R2_Batch = Batch,
       Median_R2_Treatment = Treatment
     ) %>%
-    mutate(
-      Relative_Batch_to_Baseline = ifelse(is.finite(Median_R2_Batch) & Median_R2_Batch != 0, 1, NA_real_),
-      Relative_Treatment_to_Baseline = ifelse(is.finite(Median_R2_Treatment) & Median_R2_Treatment != 0, 1, NA_real_)
-    ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment, Relative_Batch_to_Baseline, Relative_Treatment_to_Baseline)
+    select(Method, Median_R2_Batch, Median_R2_Treatment)
 
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, output_name))
@@ -287,20 +283,12 @@ if (only_baseline) {
   # No correction recommendation messages
 
 } else {
-  baseline_row <- median_r2_by_method %>%
-    filter(Method == "Before correction")
-
-  baseline_batch <- baseline_row$Batch[1]
-  baseline_treat <- baseline_row$Treatment[1]
-
   assessment_tbl <- median_r2_by_method %>%
     mutate(
       Median_R2_Batch = Batch,
-      Median_R2_Treatment = Treatment,
-      Relative_Batch_to_Baseline = if (!is.finite(baseline_batch) || baseline_batch == 0) NA_real_ else Batch / baseline_batch,
-      Relative_Treatment_to_Baseline = if (!is.finite(baseline_treat) || baseline_treat == 0) NA_real_ else Treatment / baseline_treat
+      Median_R2_Treatment = Treatment
     ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment, Relative_Batch_to_Baseline, Relative_Treatment_to_Baseline)
+    select(Method, Median_R2_Batch, Median_R2_Treatment)
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))

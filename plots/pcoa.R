@@ -629,33 +629,10 @@ if (only_baseline) {
     )
   }
 
-  assess_df <- dplyr::bind_rows(assess_rows)
+    assess_df <- dplyr::bind_rows(assess_rows)
 
-  finite_distances <- assess_df$Batch_Distance[is.finite(assess_df$Batch_Distance)]
-  comb_distance <- if (length(finite_distances) >= 2) {
-    mean(finite_distances)
-  } else if (length(finite_distances) == 1) {
-    finite_distances
-  } else {
-    NA_real_
-  }
-
-  assess_df <- dplyr::bind_rows(
-    assess_df,
-    tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "Combined",
-      Batch_Distance    = comb_distance
-    )
-  )
-
-  assess_df <- assess_df %>%
-    dplyr::mutate(
-      Relative_to_Baseline = ifelse(is.finite(Batch_Distance) & Batch_Distance != 0, 1, NA_real_)
-    )
-
-  print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, output_name))
+    print(assess_df, n = nrow(assess_df))
+    readr::write_csv(assess_df, file.path(output_folder, output_name))
 
   # No correction recommendation messages
 
@@ -699,71 +676,24 @@ if (only_baseline) {
     ))
   }
 
-  baseline_clr <- rank_tbl$Batch_Distance_Ait[rank_tbl$Method == "Before correction"][1]
-  baseline_tss <- rank_tbl$Batch_Distance_BC[rank_tbl$Method == "Before correction"][1]
+    assessment_rows <- list()
+    if (any(is.finite(rank_tbl$Batch_Distance_Ait))) {
+      assessment_rows[["Ait"]] <- tibble::tibble(
+        Method = rank_tbl$Method,
+        Geometry = "Ait",
+        Batch_Distance = rank_tbl$Batch_Distance_Ait
+      )
+    }
+    if (any(is.finite(rank_tbl$Batch_Distance_BC))) {
+      assessment_rows[["BC"]] <- tibble::tibble(
+        Method = rank_tbl$Method,
+        Geometry = "BC",
+        Batch_Distance = rank_tbl$Batch_Distance_BC
+      )
+    }
 
-  rel_clr <- rep(NA_real_, nrow(rank_tbl))
-  if (length(baseline_clr) && is.finite(baseline_clr) && baseline_clr != 0) {
-    rel_clr <- rank_tbl$Batch_Distance_Ait / baseline_clr
-  }
-  rel_tss <- rep(NA_real_, nrow(rank_tbl))
-  if (length(baseline_tss) && is.finite(baseline_tss) && baseline_tss != 0) {
-    rel_tss <- rank_tbl$Batch_Distance_BC / baseline_tss
-  }
-
-  baseline_idx <- which(rank_tbl$Method == "Before correction")[1]
-  if (length(baseline_idx) == 1L) {
-    if (is.finite(rank_tbl$Batch_Distance_Ait[baseline_idx])) rel_clr[baseline_idx] <- 1
-    if (is.finite(rank_tbl$Batch_Distance_BC[baseline_idx])) rel_tss[baseline_idx] <- 1
-  }
-
-  combine_distance <- function(a, b) {
-    vals <- c(a, b)
-    vals <- vals[is.finite(vals)]
-    if (!length(vals)) NA_real_ else mean(vals)
-  }
-
-  combined_dist <- mapply(combine_distance,
-                          rank_tbl$Batch_Distance_Ait,
-                          rank_tbl$Batch_Distance_BC)
-
-  baseline_combined <- combined_dist[baseline_idx]
-  rel_combined <- rep(NA_real_, length(combined_dist))
-  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
-    rel_combined <- combined_dist / baseline_combined
-  }
-  if (length(baseline_idx) == 1L && is.finite(combined_dist[baseline_idx])) {
-    rel_combined[baseline_idx] <- 1
-  }
-
-  assessment_rows <- list()
-  if (any(is.finite(rank_tbl$Batch_Distance_Ait))) {
-    assessment_rows[["Ait"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "Ait",
-      Batch_Distance = rank_tbl$Batch_Distance_Ait,
-      Relative_to_Baseline = rel_clr
-    )
-  }
-  if (any(is.finite(rank_tbl$Batch_Distance_BC))) {
-    assessment_rows[["BC"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "BC",
-      Batch_Distance = rank_tbl$Batch_Distance_BC,
-      Relative_to_Baseline = rel_tss
-    )
-  }
-  if (any(is.finite(combined_dist))) {
-    assessment_rows[["Combined"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "Combined",
-      Batch_Distance = combined_dist,
-      Relative_to_Baseline = rel_combined
-    )
-  }
-
-  assessment_tbl <- dplyr::bind_rows(assessment_rows)
-  assessment_tbl <- assessment_tbl %>%
+    assessment_tbl <- dplyr::bind_rows(assessment_rows)
+    assessment_tbl <- assessment_tbl %>%
     dplyr::arrange(Geometry, Method)
 
   print(assessment_tbl, n = nrow(assessment_tbl))

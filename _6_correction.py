@@ -92,8 +92,24 @@ def register_correction_callbacks(app):
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
                     html.Th("Status"),
-                    html.Th("Run Correction"),
-                    html.Th("Delete"),
+                    html.Th(
+                        dcc.Loading(
+                            html.Span("Run Correction", id="run-column-loading-indicator"),
+                            type="default",
+                            parent_className="be-column-loading",
+                            className="be-column-loading",
+                        ),
+                        className="text-center",
+                    ),
+                    html.Th(
+                        dcc.Loading(
+                            html.Span("Delete", id="delete-column-loading-indicator"),
+                            type="default",
+                            parent_className="be-column-loading",
+                            className="be-column-loading",
+                        ),
+                        className="text-center",
+                    ),
                 ]
             )
         )
@@ -141,7 +157,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             run_cell = html.Td(
-                dcc.Loading(run_button, type="default"),
+                dcc.Loading(
+                    html.Div(run_button, className="d-grid gap-1"),
+                    type="default",
+                    parent_className="be-column-loading",
+                    className="be-column-loading",
+                ),
                 className="text-center",
             )
             delete_button = dbc.Button(
@@ -154,7 +175,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             delete_cell = html.Td(
-                dcc.Loading(delete_button, type="default"),
+                dcc.Loading(
+                    html.Div(delete_button, className="d-grid gap-1"),
+                    type="default",
+                    parent_className="be-column-loading",
+                    className="be-column-loading",
+                ),
                 className="text-center",
             )
             row = html.Tr(
