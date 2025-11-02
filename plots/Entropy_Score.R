@@ -221,14 +221,7 @@ batch_entropy_mixing_knn <- function(
 }
 
 summarise_methods_ebm <- function(ebm_table) {
-  scored <- ebm_table %>% filter(is.finite(EBM))
-  baseline_row <- scored %>% filter(Method == "Before correction")
-  baseline_val <- if (nrow(baseline_row)) baseline_row$EBM[1] else NA_real_
-
-  scored %>%
-    mutate(
-      Relative_to_Baseline = if (!is.finite(baseline_val) || baseline_val == 0) NA_real_ else EBM / baseline_val
-    )
+  ebm_table %>% filter(is.finite(EBM))
 }
 
 pretty_metric <- function(m) {

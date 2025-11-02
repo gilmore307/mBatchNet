@@ -4,6 +4,7 @@
 import base64
 import csv
 import json
+import math
 import os
 import re
 import sys
@@ -54,8 +55,6 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("R^2 (Aitchison)", "R2_aitchison.png"),
     FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
     FigureSpec("PVCA", "PVCA.png"),
-    FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("AUC", "auroc.png"),
 )
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
@@ -75,8 +74,6 @@ PRE_SCRIPTS: Sequence[str] = (
     "R2.R",
     "pRDA.R",
     "pvca.R",
-    "Alignment_Score.R",
-    "AUC.R",
 )
 
 POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
@@ -93,8 +90,6 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
     "r2": "R² score",
     "prda": "pRDA score",
     "pvca": "PVCA score",
-    "alignment": "Alignment score",
-    "auc": "AUC score",
     "lisi": "LISI score",
     "ebm": "Entropy score",
     "silhouette": "Silhouette score",
@@ -767,10 +762,6 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["pRDA", "prda"]
     elif s == "pvca":
         bases = ["PVCA", "pvca"]
-    elif s == "alignment_score":
-        bases = ["alignment_score"]
-    elif s == "auroc":
-        bases = ["auroc"]
     elif s == "lisi":
         bases = ["LISI", "lisi"]
     elif s == "ebm":
@@ -1218,10 +1209,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["single"] = spec.filename; g["title"] = "PCA"
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
             g["single"] = spec.filename; g["title"] = "PVCA"
-        elif key == "alignment" and spec.filename.lower() == "alignment_score.png":
-            g["single"] = spec.filename; g["title"] = "Alignment score"
-        elif key == "auc" and spec.filename.lower() == "auroc.png":
-            g["single"] = spec.filename; g["title"] = "AUC"
         elif key == "lisi" and spec.filename.lower() == "lisi.png":
             g["single"] = spec.filename; g["title"] = "LISI"
         elif key == "ebm" and spec.filename.lower() == "ebm.png":
@@ -1378,7 +1365,6 @@ class MethodRankingEntry:
     method_code: Optional[str]
     rank: Optional[float]
     absolute: Optional[float]
-    relative: Optional[float]
     raw: Dict[str, str]
     is_baseline: bool
 
@@ -1470,8 +1456,6 @@ def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]
 
 
 RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
-    "alignment_score": ScoreSpec(field="absolute score"),
-    "auroc": ScoreSpec(field="absolute score"),
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
     "lisi": ScoreSpec(field="absolute score"),
@@ -1486,10 +1470,6 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
 
 
 RANKING_FILE_ALIASES: Dict[str, List[str]] = {
-    "alignment": ["alignment_score"],
-    "alignment_score": ["alignment_score"],
-    "auc": ["auroc"],
-    "auroc": ["auroc"],
     "dissimilarity": ["dissimilarity"],
     "ebm": ["ebm", "entropy_score"],
     "lisi": ["lisi"],
@@ -1513,8 +1493,6 @@ REQUIRED_RANKING_KEYS: Set[str] = {
     "r2",
     "prda",
     "pvca",
-    "alignment",
-    "auc",
     "lisi",
     "ebm",
     "silhouette",
@@ -1552,7 +1530,6 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
         method_col = field_map.get("method")
         rank_col = field_map.get("rank")
         absolute_col = field_map.get("absolute score")
-        relative_col = field_map.get("relative score")
         spec = RANKING_SCORE_SPECS.get(metric_key)
         baseline_label = (spec.baseline_label if spec else "Before correction").lower()
 
@@ -1582,29 +1559,15 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
             absolute = _safe_float(raw_row.get(absolute_col)) if absolute_col else None
             if absolute is None:
                 absolute = _compute_absolute_score(metric_key, raw_row)
-            relative_value = _safe_float(raw_row.get(relative_col)) if relative_col else None
             is_baseline = method_display.lower() == baseline_label
             entries.append(MethodRankingEntry(
                 method=method_display,
                 method_code=method_code,
                 rank=rank_value,
                 absolute=absolute,
-                relative=relative_value,
                 raw={column_display_map[k]: raw_row.get(k, "") for k in original_columns if column_display_map.get(k)},
                 is_baseline=is_baseline,
             ))
-
-    baseline_entry = next((e for e in entries if e.is_baseline and e.absolute not in (None, 0)), None)
-    baseline_abs = baseline_entry.absolute if baseline_entry else None
-    if baseline_entry and baseline_entry.relative is None:
-        baseline_entry.relative = 1.0
-    if baseline_abs not in (None, 0):
-        for entry in entries:
-            if entry.relative is None and entry.absolute is not None:
-                entry.relative = entry.absolute / baseline_abs
-    else:
-        for entry in entries:
-            entry.relative = None
 
     # If the CSV lacks a Rank column, derive ranks from absolute score (higher is better)
     scored = [e for e in entries if e.absolute is not None]
@@ -1620,15 +1583,12 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         return None
     has_rank = any(entry.rank is not None for entry in data.entries)
     has_absolute = any(entry.absolute is not None for entry in data.entries)
-    has_relative = any(entry.relative is not None for entry in data.entries)
 
     base_columns: List[str] = ["Method"]
     if has_rank:
         base_columns.append("Average rank")
     if has_absolute:
         base_columns.append("Absolute score")
-    if has_relative:
-        base_columns.append("Relative score")
 
     excluded = {"method", "average rank", "absolute score", "relative score"}
     excluded.update(col.lower() for col in base_columns)
@@ -1643,7 +1603,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     for entry in data.entries:
         rank_val = _rounded(entry.rank)
         absolute_val = _rounded(entry.absolute)
-        relative_val = _rounded(entry.relative)
         row: Dict[str, object] = {"Method": entry.method}
         if "Average rank" in base_columns:
             row["Average rank"] = rank_val
@@ -1653,10 +1612,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
             row["Absolute score"] = absolute_val
             if absolute_val is not None:
                 numeric_candidates["Absolute score"] = True
-        if "Relative score" in base_columns:
-            row["Relative score"] = relative_val
-            if relative_val is not None:
-                numeric_candidates["Relative score"] = True
         for col in extra_cols:
             raw_value = entry.raw.get(col, "")
             numeric_value = _safe_float(raw_value)
@@ -1683,8 +1638,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         if numeric_candidates.get(col):
             col_def["type"] = "numericColumn"
             if col == "Average rank":
-                col_def["type"] = "numericColumn"
-            elif col == "Relative score":
                 col_def["type"] = "numericColumn"
             else:
                 col_def["type"] = "numericColumn"
@@ -1769,8 +1722,6 @@ def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str
                     cell_parts.append(f"#{rounded_rank:.3f}" if rounded_rank is not None else "-")
             if entry.absolute is not None:
                 cell_parts.append(f"{_rounded(entry.absolute):.3f}")
-            if entry.relative is not None:
-                cell_parts.append(f"{_rounded(entry.relative):.3f}x")
             row[metric] = " | ".join(cell_parts) if cell_parts else "-"
         rows.append(row)
 
@@ -1874,7 +1825,7 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
 
     def pick_value(header: List[str], data_row: List[str]) -> str:
         hl = [h.lower() for h in header]
-        pri = ["score", "auc", "silhouette", "entropy", "alignment", "r2", "mean_between"]
+        pri = ["score", "silhouette", "entropy", "r2", "mean_between"]
         for key in pri:
             if key in hl:
                 idx = hl.index(key)
@@ -1967,7 +1918,7 @@ def build_overall_div(session_dir: Path, stage: str):
                 }
                 for metric_name in metrics:
                     entry = per_metric.get(metric_name)
-                    row[metric_name] = _rounded(entry.relative) if entry and entry.relative is not None else None
+                    row[metric_name] = _rounded(entry.absolute) if entry and entry.absolute is not None else None
                 typed_rows.append(row)
 
             def _sort_key(item: Dict[str, object]) -> Tuple[float, str]:
@@ -2235,13 +2186,10 @@ def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
             absolute = entry.absolute
             if absolute is None:
                 continue
-            if entry.relative is not None:
-                ratio = entry.relative
-            elif baseline_abs not in (None, 0):
-                ratio = absolute / baseline_abs
-            else:
+            if baseline_abs in (None, 0):
                 continue
-            if ratio is None:
+            ratio = absolute / baseline_abs
+            if not math.isfinite(ratio):
                 continue
             ret[method_code][data.display_name] = ratio - 1.0
     return ret

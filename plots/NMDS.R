@@ -464,29 +464,6 @@ if (only_baseline) {
 
   assess_df <- dplyr::bind_rows(assess_rows)
 
-  finite_stress <- assess_df$NMDS_Stress[is.finite(assess_df$NMDS_Stress)]
-  comb_stress <- if (length(finite_stress) >= 2) {
-    mean(finite_stress)
-  } else if (length(finite_stress) == 1) {
-    finite_stress
-  } else {
-    NA_real_
-  }
-
-  assess_df <- dplyr::bind_rows(
-    assess_df,
-    tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "Combined",
-      NMDS_Stress       = comb_stress
-    )
-  )
-
-  assess_df <- assess_df %>%
-    dplyr::mutate(
-      Relative_to_Baseline = ifelse(is.finite(NMDS_Stress) & NMDS_Stress != 0, 1, NA_real_)
-    )
-
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, output_name))
 
@@ -522,66 +499,19 @@ if (only_baseline) {
     ))
   }
 
-  baseline_clr <- rank_tbl$NMDS_Stress_Ait[rank_tbl$Method == "Before correction"][1]
-  baseline_tss <- rank_tbl$NMDS_Stress_BC[rank_tbl$Method == "Before correction"][1]
-
-  rel_clr <- rep(NA_real_, nrow(rank_tbl))
-  if (length(baseline_clr) && is.finite(baseline_clr) && baseline_clr != 0) {
-    rel_clr <- rank_tbl$NMDS_Stress_Ait / baseline_clr
-  }
-  rel_tss <- rep(NA_real_, nrow(rank_tbl))
-  if (length(baseline_tss) && is.finite(baseline_tss) && baseline_tss != 0) {
-    rel_tss <- rank_tbl$NMDS_Stress_BC / baseline_tss
-  }
-
-  baseline_idx <- which(rank_tbl$Method == "Before correction")[1]
-  if (length(baseline_idx) == 1L) {
-    if (is.finite(rank_tbl$NMDS_Stress_Ait[baseline_idx])) rel_clr[baseline_idx] <- 1
-    if (is.finite(rank_tbl$NMDS_Stress_BC[baseline_idx])) rel_tss[baseline_idx] <- 1
-  }
-
-  combine_stress <- function(a, b) {
-    vals <- c(a, b)
-    vals <- vals[is.finite(vals)]
-    if (!length(vals)) NA_real_ else mean(vals)
-  }
-
-  combined_stress <- mapply(combine_stress,
-                             rank_tbl$NMDS_Stress_Ait,
-                             rank_tbl$NMDS_Stress_BC)
-
-  baseline_combined <- combined_stress[baseline_idx]
-  rel_combined <- rep(NA_real_, length(combined_stress))
-  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
-    rel_combined <- combined_stress / baseline_combined
-  }
-  if (length(baseline_idx) == 1L && is.finite(combined_stress[baseline_idx])) {
-    rel_combined[baseline_idx] <- 1
-  }
-
   assessment_rows <- list()
   if (any(is.finite(rank_tbl$NMDS_Stress_Ait))) {
     assessment_rows[["Ait"]] <- tibble::tibble(
       Method = rank_tbl$Method,
       Geometry = "Ait",
-      NMDS_Stress = rank_tbl$NMDS_Stress_Ait,
-      Relative_to_Baseline = rel_clr
+      NMDS_Stress = rank_tbl$NMDS_Stress_Ait
     )
   }
   if (any(is.finite(rank_tbl$NMDS_Stress_BC))) {
     assessment_rows[["BC"]] <- tibble::tibble(
       Method = rank_tbl$Method,
       Geometry = "BC",
-      NMDS_Stress = rank_tbl$NMDS_Stress_BC,
-      Relative_to_Baseline = rel_tss
-    )
-  }
-  if (any(is.finite(combined_stress))) {
-    assessment_rows[["Combined"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "Combined",
-      NMDS_Stress = combined_stress,
-      Relative_to_Baseline = rel_combined
+      NMDS_Stress = rank_tbl$NMDS_Stress_BC
     )
   }
 

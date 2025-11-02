@@ -458,89 +458,31 @@ if (only_baseline) {
     )
   }
 
-  assess_df <- dplyr::bind_rows(assess_rows)
+    assess_df <- dplyr::bind_rows(assess_rows)
 
-  finite_between <- assess_df$Mean_Between[is.finite(assess_df$Mean_Between)]
-  comb_between <- if (length(finite_between)) mean(finite_between) else NA_real_
-
-  assess_df <- dplyr::bind_rows(
-    assess_df,
-    tibble::tibble(
-      Method           = "Before correction",
-      Geometry         = "Combined",
-      Mean_Between     = comb_between,
-      Mean_Within      = NA_real_
-    )
-  )
-
-  assess_df <- assess_df %>%
-    dplyr::mutate(
-      Relative_Between_to_Baseline = ifelse(is.finite(Mean_Between), 1, NA_real_)
-    )
-
-  print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, output_name))
+    print(assess_df, n = nrow(assess_df))
+    readr::write_csv(assess_df, file.path(output_folder, output_name))
 
   # No correction recommendation messages
 
 } else {
   # ---- Summaries for multiple methods (no ranking) ----
-  weights <- c(aitchison = 0.5, bray = 0.5)
-  wa <- weights["aitchison"]; wb <- weights["bray"]
-  if (is.na(wa)) wa <- 0.5
-  if (is.na(wb)) wb <- 0.5
-  wsum <- wa + wb; wa <- wa / wsum; wb <- wb / wsum
-
-  make_rows <- function(means_between, means_within, geometry_label, baseline_between) {
-    if (!length(means_between)) return(NULL)
-    rel_vals <- rep(NA_real_, length(means_between))
-    if (length(baseline_between) && is.finite(baseline_between) && baseline_between != 0) {
-      rel_vals <- means_between / baseline_between
+    make_rows <- function(means_between, means_within, geometry_label) {
+      if (!length(means_between)) return(NULL)
+      tibble::tibble(
+        Method = names(means_between),
+        Geometry = geometry_label,
+        Mean_Between = unname(means_between),
+        Mean_Within = unname(means_within[names(means_between)])
+      )
     }
-    names(rel_vals) <- names(means_between)
-    tibble::tibble(
-      Method = names(means_between),
-      Geometry = geometry_label,
-      Mean_Between = unname(means_between),
-      Mean_Within = unname(means_within[names(means_between)]),
-      Relative_Between_to_Baseline = unname(rel_vals)
+
+    rows <- list(
+      make_rows(mean_ait, within_means_ait, "Ait"),
+      make_rows(mean_bc, within_means_bc, "BC")
     )
-  }
 
-  baseline_between_ait <- mean_ait[["Before correction"]]
-  baseline_between_bc  <- mean_bc[["Before correction"]]
-
-  combined_between <- mapply(function(a, b) {
-    vals <- c(a, b)
-    wts  <- c(wa, wb)
-    keep <- is.finite(vals)
-    if (!any(keep)) return(NA_real_)
-    sum(vals[keep] * wts[keep]) / sum(wts[keep])
-  },
-  a = mean_ait[all_methods],
-  b = mean_bc[all_methods])
-
-  baseline_combined <- combined_between["Before correction"]
-  rel_combined <- rep(NA_real_, length(combined_between))
-  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
-    rel_combined <- combined_between / baseline_combined
-  }
-
-  combined_rows <- tibble::tibble(
-    Method = names(combined_between),
-    Geometry = "Combined",
-    Mean_Between = unname(combined_between),
-    Mean_Within = NA_real_,
-    Relative_Between_to_Baseline = unname(rel_combined)
-  )
-
-  rows <- list(
-    make_rows(mean_ait, within_means_ait, "Ait", baseline_between_ait),
-    make_rows(mean_bc, within_means_bc, "BC", baseline_between_bc),
-    combined_rows
-  )
-
-  assessment_tbl <- dplyr::bind_rows(rows)
+    assessment_tbl <- dplyr::bind_rows(rows)
   assessment_tbl <- assessment_tbl %>%
     dplyr::arrange(Geometry, Method)
 

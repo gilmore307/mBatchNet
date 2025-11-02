@@ -461,11 +461,6 @@ if (only_baseline) {
     Batch_Distance = D_between
   )
 
-  assess_df <- assess_df %>%
-    dplyr::mutate(
-      Relative_to_Baseline = ifelse(is.finite(Batch_Distance) & Batch_Distance != 0, 1, NA_real_)
-    )
-
   print(assess_df)
   readr::write_csv(assess_df, file.path(output_folder, output_name))
 
@@ -491,20 +486,7 @@ if (only_baseline) {
     ))
   }
 
-  baseline_distance <- rank_tbl$Batch_Distance[rank_tbl$Method == "Before correction"][1]
-  rel_values <- rep(NA_real_, nrow(rank_tbl))
-  if (length(baseline_distance) && is.finite(baseline_distance) && baseline_distance != 0) {
-    rel_values <- rank_tbl$Batch_Distance / baseline_distance
-  }
-  baseline_idx <- which(rank_tbl$Method == "Before correction")[1]
-  if (length(baseline_idx) == 1L && is.finite(rank_tbl$Batch_Distance[baseline_idx])) {
-    rel_values[baseline_idx] <- 1
-  }
-
   assessment_tbl <- rank_tbl %>%
-    dplyr::mutate(
-      Relative_to_Baseline = rel_values
-    ) %>%
     dplyr::arrange(Method)
 
   print(assessment_tbl, n = nrow(assessment_tbl))

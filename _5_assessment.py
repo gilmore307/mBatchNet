@@ -39,8 +39,6 @@ FIGURE_DEFAULTS = {
     "r2": {"width": 3000, "height": 1560, "dpi": 300},
     "prda": {"width": 2280, "height": 2070, "dpi": 300},
     "pvca": {"width": 2160, "height": 2040, "dpi": 300},
-    "alignment": {"width": 1950, "height": 1380, "dpi": 300},
-    "auc": {"width": 2640, "height": 1860, "dpi": 300},
     "lisi": {"width": 2700, "height": 2400, "dpi": 300},
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
@@ -106,55 +104,7 @@ def _param_controls(stage: str, key: str):
     sid = f"{stage}-{key}"
     tooltips = ASSESSMENT_PARAM_TOOLTIPS.get(key, {})
 
-    if key == "auc":
-        # AUC.R parameters
-        controls = [
-            num_input(
-                f"{sid}-param-cv-folds",
-                "CV_FOLDS",
-                5,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("cv_folds", ""),
-            ),
-            num_input(
-                f"{sid}-param-cv-reps",
-                "CV_REPS",
-                5,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("cv_reps", ""),
-            ),
-        ]
-    elif key == "alignment":
-        controls = [
-            num_input(
-                f"{sid}-param-k",
-                "K_NEIGHBORS",
-                10,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("k_neighbors", ""),
-            ),
-            num_input(
-                f"{sid}-param-var-prop",
-                "VAR_PROP_MIN",
-                0.95,
-                step=0.01,
-                min_=0.1,
-                max_=1.0,
-                tooltip=tooltips.get("var_prop_min", ""),
-            ),
-            num_input(
-                f"{sid}-param-max-pcs",
-                "MAX_PCS",
-                10,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("max_pcs", ""),
-            ),
-        ]
-    elif key == "ebm":
+    if key == "ebm":
         controls = [
             num_input(
                 f"{sid}-param-umap-nn",
@@ -359,8 +309,6 @@ def assessment_layout(active_path: str, stage: str):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
     post_extra = [
         ("lisi", "LISI", "LISI.R"),
@@ -474,8 +422,6 @@ def register_pre_post_callbacks(app):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
     post_extra = [
         ("lisi", "LISI", "LISI.R"),
@@ -508,27 +454,7 @@ def register_pre_post_callbacks(app):
         # Parameter States by group
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
-        if key == "auc":
-            param_state_ids.extend([
-                f"{sid}-param-cv-folds",
-                f"{sid}-param-cv-reps",
-            ])
-            states += [
-                State(f"{sid}-param-cv-folds", "value"),
-                State(f"{sid}-param-cv-reps", "value"),
-            ]
-        elif key == "alignment":
-            param_state_ids.extend([
-                f"{sid}-param-k",
-                f"{sid}-param-var-prop",
-                f"{sid}-param-max-pcs",
-            ])
-            states += [
-                State(f"{sid}-param-k", "value"),
-                State(f"{sid}-param-var-prop", "value"),
-                State(f"{sid}-param-max-pcs", "value"),
-            ]
-        elif key == "ebm":
+        if key == "ebm":
             param_state_ids.extend([
                 f"{sid}-param-umap-nn",
                 f"{sid}-param-umap-min-dist",
@@ -673,20 +599,7 @@ def register_pre_post_callbacks(app):
 
             pv = param_vals
             idx = 0
-            if _key == "auc":
-                # order: cv-folds, cv-reps
-                _add("cv_folds", pv[idx], int)
-                idx += 1
-                _add("cv_reps", pv[idx], int)
-                idx += 1
-            elif _key == "alignment":
-                _add("k", pv[idx], int)
-                idx += 1
-                _add("var_prop_min", pv[idx], float)
-                idx += 1
-                _add("max_pcs", pv[idx], int)
-                idx += 1
-            elif _key == "ebm":
+            if _key == "ebm":
                 _add("umap_neighbors", pv[idx], int)
                 idx += 1
                 _add("umap_min_dist", pv[idx], float)
