@@ -299,7 +299,7 @@ compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
   list(plot.df = plot.df, metric.df = metric.df, used.vars = present)
 }
 
-# ==== PCoA panel (scatter + marginals) with GLOBAL limit overrides ====
+# ==== PCoA panel (scatter + marginals) with per-panel limits ====
 pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NULL,
                        xlim_override = NULL, ylim_override = NULL, palette_name = "Batch") {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
@@ -428,42 +428,38 @@ SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 message(sprintf("PCoA (Aitchison on CLR): color=%s (shape: none)", batch_var))
 
 frames_cache_clr <- list()
-global_x_clr <- NULL; global_y_clr <- NULL
 
 for (nm in names(file_list_clr)) {
   cat("Computing CLR frames:", nm, "\n")
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
   fr <- compute_pcoa_frames_aitch(df, metadata, model.vars = model_vars, n_axes = max(axes_to_plot))
   frames_cache_clr[[nm]] <- fr
-  
-  xcol <- paste0("PCo", axes_to_plot[1]); ycol <- paste0("PCo", axes_to_plot[2])
-  scores <- data.frame(
-    AX1 = fr$plot.df[[xcol]],
-    AX2 = fr$plot.df[[ycol]],
-    batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-  )
-  if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-  xr <- safe_range(scores$AX1); yr <- safe_range(scores$AX2)
-  eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-  
-  global_x_clr <- if (is.null(global_x_clr)) finite_range(xr, eb$x) else finite_range(global_x_clr, xr, eb$x)
-  global_y_clr <- if (is.null(global_y_clr)) finite_range(yr, eb$y) else finite_range(global_y_clr, yr, eb$y)
-}
-
-pad_x <- safe_pad(global_x_clr, 0.12); pad_y <- safe_pad(global_y_clr, 0.12)
-xlim_global_clr <- c(global_x_clr[1] - pad_x, global_x_clr[2] + pad_x)
-ylim_global_clr <- c(global_y_clr[1] - pad_y, global_y_clr[2] + pad_y)
-if (isTRUE(SYMMETRIC_AXES)) {
-  x_half <- max(abs(xlim_global_clr)); y_half <- max(abs(ylim_global_clr))
-  xlim_global_clr <- c(-x_half, x_half); ylim_global_clr <- c(-y_half, y_half)
 }
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
   label_nm <- if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm
+  x_override <- NULL
+  y_override <- NULL
+  if (isTRUE(SYMMETRIC_AXES)) {
+    xcol <- paste0("PCo", axes_to_plot[1])
+    ycol <- paste0("PCo", axes_to_plot[2])
+    scores <- data.frame(
+      AX1 = fr$plot.df[[xcol]],
+      AX2 = fr$plot.df[[ycol]],
+      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
+    )
+    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
+    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
+    xr <- finite_range(scores$AX1, eb$x)
+    yr <- finite_range(scores$AX2, eb$y)
+    half <- max(abs(c(xr, yr)))
+    x_override <- c(-half, half)
+    y_override <- c(-half, half)
+  }
   pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
              axes = axes_to_plot, label = label_nm,
-             xlim_override = xlim_global_clr, ylim_override = ylim_global_clr,
+             xlim_override = x_override, ylim_override = y_override,
              palette_name = "Batch")
 })
 names(plots_clr) <- names(file_list_clr)
@@ -507,42 +503,38 @@ ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
 message(sprintf("PCoA (Bray–Curtis on TSS): color=%s (shape: none)", batch_var))
 
 frames_cache_tss <- list()
-global_x_tss <- NULL; global_y_tss <- NULL
 
 for (nm in names(file_list_tss)) {
   cat("Computing TSS/Bray frames:", nm, "\n")
   df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
   fr <- compute_pcoa_frames_bray(df, metadata, model.vars = model_vars, n_axes = max(axes_to_plot))
   frames_cache_tss[[nm]] <- fr
-  
-  xcol <- paste0("PCo", axes_to_plot[1]); ycol <- paste0("PCo", axes_to_plot[2])
-  scores <- data.frame(
-    AX1 = fr$plot.df[[xcol]],
-    AX2 = fr$plot.df[[ycol]],
-    batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-  )
-  if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-  xr <- safe_range(scores$AX1); yr <- safe_range(scores$AX2)
-  eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-  
-  global_x_tss <- if (is.null(global_x_tss)) finite_range(xr, eb$x) else finite_range(global_x_tss, xr, eb$x)
-  global_y_tss <- if (is.null(global_y_tss)) finite_range(yr, eb$y) else finite_range(global_y_tss, yr, eb$y)
-}
-
-pad_x <- safe_pad(global_x_tss, 0.12); pad_y <- safe_pad(global_y_tss, 0.12)
-xlim_global_tss <- c(global_x_tss[1] - pad_x, global_x_tss[2] + pad_x)
-ylim_global_tss <- c(global_y_tss[1] - pad_y, global_y_tss[2] + pad_y)
-if (isTRUE(SYMMETRIC_AXES)) {
-  x_half <- max(abs(xlim_global_tss)); y_half <- max(abs(ylim_global_tss))
-  xlim_global_tss <- c(-x_half, x_half); ylim_global_tss <- c(-y_half, y_half)
 }
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
   label_nm <- if (has_dual_geometries) sprintf("%s - Bray-Curtis", nm) else nm
+  x_override <- NULL
+  y_override <- NULL
+  if (isTRUE(SYMMETRIC_AXES)) {
+    xcol <- paste0("PCo", axes_to_plot[1])
+    ycol <- paste0("PCo", axes_to_plot[2])
+    scores <- data.frame(
+      AX1 = fr$plot.df[[xcol]],
+      AX2 = fr$plot.df[[ycol]],
+      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
+    )
+    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
+    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
+    xr <- finite_range(scores$AX1, eb$x)
+    yr <- finite_range(scores$AX2, eb$y)
+    half <- max(abs(c(xr, yr)))
+    x_override <- c(-half, half)
+    y_override <- c(-half, half)
+  }
   pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
              axes = axes_to_plot, label = label_nm,
-             xlim_override = xlim_global_tss, ylim_override = ylim_global_tss,
+             xlim_override = x_override, ylim_override = y_override,
              palette_name = "Batch")
 })
 names(plots_tss) <- names(file_list_tss)

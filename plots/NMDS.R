@@ -227,7 +227,7 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
   list(plot.df = plot.df, stress = fit$stress, used.vars = present)
 }
 
-# ==== NMDS panel (scatter with ellipses) with GLOBAL limit overrides ====
+# ==== NMDS panel (scatter with ellipses) with per-panel limits ====
 nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
                        label = NULL, xlim_override = NULL, ylim_override = NULL,
                        palette_name = "Batch") {
@@ -298,34 +298,38 @@ SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
 # =========================
 message("NMDS (Aitchison on CLR)")
 
-frames_cache_clr <- list(); all_x <- NULL; all_y <- NULL
+frames_cache_clr <- list()
 for (nm in names(file_list_clr)) {
   cat("Computing CLR NMDS:", nm, "\n")
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
   fr <- compute_nmds_frames_aitch(df, metadata, model.vars = model_vars, k = max(axes_to_plot))
   frames_cache_clr[[nm]] <- fr
-  
-  xcol <- paste0("NMDS", axes_to_plot[1]); ycol <- paste0("NMDS", axes_to_plot[2])
-  scores <- data.frame(
-    AX1 = fr$plot.df[[xcol]], AX2 = fr$plot.df[[ycol]],
-    batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-  )
-  if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-  eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-  all_x <- if (is.null(all_x)) finite_range(scores$AX1, eb$x) else finite_range(all_x, scores$AX1, eb$x)
-  all_y <- if (is.null(all_y)) finite_range(scores$AX2, eb$y) else finite_range(all_y, scores$AX2, eb$y)
 }
-pad_x <- safe_pad(all_x, 0.12); pad_y <- safe_pad(all_y, 0.12)
-xlim_clr <- c(all_x[1] - pad_x, all_x[2] + pad_x)
-ylim_clr <- c(all_y[1] - pad_y, all_y[2] + pad_y)
-if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_clr)); yh <- max(abs(ylim_clr)); xlim_clr <- c(-xh, xh); ylim_clr <- c(-yh, yh) }
 
 plots_clr <- lapply(names(file_list_clr), function(nm) {
   fr <- frames_cache_clr[[nm]]
   label_nm <- if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm
+  x_override <- NULL
+  y_override <- NULL
+  if (isTRUE(SYMMETRIC_AXES)) {
+    xcol <- paste0("NMDS", axes_to_plot[1])
+    ycol <- paste0("NMDS", axes_to_plot[2])
+    scores <- data.frame(
+      AX1 = fr$plot.df[[xcol]],
+      AX2 = fr$plot.df[[ycol]],
+      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
+    )
+    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
+    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
+    xr <- finite_range(scores$AX1, eb$x)
+    yr <- finite_range(scores$AX2, eb$y)
+    half <- max(abs(c(xr, yr)))
+    x_override <- c(-half, half)
+    y_override <- c(-half, half)
+  }
   nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = label_nm,
-             xlim_override = xlim_clr, ylim_override = ylim_clr, palette_name = "Batch")
+             xlim_override = x_override, ylim_override = y_override, palette_name = "Batch")
 })
 names(plots_clr) <- names(file_list_clr)
 
@@ -360,34 +364,38 @@ ggsave(file.path(output_folder, "nmds_aitchison.tif"),
 # =========================
 message("NMDS (Bray-Curtis on TSS)")
 
-frames_cache_tss <- list(); all_x <- NULL; all_y <- NULL
+frames_cache_tss <- list()
 for (nm in names(file_list_tss)) {
   cat("Computing TSS NMDS:", nm, "\n")
   df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
   fr <- compute_nmds_frames_bray(df, metadata, model.vars = model_vars, k = max(axes_to_plot))
   frames_cache_tss[[nm]] <- fr
-  
-  xcol <- paste0("NMDS", axes_to_plot[1]); ycol <- paste0("NMDS", axes_to_plot[2])
-  scores <- data.frame(
-    AX1 = fr$plot.df[[xcol]], AX2 = fr$plot.df[[ycol]],
-    batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-  )
-  if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-  eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-  all_x <- if (is.null(all_x)) finite_range(scores$AX1, eb$x) else finite_range(all_x, scores$AX1, eb$x)
-  all_y <- if (is.null(all_y)) finite_range(scores$AX2, eb$y) else finite_range(all_y, scores$AX2, eb$y)
 }
-pad_x <- safe_pad(all_x, 0.12); pad_y <- safe_pad(all_y, 0.12)
-xlim_tss <- c(all_x[1] - pad_x, all_x[2] + pad_x)
-ylim_tss <- c(all_y[1] - pad_y, all_y[2] + pad_y)
-if (isTRUE(SYMMETRIC_AXES)) { xh <- max(abs(xlim_tss)); yh <- max(abs(ylim_tss)); xlim_tss <- c(-xh, xh); ylim_tss <- c(-yh, yh) }
 
 plots_tss <- lapply(names(file_list_tss), function(nm) {
   fr <- frames_cache_tss[[nm]]
   label_nm <- if (has_dual_geometries) sprintf("%s - Bray-Curtis", nm) else nm
+  x_override <- NULL
+  y_override <- NULL
+  if (isTRUE(SYMMETRIC_AXES)) {
+    xcol <- paste0("NMDS", axes_to_plot[1])
+    ycol <- paste0("NMDS", axes_to_plot[2])
+    scores <- data.frame(
+      AX1 = fr$plot.df[[xcol]],
+      AX2 = fr$plot.df[[ycol]],
+      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
+    )
+    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
+    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
+    xr <- finite_range(scores$AX1, eb$x)
+    yr <- finite_range(scores$AX2, eb$y)
+    half <- max(abs(c(xr, yr)))
+    x_override <- c(-half, half)
+    y_override <- c(-half, half)
+  }
   nmds_panel(fr$plot.df, model_vars,
              axes = axes_to_plot, label = label_nm,
-             xlim_override = xlim_tss, ylim_override = ylim_tss, palette_name = "Batch")
+             xlim_override = x_override, ylim_override = y_override, palette_name = "Batch")
 })
 names(plots_tss) <- names(file_list_tss)
 
