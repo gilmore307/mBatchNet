@@ -1,8 +1,10 @@
 from typing import Dict, List
 
+import json
+
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output, State, MATCH
+from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 
 from _1_components import build_navbar
@@ -96,6 +98,7 @@ def register_correction_callbacks(app):
             )
         )
         body_rows: List[html.Tr] = []
+        row_stores: List[dcc.Store] = []
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
             selections = 0
@@ -162,20 +165,19 @@ def register_correction_callbacks(app):
                 ]
             )
             body_rows.append(row)
+            row_stores.append(
+                dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
+            )
         table = dbc.Table([header, html.Tbody(body_rows)], bordered=True, hover=True, responsive=True, striped=True, className="align-middle")
+        if row_stores:
+            return html.Div([table, *row_stores])
         return table
 
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children"),
         Output({"type": "method-run-button", "code": MATCH}, "disabled"),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output("correction-status", "children"),
-        Output("correction-complete", "data"),
-        Output("method-operation-trigger", "data"),
-        Output("runlog-path", "data", allow_duplicate=True),
-        Output("runlog-file-meta", "data", allow_duplicate=True),
-        Output("runlog-modal", "is_open", allow_duplicate=True),
-        Output("runlog-interval", "disabled", allow_duplicate=True),
+        Output({"type": "method-operation-result", "code": MATCH}, "data"),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -192,32 +194,22 @@ def register_correction_callbacks(app):
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
         if not session_id:
             message = "Session not initialised. Upload data before running corrections."
+            payload = {"message": message}
             return (
                 "Not selected",
                 True,
                 True,
-                message,
-                dash.no_update,
-                refresh_value,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
+                payload,
             )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
             message = "Upload data before running corrections."
+            payload = {"message": message}
             return (
                 "Not selected",
                 True,
                 True,
-                message,
-                dash.no_update,
-                refresh_value,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
+                payload,
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
@@ -235,26 +227,81 @@ def register_correction_callbacks(app):
             delete_disabled = True
             message = f"{display_name} correction failed. Check logs."
         complete_flag = any_method_outputs(session_dir)
+        payload = {
+            "message": message,
+            "complete": bool(complete_flag),
+            "refresh": new_refresh,
+            "log_path": str(log_path),
+            "log_meta": None,
+        }
         return (
             status_text,
             run_disabled,
             delete_disabled,
-            message,
-            bool(complete_flag),
-            new_refresh,
-            str(log_path),
-            None,
-            dash.no_update,
-            dash.no_update,
+            payload,
+        )
+
+    @app.callback(
+        Output("correction-status", "children"),
+        Output("correction-complete", "data"),
+        Output("method-operation-trigger", "data"),
+        Output("runlog-path", "data", allow_duplicate=True),
+        Output("runlog-file-meta", "data", allow_duplicate=True),
+        Output("runlog-modal", "is_open", allow_duplicate=True),
+        Output("runlog-interval", "disabled", allow_duplicate=True),
+        Input({"type": "method-operation-result", "code": ALL}, "data"),
+        State({"type": "method-operation-result", "code": ALL}, "id"),
+        prevent_initial_call=True,
+    )
+    def fanout_method_operation(results: List[Dict[str, object]] | None, ids: List[Dict[str, str]] | None):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            raise dash.exceptions.PreventUpdate
+        triggered_raw = ctx.triggered[0]["prop_id"].split(".")[0]
+        try:
+            triggered_id = json.loads(triggered_raw)
+        except json.JSONDecodeError:
+            raise dash.exceptions.PreventUpdate
+
+        payload: Dict[str, object] | None = None
+        if isinstance(results, list) and isinstance(ids, list):
+            for idx, store_id in enumerate(ids):
+                if store_id == triggered_id:
+                    candidate = results[idx]
+                    if isinstance(candidate, dict):
+                        payload = candidate
+                    break
+        if not isinstance(payload, dict):
+            raise dash.exceptions.PreventUpdate
+
+        message = payload.get("message") if "message" in payload else dash.no_update
+        complete = payload.get("complete") if "complete" in payload else dash.no_update
+        refresh = payload.get("refresh") if "refresh" in payload else dash.no_update
+        log_path = payload.get("log_path") if "log_path" in payload else dash.no_update
+        log_meta = payload.get("log_meta") if "log_meta" in payload else dash.no_update
+        open_log = payload.get("open_log") if "open_log" in payload else dash.no_update
+        interval_disabled = (
+            payload.get("interval_disabled") if "interval_disabled" in payload else dash.no_update
+        )
+
+        status_message = message if message is not None else dash.no_update
+        complete_flag = bool(complete) if isinstance(complete, bool) else complete
+
+        return (
+            status_message,
+            complete_flag,
+            refresh,
+            log_path,
+            log_meta,
+            open_log,
+            interval_disabled,
         )
 
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children"),
         Output({"type": "method-run-button", "code": MATCH}, "disabled"),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output("correction-status", "children"),
-        Output("correction-complete", "data"),
-        Output("method-operation-trigger", "data"),
+        Output({"type": "method-operation-result", "code": MATCH}, "data"),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -271,13 +318,12 @@ def register_correction_callbacks(app):
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
         if not session_id:
             message = "Session not initialised."
+            payload = {"message": message}
             return (
                 "Not selected",
                 True,
                 True,
-                message,
-                dash.no_update,
-                refresh_value,
+                payload,
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
@@ -287,11 +333,14 @@ def register_correction_callbacks(app):
         delete_disabled = True
         message = f"Removed outputs for {display_name}." if removed else f"No outputs found for {display_name}."
         complete_flag = any_method_outputs(session_dir)
+        payload = {
+            "message": message,
+            "complete": bool(complete_flag),
+            "refresh": refresh_value + 1,
+        }
         return (
             status_text,
             run_disabled,
             delete_disabled,
-            message,
-            bool(complete_flag),
-            refresh_value + 1,
+            payload,
         )

@@ -67,6 +67,11 @@ ellipse_union_bounds <- function(df_scores, group_var, level = 0.95, n = 240) {
     ymins <- c(ymins, min(pts[,2], na.rm = TRUE))
     ymaxs <- c(ymaxs, max(pts[,2], na.rm = TRUE))
   }
+  if (!length(xmins) || !length(xmaxs) || !length(ymins) || !length(ymaxs)) {
+    xr <- range(df_scores$PCX, na.rm = TRUE)
+    yr <- range(df_scores$PCY, na.rm = TRUE)
+    return(list(x = xr, y = yr))
+  }
   list(x = c(min(xmins, na.rm = TRUE), max(xmaxs, na.rm = TRUE)),
        y = c(min(ymins, na.rm = TRUE), max(ymaxs, na.rm = TRUE)))
 }
