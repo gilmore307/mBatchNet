@@ -2181,24 +2181,46 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
-def _load_known_signatures() -> Set[tuple[str, str]]:
+def _load_signature_sessions() -> Dict[tuple[str, str], Set[str]]:
     if not SESSION_SIGNATURES_PATH.exists():
-        return set()
+        return {}
     try:
         data = json.loads(SESSION_SIGNATURES_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return set()
-    signatures: Set[tuple[str, str]] = set()
+        return {}
+    sessions_map: Dict[tuple[str, str], Set[str]] = {}
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, (list, tuple)) and len(item) == 2:
-                signatures.add((str(item[0]), str(item[1])))
-    return signatures
+            if isinstance(item, dict):
+                raw = item.get("raw")
+                meta = item.get("meta")
+                recorded_sessions = item.get("sessions", [])
+            elif isinstance(item, (list, tuple)) and len(item) == 2:
+                raw, meta = item
+                recorded_sessions = []
+            else:
+                continue
+            if raw is None or meta is None:
+                continue
+            raw_hash = str(raw)
+            meta_hash = str(meta)
+            key = (raw_hash, meta_hash)
+            if key not in sessions_map:
+                sessions_map[key] = set()
+            if isinstance(recorded_sessions, (list, tuple)):
+                for session_id in recorded_sessions:
+                    if session_id is None:
+                        continue
+                    sessions_map[key].add(str(session_id))
+    return sessions_map
 
 
-def _store_known_signatures(signatures: Set[tuple[str, str]]) -> None:
+def _store_signature_sessions(sessions_map: Dict[tuple[str, str], Set[str]]) -> None:
     try:
-        serialisable = sorted([list(sig) for sig in signatures])
+        serialisable = [
+            {"raw": raw, "meta": meta, "sessions": sorted(session_ids)}
+            for (raw, meta), session_ids in sorted(sessions_map.items())
+        ]
         SESSION_SIGNATURES_PATH.write_text(json.dumps(serialisable, indent=2), encoding="utf-8")
     except Exception:
         pass
@@ -2268,8 +2290,7 @@ def compute_integrated_summary() -> Dict[str, object]:
     """Aggregate cross-session performance statistics and persist the summary."""
     ensure_output_root()
     example_signatures = set(_example_signatures())
-    known_signatures = _load_known_signatures()
-    seen_signatures: Set[tuple[str, str]] = set()
+    signature_sessions = _load_signature_sessions()
     method_stats: Dict[str, Dict[str, object]] = {
         code: {
             "code": code,
@@ -2283,11 +2304,8 @@ def compute_integrated_summary() -> Dict[str, object]:
     included_sessions: List[str] = []
     for session_dir in sorted(p for p in OUTPUT_ROOT.iterdir() if p.is_dir()):
         signature = _session_signature(session_dir)
-        if signature:
-            if signature in example_signatures:
-                continue
-            if signature in known_signatures or signature in seen_signatures:
-                continue
+        if signature and signature in example_signatures:
+            continue
         summary = _load_session_summary(session_dir)
         if not summary:
             continue
@@ -2320,8 +2338,7 @@ def compute_integrated_summary() -> Dict[str, object]:
         if session_contributed:
             included_sessions.append(session_id)
             if signature:
-                seen_signatures.add(signature)
-                known_signatures.add(signature)
+                signature_sessions.setdefault(signature, set()).add(session_id)
 
     rows: List[Dict[str, object]] = []
     methods_payload: Dict[str, Dict[str, object]] = {}
@@ -2357,7 +2374,7 @@ def compute_integrated_summary() -> Dict[str, object]:
         integrated_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     except Exception:
         pass
-    _store_known_signatures(known_signatures)
+    _store_signature_sessions(signature_sessions)
     return summary
 
 
