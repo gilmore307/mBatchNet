@@ -70,8 +70,6 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-scroll-trigger", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
-            # User consent for optional data collection
-            dcc.Store(id="consent-status", storage_type="session", data="pending"),
 
             # Download
             dcc.Download(id="download-results"),
@@ -147,41 +145,6 @@ def serve_layout() -> html.Div:
                 scrollable=True,
             ),
 
-            # Optional data collection consent modal
-            dbc.Modal(
-                [
-                    dbc.ModalHeader(dbc.ModalTitle("Optional data sharing")),
-                    dbc.ModalBody(
-                        html.Div(
-                            [
-                                html.P(
-                                    "With your permission, we may retain anonymised analysis results to improve future versions of the Batch-Effect Explorer."
-                                ),
-                                html.Ul(
-                                    [
-                                        html.Li("Declining will not limit any functionality."),
-                                        html.Li("Shared results never include raw uploads or personal identifiers."),
-                                        html.Li("Only sessions where every correction method and assessment test has been completed are eligible for sharing."),
-                                        html.Li("You can change your decision at any time by refreshing your browser session."),
-                                    ]
-                                ),
-                                html.P("Do you consent to share anonymised analysis results?"),
-                            ]
-                        )
-                    ),
-                    dbc.ModalFooter(
-                        [
-                            dbc.Button("Decline", id="consent-decline", color="secondary", className="me-2"),
-                            dbc.Button("Agree", id="consent-accept", color="primary"),
-                        ]
-                    ),
-                ],
-                id="consent-modal",
-                is_open=False,
-                backdrop="static",
-                keyboard=False,
-                centered=True,
-            ),
         ]
     )
 
@@ -222,16 +185,6 @@ def gate_nav_buttons(preprocess_done, pre_started, pre_done, correction_done, po
         not pre_started,       # Correction enabled after pre is started
         not correction_done,   # Post requires correction
     )
-
-
-@app.callback(
-    Output("run-correction", "disabled"),
-    Output("run-correction", "color"),
-    Input("upload-complete", "data"),
-)
-def toggle_correction_button(upload_complete: bool):
-    enabled = bool(upload_complete)
-    return (not enabled), ("success" if enabled else "secondary")
 
 
 # ---- Intercept Home/Upload nav to confirm restart ----
@@ -578,34 +531,9 @@ app.clientside_callback(
 )
 
 
-@app.callback(
-    Output("consent-modal", "is_open"),
-    Output("consent-status", "data"),
-    Input("page-url", "pathname"),
-    Input("consent-accept", "n_clicks"),
-    Input("consent-decline", "n_clicks"),
-    State("consent-status", "data"),
-    prevent_initial_call=False,
-)
-def manage_consent_modal(pathname, accept_clicks, decline_clicks, consent_status):
-    ctx = dash.callback_context
-    triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
-    current_path = (pathname or "/").split("?", 1)[0]
-
-    if triggered == "consent-accept":
-        return False, "accepted"
-    if triggered == "consent-decline":
-        return False, "declined"
-
-    status = consent_status or "pending"
-    if status == "pending" and current_path == "/correction":
-        return True, status
-    return False, status
-
-
 if __name__ == "__main__":
     # Production-friendly defaults. Override with env: DASH_DEBUG, HOST, PORT
-    debug = (os.getenv("DASH_DEBUG", "0") == "1")
+    debug = (os.getenv("DASH_DEBUG", "1") == "1")
     # On Windows, binding to 0.0.0.0 can be blocked by firewall policies and yield
     # "以一种访问权限不允许的方式做了一个访问套接字的尝试" (WSAEACCES 10013).
     # Use 127.0.0.1 by default on Windows; allow override via HOST env.
