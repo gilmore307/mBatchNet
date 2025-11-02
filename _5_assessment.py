@@ -27,7 +27,6 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
-    build_overall_div,
 )
 
 
@@ -405,18 +404,6 @@ def assessment_layout(active_path: str, stage: str):
             )
         )
 
-    # Overall tab only for post stage
-    if stage == "post":
-        tab_items.append(
-            dcc.Tab(
-                label="Overall",
-                value="tab-overall",
-                style=TOP_TAB_STYLE,
-                selected_style=TOP_TAB_SELECTED_STYLE,
-                children=html.Div(id=f"{stage}-overall-content", children=html.Div("No results yet.")),
-            )
-        )
-
     tabs = dcc.Tabs(
         children=tab_items,
         value=(tab_items[0].value if tab_items else None),
@@ -477,9 +464,6 @@ def register_pre_post_callbacks(app):
             Output("runlog-modal", "is_open", allow_duplicate=True),
             Output("runlog-interval", "disabled", allow_duplicate=True),
         ])
-        # Only post stage updates an Overall tab
-        if stage == "post":
-            outputs.append(Output(f"{stage}-overall-content", "children", allow_duplicate=True))
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
 
         # Parameter States by group
@@ -708,8 +692,6 @@ def register_pre_post_callbacks(app):
                     persisted_payload,
                 )
             else:
-                # post: update Overall
-                overall = build_overall_div(session_dir, _stage)
                 return (
                     content,
                     True,
@@ -717,7 +699,6 @@ def register_pre_post_callbacks(app):
                     None,
                     dash.no_update,
                     dash.no_update,
-                    overall,
                     persisted_payload,
                 )
 

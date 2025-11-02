@@ -883,7 +883,7 @@ def _load_info_table_for_key(
         for idx, column_name in enumerate(header):
             display = _display_column_name(column_name)
             display_lower = display.lower()
-            if "score" in display_lower or "rank" in display_lower:
+            if "rank" in display_lower:
                 continue
             if display in seen_headers:
                 continue
