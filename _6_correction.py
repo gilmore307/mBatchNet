@@ -91,10 +91,10 @@ def register_correction_callbacks(app):
                     html.Th("Methods"),
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
+                    html.Th("Citation"),
                     html.Th("Status"),
                     html.Th("Run Correction", className="text-center"),
                     html.Th("Delete", className="text-center"),
-                    html.Th("Citation"),
                 ]
             )
         )
@@ -202,10 +202,10 @@ def register_correction_callbacks(app):
                     html.Td(method_display),
                     html.Td(str(selections)),
                     html.Td(avg_display),
+                    citation_cell,
                     status_cell,
                     run_cell,
                     delete_cell,
-                    citation_cell,
                 ]
             )
             body_rows.append(row)
