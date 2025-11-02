@@ -180,6 +180,34 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
     for code, display in SUPPORTED_METHODS
 }
 
+
+_DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
+    "pca": (
+        ("Var12_PCA", "up"),
+        ("Batch_Distance_PCA", "down"),
+        ("R_within_PCA", "down"),
+        ("Mixing_k10_PCA", "up"),
+        ("n_features_used_PCA", "up"),
+        ("n_features_total_PCA", "up"),
+    ),
+    "pcoa": (
+        ("Var12_PCoA", "up"),
+        ("Batch_Distance_PCoA", "down"),
+        ("R_within_PCoA", "down"),
+        ("Mixing_k10_PCoA", "up"),
+        ("n_features_used_PCoA", "up"),
+        ("n_features_total_PCoA", "up"),
+    ),
+    "nmds": (
+        ("NMDS_Stress", "down"),
+        ("Shepard_R2", "up"),
+        ("Site_GoF_Median", "up"),
+        ("Batch_Distance_NMDS", "down"),
+        ("R_within_NMDS", "down"),
+        ("Mixing_k10_NMDS", "up"),
+    ),
+}
+
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
@@ -940,19 +968,48 @@ def _load_info_table_for_key(
         if not header:
             continue
 
-        column_info: List[Tuple[int, str]] = []
+        column_info: List[Tuple[Optional[int], str, str]] = []
         display_headers: List[str] = []
         seen_headers: Set[str] = set()
+        seen_canonical: Set[str] = set()
+        header_lookup = {str(col).lower(): idx for idx, col in enumerate(header)}
+
+        def _append_column(idx: Optional[int], display: str, canonical: str):
+            canonical_key = canonical.lower()
+            if display in seen_headers or canonical_key in seen_canonical:
+                return
+            seen_headers.add(display)
+            seen_canonical.add(canonical_key)
+            column_info.append((idx, display, canonical))
+            display_headers.append(display)
+
+        method_idx = header_lookup.get("method")
+        if method_idx is not None:
+            _append_column(method_idx, "Method", "Method")
+
+        geometry_idx = header_lookup.get("geometry")
+        if geometry_idx is not None:
+            _append_column(geometry_idx, "Geometry", "Geometry")
+
+        trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
+        for column_name, trend in trend_spec:
+            idx = header_lookup.get(column_name.lower())
+            arrow = "↑" if trend == "up" else "↓"
+            display = f"{column_name} {arrow}"
+            _append_column(idx, display, column_name)
+
         for idx, column_name in enumerate(header):
-            display = _display_column_name(column_name)
-            display_lower = display.lower()
-            if "rank" in display_lower:
+            raw_name = str(column_name)
+            lower_name = raw_name.lower()
+            if "rank" in lower_name:
                 continue
+            display = _display_column_name(column_name)
+            if not display:
+                continue
+            canonical = raw_name
             if display in seen_headers:
                 continue
-            seen_headers.add(display)
-            column_info.append((idx, display))
-            display_headers.append(display)
+            _append_column(idx, display, canonical)
 
         if not column_info:
             continue
@@ -960,9 +1017,12 @@ def _load_info_table_for_key(
         formatted_rows: List[Dict[str, object]] = []
         for raw_row in data:
             row_dict: Dict[str, object] = {}
-            for idx, display in column_info:
-                cell = raw_row[idx] if idx < len(raw_row) else ""
-                key_lower = display.lower()
+            for idx, display, canonical in column_info:
+                if idx is None or idx >= len(raw_row):
+                    cell = "-"
+                else:
+                    cell = raw_row[idx]
+                key_lower = canonical.lower()
                 if key_lower == "method":
                     row_dict[display] = method_formal_name(str(cell))
                 elif key_lower == "geometry":
@@ -977,13 +1037,13 @@ def _load_info_table_for_key(
         }
 
         column_defs: List[Dict[str, object]] = []
-        for display in display_headers:
+        for _idx, display, canonical in column_info:
             col_def: Dict[str, object] = {
                 "headerName": display,
                 "field": display,
-                "minWidth": 160 if display.lower() != "method" else 200,
+                "minWidth": 160 if canonical.lower() != "method" else 200,
             }
-            if display.lower() == "method":
+            if canonical.lower() == "method":
                 col_def["pinned"] = "left"
             if display in numeric_headers:
                 col_def["type"] = "numericColumn"
