@@ -174,10 +174,10 @@ def register_correction_callbacks(app):
         return table
 
     @app.callback(
-        Output({"type": "method-status-label", "code": MATCH}, "children"),
-        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-operation-result", "code": MATCH}, "data"),
+        Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -298,10 +298,10 @@ def register_correction_callbacks(app):
         )
 
     @app.callback(
-        Output({"type": "method-status-label", "code": MATCH}, "children"),
-        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
-        Output({"type": "method-operation-result", "code": MATCH}, "data"),
+        Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
+        Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
