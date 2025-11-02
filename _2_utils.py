@@ -31,6 +31,8 @@ OUTPUT_ROOT = BASE_DIR / "output"
 PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
 METHODS_DIR = CORRECTION_DIR / "methods"
+DOCS_DIR = BASE_DIR / "assets" / "doc"
+METHODS_REFERENCE_PATH = DOCS_DIR / "methods.csv"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 COMPLETED_METHODS_FILENAME = "completed_methods.json"
 CLEANUP_HOURS = 6
@@ -117,22 +119,66 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
 }
 
 
-SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
-    ("QN", "QN"),
-    ("BMC", "BMC"),
-    ("limma", "Limma"),
-    ("ConQuR", "ConQuR"),
-    ("PLSDA", "PLSDA-batch"),
-    ("ComBat", "ComBat"),
-    ("FSQN", "FSQN"),
-    ("MMUPHin", "MMUPHin"),
-    ("RUV", "RUV-III-NB"),
-    ("MetaDICT", "MetaDICT"),
-    ("PN", "PN"),
-    ("FAbatch", "FAbatch"),
-    ("ComBatSeq", "ComBat-seq"),
-    ("DEBIAS", "DEBIAS-M"),
-)
+_METHOD_DISPLAY_NAMES: Dict[str, str] = {
+    "DEBIAS": "DEBIAS-M",
+    "MetaDICT": "MetaDICT",
+    "BMC": "BMC (pamr)",
+    "PLSDA": "PLSDA-batch",
+    "ConQuR": "ConQuR",
+    "MMUPHin": "MMUPHin",
+    "RUV": "RUV-III-NB",
+    "ComBatSeq": "ComBat-seq",
+    "FSQN": "FSQN",
+    "PN": "PN",
+    "FAbatch": "FAbatch",
+    "limma": "Limma",
+    "ComBat": "ComBat",
+    "QN": "QN",
+}
+
+_METHOD_NAME_TO_CODE: Dict[str, str] = {display: code for code, display in _METHOD_DISPLAY_NAMES.items()}
+
+
+def _load_method_reference() -> Tuple[Tuple[Tuple[str, str], ...], Dict[str, Dict[str, str]]]:
+    supported: List[Tuple[str, str]] = []
+    reference: Dict[str, Dict[str, str]] = {}
+    seen_codes: Set[str] = set()
+    if METHODS_REFERENCE_PATH.exists():
+        with open(METHODS_REFERENCE_PATH, newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                method_name = (row.get("Methods") or "").strip()
+                if not method_name:
+                    continue
+                citation = (row.get("Citations") or "").strip()
+                url = (row.get("Url") or "").strip()
+                package = (row.get("Package") or "").strip()
+                reference[method_name] = {
+                    "citation": citation,
+                    "url": url,
+                    "package": package,
+                }
+                code = _METHOD_NAME_TO_CODE.get(method_name)
+                if code and code not in seen_codes:
+                    supported.append((code, method_name))
+                    seen_codes.add(code)
+    for code, display in _METHOD_DISPLAY_NAMES.items():
+        if code not in seen_codes:
+            supported.append((code, display))
+            reference.setdefault(display, {"citation": "", "url": "", "package": ""})
+    return tuple(supported), reference
+
+
+SUPPORTED_METHODS: Sequence[Tuple[str, str]]
+METHOD_REFERENCE_BY_DISPLAY: Dict[str, Dict[str, str]]
+SUPPORTED_METHODS, METHOD_REFERENCE_BY_DISPLAY = _load_method_reference()
+SUPPORTED_METHODS = tuple(SUPPORTED_METHODS)
+METHOD_REFERENCE_BY_DISPLAY = dict(METHOD_REFERENCE_BY_DISPLAY)
+
+METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
+    code: METHOD_REFERENCE_BY_DISPLAY.get(display, {"citation": "", "url": "", "package": ""})
+    for code, display in SUPPORTED_METHODS
+}
 
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
