@@ -253,9 +253,9 @@ p_clr <- make_boxplot(
 )
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)
-  ggsave(file.path(output_folder, "R2_aitchison.png"), p_clr,
+  ggsave(file.path(output_folder, "anova_aitchison.png"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
-  ggsave(file.path(output_folder, "R2_aitchison.tif"), p_clr,
+  ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
 }
 
@@ -267,7 +267,7 @@ median_r2_by_method <- r2_long_clr %>%
 
 all_methods <- sort(unique(levels(r2_long_clr$Method)))
 only_baseline <- length(all_methods) == 1L && identical(all_methods, "Before correction")
-output_name <- if (only_baseline) "R2_raw_assessment_pre.csv" else "R2_raw_assessment_post.csv"
+output_name <- if (only_baseline) "anova_raw_assessment_pre.csv" else "anova_raw_assessment_post.csv"
 
 if (only_baseline) {
   assess_df <- median_r2_by_method %>%

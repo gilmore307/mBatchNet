@@ -36,6 +36,7 @@ FIGURE_DEFAULTS = {
     "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "dissimilarity": {"width": 2550, "height": 1800, "dpi": 300, "ncol": 2},
+    "permanova": {"width": 2550, "height": 1560, "dpi": 300},
     "r2": {"width": 3000, "height": 1560, "dpi": 300},
     "prda": {"width": 2280, "height": 2070, "dpi": 300},
     "pvca": {"width": 2160, "height": 2040, "dpi": 300},
@@ -334,7 +335,8 @@ def assessment_layout(active_path: str, stage: str):
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
         ("dissimilarity", "Dissimilarity heatmaps", "Dissimilarity_Heatmaps.R"),
-        ("r2", "Feature-wise ANOVA R²", "R2.R"),
+        ("permanova", "PERMANOVA R²", "PERMANOVA.R"),
+        ("r2", "Feature-wise ANOVA R²", "ANOVA.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
     ]
@@ -436,7 +438,8 @@ def register_pre_post_callbacks(app):
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
         ("dissimilarity", "Dissimilarity heatmaps", "Dissimilarity_Heatmaps.R"),
-        ("r2", "Feature-wise ANOVA R²", "R2.R"),
+        ("permanova", "PERMANOVA R²", "PERMANOVA.R"),
+        ("r2", "Feature-wise ANOVA R²", "ANOVA.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
     ]

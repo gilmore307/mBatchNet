@@ -92,24 +92,8 @@ def register_correction_callbacks(app):
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
                     html.Th("Status"),
-                    html.Th(
-                        dcc.Loading(
-                            html.Span("Run Correction", id="run-column-loading-indicator"),
-                            type="default",
-                            parent_className="be-column-loading",
-                            className="be-column-loading",
-                        ),
-                        className="text-center",
-                    ),
-                    html.Th(
-                        dcc.Loading(
-                            html.Span("Delete", id="delete-column-loading-indicator"),
-                            type="default",
-                            parent_className="be-column-loading",
-                            className="be-column-loading",
-                        ),
-                        className="text-center",
-                    ),
+                    html.Th("Run Correction", className="text-center"),
+                    html.Th("Delete", className="text-center"),
                 ]
             )
         )
@@ -157,13 +141,8 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             run_cell = html.Td(
-                dcc.Loading(
-                    html.Div(run_button, className="d-grid gap-1"),
-                    type="default",
-                    parent_className="be-column-loading",
-                    className="be-column-loading",
-                ),
-                className="text-center",
+                html.Div(run_button, className="d-grid gap-1"),
+                className="text-center be-run-cell",
             )
             delete_button = dbc.Button(
                 "Delete",
@@ -175,13 +154,8 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             delete_cell = html.Td(
-                dcc.Loading(
-                    html.Div(delete_button, className="d-grid gap-1"),
-                    type="default",
-                    parent_className="be-column-loading",
-                    className="be-column-loading",
-                ),
-                className="text-center",
+                html.Div(delete_button, className="d-grid gap-1"),
+                className="text-center be-delete-cell",
             )
             row = html.Tr(
                 [
@@ -197,10 +171,25 @@ def register_correction_callbacks(app):
             row_stores.append(
                 dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
             )
-        table = dbc.Table([header, html.Tbody(body_rows)], bordered=True, hover=True, responsive=True, striped=True, className="align-middle")
+        table = dbc.Table(
+            [header, html.Tbody(body_rows)],
+            bordered=True,
+            hover=True,
+            responsive=True,
+            striped=True,
+            className="align-middle",
+        )
+        loading_anchor = html.Div(id="method-actions-loading-anchor", style={"display": "none"})
+        children: List[object] = [table, loading_anchor]
         if row_stores:
-            return html.Div([table, *row_stores])
-        return table
+            children.extend(row_stores)
+        table_wrapper = html.Div(children, className="be-method-table-wrapper")
+        return dcc.Loading(
+            table_wrapper,
+            type="default",
+            parent_className="be-method-actions-loading",
+            className="be-method-actions-loading",
+        )
 
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
@@ -209,6 +198,7 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
+        Output("method-actions-loading-anchor", "children", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -233,6 +223,7 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
+                str(refresh_value),
             )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
@@ -245,6 +236,7 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
+                str(refresh_value),
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
@@ -278,6 +270,7 @@ def register_correction_callbacks(app):
             delete_disabled,
             delete_color,
             payload,
+            str(new_refresh),
         )
 
     @app.callback(
@@ -343,13 +336,19 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
+        Output("method-actions-loading-anchor", "children", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
         State("method-operation-trigger", "data"),
         prevent_initial_call=True,
     )
-    def delete_correction_outputs(n_clicks: int, component_id: Dict[str, str], session_id: str | None, refresh_token: int | None):
+    def delete_correction_outputs(
+        n_clicks: int,
+        component_id: Dict[str, str],
+        session_id: str | None,
+        refresh_token: int | None,
+    ):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         method_code = component_id.get("code") if isinstance(component_id, dict) else None
@@ -367,6 +366,7 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
+                str(refresh_value),
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
@@ -390,4 +390,5 @@ def register_correction_callbacks(app):
             delete_disabled,
             delete_color,
             payload,
+            str(refresh_value + 1),
         )
