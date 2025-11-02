@@ -51,18 +51,9 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("NMDS (Bray-Curtis)", "nmds_braycurtis.png"),
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("R^2 (Aitchison)", "R2_aitchison.png"),
-    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("PVCA", "PVCA.png"),
-    FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("AUC", "auroc.png"),
 )
 
-POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("LISI", "LISI.png"),
-    FigureSpec("Entropy score", "ebm.png"),
-    FigureSpec("Silhouette score", "silhouette.png"),
-)
+POST_EXTRA_FIGURES: Sequence[FigureSpec] = ()
 
 POST_FIGURES: Sequence[FigureSpec] = PRE_FIGURES + POST_EXTRA_FIGURES
 
@@ -72,33 +63,9 @@ PRE_SCRIPTS: Sequence[str] = (
     "pcoa.R",
     "NMDS.R",
     "Dissimilarity_Heatmaps.R",
-    "R2.R",
-    "pRDA.R",
-    "pvca.R",
-    "Alignment_Score.R",
-    "AUC.R",
 )
 
-POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
-    "LISI.R",
-    "Entropy_Score.R",
-    "Silhouette.R",
-)
-
-RANKING_SCORE_LABELS: Dict[str, str] = {
-    "pca": "PCA score",
-    "pcoa": "PCoA score",
-    "nmds": "NMDS score",
-    "dissimilarity": "Dissimilarity score",
-    "r2": "R² score",
-    "prda": "pRDA score",
-    "pvca": "PVCA score",
-    "alignment": "Alignment score",
-    "auc": "AUC score",
-    "lisi": "LISI score",
-    "ebm": "Entropy score",
-    "silhouette": "Silhouette score",
-}
+POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS
 
 
 SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
@@ -688,18 +655,6 @@ def render_figures(session_dir: Path, figures: Sequence[FigureSpec]):
     return dbc.Row(cards, className="gy-2")
 
 
-def _read_csv_rows(csv_path: Path) -> Tuple[List[str], List[List[str]]]:
-    import csv as _csv
-    with csv_path.open("r", encoding="utf-8", newline="") as fh:
-        reader = _csv.reader(fh)
-        rows = list(reader)
-    if not rows:
-        return [], []
-    header = rows[0]
-    data = rows[1:] if len(rows) > 1 else []
-    return header, data
-
-
 def _make_ag_grid(
     grid_id: str,
     column_defs: Sequence[Dict[str, object]],
@@ -750,412 +705,6 @@ def _find_file_case_insensitive(directory: Path, target_name: str) -> Path | Non
     return None
 
 
-def _candidate_csvs_for_image(filename: str) -> List[str]:
-    stem = Path(filename).stem
-    s = stem.lower()
-    bases: List[str] = []
-    # image families with shared tables
-    if s.startswith("pcoa_"):
-        bases = ["pcoa"]
-    elif s.startswith("nmds_"):
-        bases = ["nmds"]
-    elif s.startswith("dissimilarity_") or s.startswith("dissimilarity-") or s.startswith("dissimilarity"):
-        bases = ["dissimilarity"]
-    elif s.startswith("r2_"):
-        bases = ["r2"]
-    elif s.startswith("prda_") or s.startswith("prda"):
-        bases = ["pRDA", "prda"]
-    elif s == "pvca":
-        bases = ["PVCA", "pvca"]
-    elif s == "alignment_score":
-        bases = ["alignment_score"]
-    elif s == "auroc":
-        bases = ["auroc"]
-    elif s == "lisi":
-        bases = ["LISI", "lisi"]
-    elif s == "ebm":
-        bases = ["ebm"]
-    elif s == "silhouette":
-        bases = ["silhouette"]
-    elif s == "pca":
-        bases = ["pca"]
-    else:
-        bases = [stem]
-
-    # Generate candidate filenames (prefer ranking first)
-    candidates: List[str] = []
-    for b in bases:
-        # ranking summary across methods
-        candidates.append(f"{b}_ranking.csv")
-    for b in bases:
-        # raw assessment tables (stage-specific names first)
-        candidates.append(f"{b}_raw_assessment_pre.csv")
-    for b in bases:
-        candidates.append(f"{b}_raw_assessment_post.csv")
-    for b in bases:
-        candidates.append(f"{b}_raw_assessment.csv")
-    # Special LISI grid file
-    for b in bases:
-        if b.lower() == "lisi":
-            candidates.append(f"{b}_k_grid.csv")
-    return candidates
-
-
-RAW_ASSESSMENT_SUFFIXES: Tuple[str, ...] = (
-    "_raw_assessment_pre.csv",
-    "_raw_assessment_post.csv",
-    "_raw_assessment.csv",
-)
-
-
-_RAW_ASSESSMENT_STAGE_ORDER = {
-    "pre": ("_raw_assessment_pre.csv", "_raw_assessment.csv", "_raw_assessment_post.csv"),
-    "post": ("_raw_assessment_post.csv", "_raw_assessment.csv", "_raw_assessment_pre.csv"),
-}
-
-
-def _raw_assessment_stage_suffixes(stage: str) -> Tuple[str, ...]:
-    return _RAW_ASSESSMENT_STAGE_ORDER.get(stage, _RAW_ASSESSMENT_STAGE_ORDER["post"])
-
-
-_RAW_ASSESSMENT_STRIP_SUFFIXES = ("_raw_assessment_pre", "_raw_assessment_post", "_raw_assessment")
-
-
-def _raw_assessment_metric_title(path: Path) -> str:
-    stem = path.stem
-    lower = stem.lower()
-    base = stem
-    for suffix in _RAW_ASSESSMENT_STRIP_SUFFIXES:
-        if lower.endswith(suffix):
-            base = stem[: -len(suffix)]
-            break
-    return base.replace("_", " ").strip().title()
-
-
-def _raw_assessment_group_key(path: Path) -> str:
-    name = path.name
-    lower = name.lower()
-    for suffix in RAW_ASSESSMENT_SUFFIXES:
-        if lower.endswith(suffix):
-            return lower[: -len(suffix)]
-    return Path(name).stem.lower()
-
-
-def _sort_raw_assessment_names(names: Iterable[str], stage: str) -> List[str]:
-    order = _raw_assessment_stage_suffixes(stage)
-    order_index = {suffix: idx for idx, suffix in enumerate(order)}
-    def sort_key(name: str) -> Tuple[int, str]:
-        lower = name.lower()
-        for suffix, idx in order_index.items():
-            if lower.endswith(suffix):
-                return idx, lower
-        return len(order), lower
-    return sorted(names, key=sort_key)
-
-
-def _load_info_table_for_key(
-    session_dir: Path,
-    stage: str,
-    key: str,
-    representative: Optional[str],
-) -> Optional[dag.AgGrid]:
-    """Load an informational table for the given metric, excluding score/rank columns."""
-
-    if not representative:
-        return None
-
-    candidates = [
-        cand
-        for cand in _candidate_csvs_for_image(representative)
-        if any(cand.lower().endswith(sfx) for sfx in RAW_ASSESSMENT_SUFFIXES)
-    ]
-    if not candidates:
-        return None
-
-    for cand in _sort_raw_assessment_names(candidates, stage):
-        found = _find_file_case_insensitive(session_dir, cand)
-        if not (found and found.exists()):
-            continue
-
-        header, data = _read_csv_rows(found)
-        if not header:
-            continue
-
-        column_info: List[Tuple[int, str]] = []
-        display_headers: List[str] = []
-        seen_headers: Set[str] = set()
-        for idx, column_name in enumerate(header):
-            display = _display_column_name(column_name)
-            display_lower = display.lower()
-            if "score" in display_lower or "rank" in display_lower:
-                continue
-            if display in seen_headers:
-                continue
-            seen_headers.add(display)
-            column_info.append((idx, display))
-            display_headers.append(display)
-
-        if not column_info:
-            continue
-
-        formatted_rows: List[Dict[str, object]] = []
-        for raw_row in data:
-            row_dict: Dict[str, object] = {}
-            for idx, display in column_info:
-                cell = raw_row[idx] if idx < len(raw_row) else ""
-                key_lower = display.lower()
-                if key_lower == "method":
-                    row_dict[display] = method_formal_name(str(cell))
-                elif key_lower == "geometry":
-                    row_dict[display] = _format_geometry_value(cell)
-                else:
-                    numeric_value = _safe_float(cell)
-                    row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
-            formatted_rows.append(row_dict)
-
-        numeric_headers = {
-            col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
-        }
-
-        column_defs: List[Dict[str, object]] = []
-        for display in display_headers:
-            col_def: Dict[str, object] = {
-                "headerName": display,
-                "field": display,
-                "minWidth": 160 if display.lower() != "method" else 200,
-            }
-            if display.lower() == "method":
-                col_def["pinned"] = "left"
-            if display in numeric_headers:
-                col_def["type"] = "numericColumn"
-            column_defs.append(col_def)
-
-        return _make_ag_grid(
-            grid_id=f"{stage}-{key}-details",
-            column_defs=column_defs,
-            row_data=formatted_rows,
-            default_col_def={"minWidth": 140},
-        )
-
-    return None
-
-
-def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], stage: str = "pre", extra_tabs: Sequence = ()):  # extra dcc.Tab items appended
-    """Render a vertical tab set of assessment outputs.
-
-    Group metrics by base (e.g., PCoA, NMDS, R2, pRDA, Dissimilarity heatmaps).
-    For groups with multiple geometries (Aitchison/Bray-Curtis), show a single
-    top-level tab with sub-tabs: Aitchison, Bray-Curtis, and a third
-    "Details" sub-tab containing contextual tables without scores or ranks.
-    Single-geometry plots also include the third sub-tab accordingly.
-    """
-
-    # Consistent styles for top-level and inner tabs (keeps size stable)
-    TOP_TAB_STYLE = {
-        "borderBottom": "1px solid #d6d6d6",
-        "padding": "1px",
-        "fontWeight": "bold",
-        "width": "12vw",
-        "minWidth": "12vw",
-        "maxWidth": "12vw",
-        "height": "60px",
-        "minHeight": "60px",
-        "maxHeight": "60px",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        "marginRight": "1vw",
-    }
-    TOP_TAB_SELECTED_STYLE = {
-        "borderTop": "1px solid #d6d6d6",
-        "borderBottom": "1px solid #d6d6d6",
-        "backgroundColor": "#f8f9fa",
-        "color": "#0d6efd",
-        "padding": "1px",
-        "width": "12vw",
-        "minWidth": "12vw",
-        "maxWidth": "12vw",
-        "height": "60px",
-        "minHeight": "60px",
-        "maxHeight": "60px",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        "marginRight": "1vw",
-    }
-    SUBTAB_STYLE_BASE = {
-        "borderBottom": "1px solid #d6d6d6",
-        "padding": "1px",
-        "fontWeight": "bold",
-        "height": "40px",
-        "minHeight": "40px",
-        "maxHeight": "40px",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        # Auto sizing: distribute across available width
-        "flex": "1 1 0",
-        "minWidth": "0",
-        "width": "auto",
-        "boxSizing": "border-box",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap",
-    }
-    SUBTAB_SELECTED_STYLE_BASE = {
-        "borderTop": "1px solid #d6d6d6",
-        "borderBottom": "1px solid #d6d6d6",
-        "backgroundColor": "#f8f9fa",
-        "color": "#0d6efd",
-        "padding": "1px",
-        "height": "40px",
-        "minHeight": "40px",
-        "maxHeight": "40px",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        # Auto sizing: distribute across available width
-        "flex": "1 1 0",
-        "minWidth": "0",
-        "width": "auto",
-        "boxSizing": "border-box",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap",
-    }
-
-    def content_for_image(filename: str) -> html.Div:
-        img_path = session_dir / filename
-        if not img_path.exists():
-            return html.Div("Image not found.")
-        encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
-        src = f"data:image/png;base64,{encoded}"
-        img = html.Img(
-            src=src,
-            style={
-                "maxWidth": "100%",
-                "height": "auto",
-                "display": "block",
-                "margin": "0 auto",
-            },
-        )
-        return html.Div([img], style={"width": "100%"})
-
-    tabs = []
-    first_value = None
-
-    # Build groups
-    groups = {}
-
-    def add_group_item(key: str, title: str, geom: str, filename: str):
-        g = groups.setdefault(key, {"title": title, "ait": None, "bray": None, "single": None})
-        if geom == "ait":
-            g["ait"] = filename
-        elif geom == "bray":
-            g["bray"] = filename
-        else:
-            g["single"] = filename
-
-    for spec in figures:
-        fn = spec.filename
-        low = fn.lower()
-        if low.startswith("pcoa_aitchison"):
-            add_group_item("pcoa", "PCoA", "ait", fn)
-        elif low.startswith("pcoa_braycurtis"):
-            add_group_item("pcoa", "PCoA", "bray", fn)
-        elif low.startswith("nmds_aitchison"):
-            add_group_item("nmds", "NMDS", "ait", fn)
-        elif low.startswith("nmds_braycurtis"):
-            add_group_item("nmds", "NMDS", "bray", fn)
-        elif low.startswith("dissimilarity_heatmaps_aitchison"):
-            add_group_item("dissimilarity", "Dissimilarity heatmaps", "ait", fn)
-        elif low.startswith("dissimilarity_heatmaps_braycurtis"):
-            add_group_item("dissimilarity", "Dissimilarity heatmaps", "bray", fn)
-        elif low.startswith("r2_aitchison"):
-            add_group_item("r2", "Feature-wise ANOVA R²", "ait", fn)
-        elif low.startswith("r2_braycurtis"):
-            add_group_item("r2", "Feature-wise ANOVA R²", "bray", fn)
-        elif low.startswith("prda_aitchison"):
-            add_group_item("prda", "pRDA", "ait", fn)
-        elif low.startswith("prda_braycurtis"):
-            add_group_item("prda", "pRDA", "bray", fn)
-        elif low == "pca.png":
-            add_group_item("pca", "PCA", "ait", fn)
-        else:
-            # fallback: one tab per figure (with its own assessment sub-tab if any)
-            key = f"single:{low}"
-            add_group_item(key, spec.label, "single", fn)
-
-    # Build tabs with sub-tabs
-    for idx, (key, g) in enumerate(groups.items()):
-        title = g["title"]
-        sub_tabs = []
-        # choose a representative filename for assessment lookup
-        rep = g["ait"] or g["bray"] or g["single"]
-
-        # Build sub-tab definitions first so we can size them evenly later
-        sub_defs = []
-        has_ait = bool(g["ait"])
-        has_bray = bool(g["bray"])
-        has_single = bool(g["single"])
-        if has_ait:
-            label = "Plot" if not has_bray and not has_single else "Aitchison"
-            sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
-        if has_bray:
-            label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
-            sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
-        if has_single and not (has_ait or has_bray):
-            sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
-
-        # Third sub-tab: informational summary table (no scoring)
-        third_label = "Details"
-        third_content = _load_info_table_for_key(session_dir, stage, key, rep)
-        if third_content is not None:
-            sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
-
-        # Create sub-tabs with fixed width; allow horizontal scrolling in container
-        SUBTAB_STYLE = dict(SUBTAB_STYLE_BASE)
-        SUBTAB_SELECTED_STYLE = dict(SUBTAB_SELECTED_STYLE_BASE)
-        sub_tabs = [
-            dcc.Tab(label=lbl, value=val, children=child, style=SUBTAB_STYLE, selected_style=SUBTAB_SELECTED_STYLE)
-            for (lbl, val, child) in sub_defs
-        ]
-
-        inner_default = sub_tabs[0].value if sub_tabs else None
-        inner = dcc.Tabs(
-            className="be-subtabs",
-            children=sub_tabs,
-            value=inner_default,
-            vertical=False,
-            mobile_breakpoint=0,
-            # Keep in one row and allow horizontal scroll
-            style={
-                "width": "100%",
-            },
-        )
-
-        top_value = f"tab-{key}"
-        tabs.append(dcc.Tab(label=title, value=top_value, children=html.Div(inner), style=TOP_TAB_STYLE, selected_style=TOP_TAB_SELECTED_STYLE))
-        if first_value is None:
-            first_value = top_value
-
-    if not tabs and not extra_tabs:
-        return html.Div("No figures available yet. Run the analysis to generate outputs.")
-
-    # Append any extra tabs (e.g., additional summaries)
-    for extra in extra_tabs:
-        if first_value is None:
-            first_value = getattr(extra, 'value', None) or 'extra-0'
-        tabs.append(extra)
-
-    return dcc.Tabs(
-        children=tabs,
-        value=first_value or (extra_tabs[0].value if extra_tabs else None),
-        vertical=True,
-        className="be-results-tabs",
-    )
-
-
 def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     """Return subtab definitions as (label, value, content Div).
 
@@ -1202,32 +751,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             elif low.startswith("dissimilarity_heatmaps_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "Dissimilarity heatmaps"
-        elif key == "r2":
-            if low.startswith("r2_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("r2_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "Feature-wise ANOVA R²"
-        elif key == "prda":
-            if low.startswith("prda_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("prda_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "pRDA"
         elif key == "pca" and spec.filename.lower() == "pca.png":
             g["single"] = spec.filename; g["title"] = "PCA"
-        elif key == "pvca" and spec.filename.lower() == "pvca.png":
-            g["single"] = spec.filename; g["title"] = "PVCA"
-        elif key == "alignment" and spec.filename.lower() == "alignment_score.png":
-            g["single"] = spec.filename; g["title"] = "Alignment score"
-        elif key == "auc" and spec.filename.lower() == "auroc.png":
-            g["single"] = spec.filename; g["title"] = "AUC"
-        elif key == "lisi" and spec.filename.lower() == "lisi.png":
-            g["single"] = spec.filename; g["title"] = "LISI"
-        elif key == "ebm" and spec.filename.lower() == "ebm.png":
-            g["single"] = spec.filename; g["title"] = "Entropy score"
-        elif key == "silhouette" and spec.filename.lower() == "silhouette.png":
-            g["single"] = spec.filename; g["title"] = "Silhouette score"
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
     has_ait = bool(g["ait"])
@@ -1242,13 +767,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     if has_single and not (has_ait or has_bray):
         sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
-    rep = g["ait"] or g["bray"] or g["single"]
-    third_label = "Details"
-    third_content = _load_info_table_for_key(session_dir, stage, key, rep)
-
-    if third_content is not None:
-        sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
-
+    if not sub_defs:
+        sub_defs.append(("Plot", f"{key}-plot", html.Div("No plot available.")))
     return sub_defs
 
 
@@ -1378,7 +898,6 @@ class MethodRankingEntry:
     method_code: Optional[str]
     rank: Optional[float]
     absolute: Optional[float]
-    relative: Optional[float]
     raw: Dict[str, str]
     is_baseline: bool
 
@@ -1471,7 +990,6 @@ def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]
 
 RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
     "alignment_score": ScoreSpec(field="absolute score"),
-    "auroc": ScoreSpec(field="absolute score"),
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
     "lisi": ScoreSpec(field="absolute score"),
@@ -1488,8 +1006,6 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
 RANKING_FILE_ALIASES: Dict[str, List[str]] = {
     "alignment": ["alignment_score"],
     "alignment_score": ["alignment_score"],
-    "auc": ["auroc"],
-    "auroc": ["auroc"],
     "dissimilarity": ["dissimilarity"],
     "ebm": ["ebm", "entropy_score"],
     "lisi": ["lisi"],
@@ -1514,7 +1030,6 @@ REQUIRED_RANKING_KEYS: Set[str] = {
     "prda",
     "pvca",
     "alignment",
-    "auc",
     "lisi",
     "ebm",
     "silhouette",
@@ -1552,7 +1067,6 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
         method_col = field_map.get("method")
         rank_col = field_map.get("rank")
         absolute_col = field_map.get("absolute score")
-        relative_col = field_map.get("relative score")
         spec = RANKING_SCORE_SPECS.get(metric_key)
         baseline_label = (spec.baseline_label if spec else "Before correction").lower()
 
@@ -1582,29 +1096,15 @@ def _parse_ranking_file(csv_path: Path) -> RankingData:
             absolute = _safe_float(raw_row.get(absolute_col)) if absolute_col else None
             if absolute is None:
                 absolute = _compute_absolute_score(metric_key, raw_row)
-            relative_value = _safe_float(raw_row.get(relative_col)) if relative_col else None
             is_baseline = method_display.lower() == baseline_label
             entries.append(MethodRankingEntry(
                 method=method_display,
                 method_code=method_code,
                 rank=rank_value,
                 absolute=absolute,
-                relative=relative_value,
                 raw={column_display_map[k]: raw_row.get(k, "") for k in original_columns if column_display_map.get(k)},
                 is_baseline=is_baseline,
             ))
-
-    baseline_entry = next((e for e in entries if e.is_baseline and e.absolute not in (None, 0)), None)
-    baseline_abs = baseline_entry.absolute if baseline_entry else None
-    if baseline_entry and baseline_entry.relative is None:
-        baseline_entry.relative = 1.0
-    if baseline_abs not in (None, 0):
-        for entry in entries:
-            if entry.relative is None and entry.absolute is not None:
-                entry.relative = entry.absolute / baseline_abs
-    else:
-        for entry in entries:
-            entry.relative = None
 
     # If the CSV lacks a Rank column, derive ranks from absolute score (higher is better)
     scored = [e for e in entries if e.absolute is not None]
@@ -1620,17 +1120,14 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
         return None
     has_rank = any(entry.rank is not None for entry in data.entries)
     has_absolute = any(entry.absolute is not None for entry in data.entries)
-    has_relative = any(entry.relative is not None for entry in data.entries)
 
     base_columns: List[str] = ["Method"]
     if has_rank:
         base_columns.append("Average rank")
     if has_absolute:
         base_columns.append("Absolute score")
-    if has_relative:
-        base_columns.append("Relative score")
 
-    excluded = {"method", "average rank", "absolute score", "relative score"}
+    excluded = {"method", "average rank", "absolute score"}
     excluded.update(col.lower() for col in base_columns)
     extra_cols = [
         col for col in data.columns
@@ -1643,7 +1140,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
     for entry in data.entries:
         rank_val = _rounded(entry.rank)
         absolute_val = _rounded(entry.absolute)
-        relative_val = _rounded(entry.relative)
         row: Dict[str, object] = {"Method": entry.method}
         if "Average rank" in base_columns:
             row["Average rank"] = rank_val
@@ -1653,10 +1149,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
             row["Absolute score"] = absolute_val
             if absolute_val is not None:
                 numeric_candidates["Absolute score"] = True
-        if "Relative score" in base_columns:
-            row["Relative score"] = relative_val
-            if relative_val is not None:
-                numeric_candidates["Relative score"] = True
         for col in extra_cols:
             raw_value = entry.raw.get(col, "")
             numeric_value = _safe_float(raw_value)
@@ -1682,12 +1174,6 @@ def _build_ranking_table_component(data: RankingData) -> Optional[dag.AgGrid]:
             col_def["minWidth"] = 160
         if numeric_candidates.get(col):
             col_def["type"] = "numericColumn"
-            if col == "Average rank":
-                col_def["type"] = "numericColumn"
-            elif col == "Relative score":
-                col_def["type"] = "numericColumn"
-            else:
-                col_def["type"] = "numericColumn"
         column_defs.append(col_def)
 
     return _make_ag_grid(
@@ -1769,8 +1255,6 @@ def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str
                     cell_parts.append(f"#{rounded_rank:.3f}" if rounded_rank is not None else "-")
             if entry.absolute is not None:
                 cell_parts.append(f"{_rounded(entry.absolute):.3f}")
-            if entry.relative is not None:
-                cell_parts.append(f"{_rounded(entry.relative):.3f}x")
             row[metric] = " | ".join(cell_parts) if cell_parts else "-"
         rows.append(row)
 
@@ -1874,7 +1358,7 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
 
     def pick_value(header: List[str], data_row: List[str]) -> str:
         hl = [h.lower() for h in header]
-        pri = ["score", "auc", "silhouette", "entropy", "alignment", "r2", "mean_between"]
+        pri = ["score", "silhouette", "entropy", "alignment", "r2", "mean_between"]
         for key in pri:
             if key in hl:
                 idx = hl.index(key)
@@ -1967,7 +1451,7 @@ def build_overall_div(session_dir: Path, stage: str):
                 }
                 for metric_name in metrics:
                     entry = per_metric.get(metric_name)
-                    row[metric_name] = _rounded(entry.relative) if entry and entry.relative is not None else None
+                    row[metric_name] = _rounded(entry.absolute) if entry and entry.absolute is not None else None
                 typed_rows.append(row)
 
             def _sort_key(item: Dict[str, object]) -> Tuple[float, str]:
@@ -2233,16 +1717,9 @@ def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
             if not method_code:
                 continue
             absolute = entry.absolute
-            if absolute is None:
+            if absolute is None or baseline_abs in (None, 0):
                 continue
-            if entry.relative is not None:
-                ratio = entry.relative
-            elif baseline_abs not in (None, 0):
-                ratio = absolute / baseline_abs
-            else:
-                continue
-            if ratio is None:
-                continue
+            ratio = absolute / baseline_abs
             ret[method_code][data.display_name] = ratio - 1.0
     return ret
 

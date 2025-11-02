@@ -7,10 +7,6 @@ HELP_MODAL_SECTIONS: List = []
 
 # Parameter tooltips for assessment configuration controls.
 ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
-    "auc": {
-        "cv_folds": "Number of cross-validation folds (repeated CV).",
-        "cv_reps": "Number of repetitions for repeated cross-validation.",
-    },
     "alignment": {
         "k_neighbors": "k for k-NN graph in PCA space.",
         "var_prop_min": "Min cumulative variance for PCA retention (0–1).",
@@ -84,9 +80,6 @@ RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
         "**Score formula:** $S = \\frac{1}{N} \\sum_{i=1}^{N} \\Big(1 - \\frac{\\#\\text{same-batch NN}_i}{k}\\Big)$\n\n"
         "**Symbols:** $N$ = number of samples; $k$ = k-NN size; $\\#\\text{same-batch NN}_i$ = count of neighbors sharing sample $i$'s batch.\n\n"
         "Counts how often k-NN in PCA space come from other batches."
-    ),
-    "auc": (
-        "**Score formula:** $S = \\text{AUROC}$\n\nTracks phenotype separability using repeated-cross-validation random forests."
     ),
     "lisi": (
         "**Score formula:** $S = \\tfrac{1}{2}\\big(\\tilde{\\text{iLISI}} + 1 - \\tilde{\\text{cLISI}}\\big)$\n\n"

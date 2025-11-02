@@ -40,7 +40,6 @@ FIGURE_DEFAULTS = {
     "prda": {"width": 2280, "height": 2070, "dpi": 300},
     "pvca": {"width": 2160, "height": 2040, "dpi": 300},
     "alignment": {"width": 1950, "height": 1380, "dpi": 300},
-    "auc": {"width": 2640, "height": 1860, "dpi": 300},
     "lisi": {"width": 2700, "height": 2400, "dpi": 300},
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
@@ -106,27 +105,7 @@ def _param_controls(stage: str, key: str):
     sid = f"{stage}-{key}"
     tooltips = ASSESSMENT_PARAM_TOOLTIPS.get(key, {})
 
-    if key == "auc":
-        # AUC.R parameters
-        controls = [
-            num_input(
-                f"{sid}-param-cv-folds",
-                "CV_FOLDS",
-                5,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("cv_folds", ""),
-            ),
-            num_input(
-                f"{sid}-param-cv-reps",
-                "CV_REPS",
-                5,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("cv_reps", ""),
-            ),
-        ]
-    elif key == "alignment":
+    if key == "alignment":
         controls = [
             num_input(
                 f"{sid}-param-k",
@@ -351,7 +330,7 @@ def assessment_layout(active_path: str, stage: str):
     gallery_id = "pre-assessment-gallery" if stage == "pre" else "post-assessment-gallery"
 
     # Define groups (key, title, script)
-    pre_groups = [
+    base_groups = [
         ("pca", "PCA", "pca.R"),
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
@@ -359,19 +338,18 @@ def assessment_layout(active_path: str, stage: str):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
-    post_extra = [
+    post_only = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
     # Extend post assessment with additional post-only metrics
     if stage == "post":
-        groups = pre_groups + post_extra
+        groups = base_groups + post_only
     else:
-        groups = pre_groups
+        groups = base_groups
 
     # Build preset tabs with a Run button per group and placeholder until run
     tab_items = []
@@ -466,7 +444,7 @@ def assessment_layout(active_path: str, stage: str):
 
 def register_pre_post_callbacks(app):
     # Group definitions for per-tab runs
-    pre_groups = [
+    base_groups = [
         ("pca", "PCA", "pca.R"),
         ("pcoa", "PCoA", "pcoa.R"),
         ("nmds", "NMDS", "NMDS.R"),
@@ -474,10 +452,9 @@ def register_pre_post_callbacks(app):
         ("r2", "Feature-wise ANOVA R²", "R2.R"),
         ("prda", "pRDA", "pRDA.R"),
         ("pvca", "PVCA", "pvca.R"),
-        ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("auc", "AUC", "AUC.R"),
     ]
-    post_extra = [
+    post_only = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
@@ -508,16 +485,7 @@ def register_pre_post_callbacks(app):
         # Parameter States by group
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
-        if key == "auc":
-            param_state_ids.extend([
-                f"{sid}-param-cv-folds",
-                f"{sid}-param-cv-reps",
-            ])
-            states += [
-                State(f"{sid}-param-cv-folds", "value"),
-                State(f"{sid}-param-cv-reps", "value"),
-            ]
-        elif key == "alignment":
+        if key == "alignment":
             param_state_ids.extend([
                 f"{sid}-param-k",
                 f"{sid}-param-var-prop",
@@ -673,13 +641,7 @@ def register_pre_post_callbacks(app):
 
             pv = param_vals
             idx = 0
-            if _key == "auc":
-                # order: cv-folds, cv-reps
-                _add("cv_folds", pv[idx], int)
-                idx += 1
-                _add("cv_reps", pv[idx], int)
-                idx += 1
-            elif _key == "alignment":
+            if _key == "alignment":
                 _add("k", pv[idx], int)
                 idx += 1
                 _add("var_prop_min", pv[idx], float)
@@ -791,9 +753,9 @@ def register_pre_post_callbacks(app):
             return build_group_subtab_content(session_dir, _stage, _key, selected_value)
 
     # Register all group callbacks
-    for key, _, script in pre_groups:
+    for key, _, script in base_groups:
         _register_group("pre", key, script)
     # Register post-stage groups (baseline pre groups plus post-only extras)
-    for key, _, script in pre_groups + post_extra:
+    for key, _, script in base_groups + post_only:
         _register_group("post", key, script)
 
