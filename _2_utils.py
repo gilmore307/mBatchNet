@@ -1221,8 +1221,9 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             elif low.startswith("prda_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "pRDA"
-        elif key == "alignment" and spec.filename.lower() == "alignment_score.png":
-            g["single"] = spec.filename; g["title"] = "Alignment score"
+        elif key == "alignment" and spec.filename.lower() in {"alignment_score.png", "alignment.png"}:
+            g["single"] = spec.filename
+            g["title"] = "Alignment score"
         elif key == "pca" and spec.filename.lower() == "pca.png":
             g["single"] = spec.filename; g["title"] = "PCA"
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
