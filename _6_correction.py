@@ -98,7 +98,7 @@ def register_correction_callbacks(app):
             )
         )
         body_rows: List[html.Tr] = []
-        row_stores: List[dcc.Store] = []
+        row_extras: List[object] = []
 
         def button_color(disabled: bool) -> str:
             return "secondary" if disabled else "success"
@@ -168,8 +168,14 @@ def register_correction_callbacks(app):
                 ]
             )
             body_rows.append(row)
-            row_stores.append(
+            row_extras.append(
                 dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
+            )
+            row_extras.append(
+                html.Div(
+                    id={"type": "method-actions-loading-anchor", "code": code},
+                    style={"display": "none"},
+                )
             )
         table = dbc.Table(
             [header, html.Tbody(body_rows)],
@@ -179,10 +185,9 @@ def register_correction_callbacks(app):
             striped=True,
             className="align-middle",
         )
-        loading_anchor = html.Div(id="method-actions-loading-anchor", style={"display": "none"})
-        children: List[object] = [table, loading_anchor]
-        if row_stores:
-            children.extend(row_stores)
+        children: List[object] = [table]
+        if row_extras:
+            children.extend(row_extras)
         table_wrapper = html.Div(children, className="be-method-table-wrapper")
         return dcc.Loading(
             table_wrapper,
@@ -198,7 +203,7 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
-        Output("method-actions-loading-anchor", "children", allow_duplicate=True),
+        Output({"type": "method-actions-loading-anchor", "code": MATCH}, "children", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -336,7 +341,7 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
-        Output("method-actions-loading-anchor", "children", allow_duplicate=True),
+        Output({"type": "method-actions-loading-anchor", "code": MATCH}, "children", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
