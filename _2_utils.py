@@ -261,6 +261,23 @@ def save_uploaded_file(contents: str, directory: Path, dest_name: str) -> None:
     (directory / dest_name).write_bytes(data)
 
 
+def _build_subprocess_env(command: Sequence[str]) -> Dict[str, str]:
+    """Return an environment with project-wide defaults for subprocesses."""
+
+    env = os.environ.copy()
+    # Ensure R's reticulate uses this same Python interpreter by default
+    env.setdefault("RETICULATE_PYTHON", sys.executable)
+    if command:
+        exe_name = Path(str(command[0])).name.lower()
+        if "rscript" in exe_name:
+            # Direct R's implicit plotting device to a null target so commands that
+            # emit base plots do not leave behind stray Rplots.pdf artifacts.
+            null_target = "NUL" if os.name == "nt" else "/dev/null"
+            env.setdefault("R_DEFAULT_DEVICE", "pdf")
+            env.setdefault("R_PDF_DEFAULT", null_target)
+    return env
+
+
 def run_command(command: Sequence[str], cwd: Path) -> Tuple[bool, str]:
     def _s(val) -> str:
         if val is None:
@@ -274,9 +291,7 @@ def run_command(command: Sequence[str], cwd: Path) -> Tuple[bool, str]:
                 return ""
 
     try:
-        env = os.environ.copy()
-        # Ensure R's reticulate uses this same Python interpreter by default
-        env.setdefault("RETICULATE_PYTHON", sys.executable)
+        env = _build_subprocess_env(command)
         result = subprocess.run(
             command,
             cwd=cwd,
@@ -333,8 +348,7 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
     combined: List[str] = []
-    env = os.environ.copy()
-    env.setdefault("RETICULATE_PYTHON", sys.executable)
+    env = _build_subprocess_env(command)
     header = "$ " + " ".join(command) + "\n"
     proc: Optional[subprocess.Popen] = None
     try:
