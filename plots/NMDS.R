@@ -185,8 +185,17 @@ compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id","p
   dfm <- inner_join(df, metadata, by = "sample_id")
   
   feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
+  numeric_df <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric))
+  n_features_total <- as.integer(ncol(numeric_df))
+  if (is.null(n_features_total) || length(n_features_total) == 0) n_features_total <- 0L
+  keep <- if (n_features_total) {
+    vapply(numeric_df, function(x) sd(x, na.rm = TRUE) > 0, logical(1))
+  } else {
+    logical(0)
+  }
+  X <- as.matrix(numeric_df[, keep, drop = FALSE])
   if (!ncol(X)) stop("No numeric features for NMDS (CLR).")
+  n_features_used <- as.integer(ncol(X))
   # If negatives exist, assume CLR; else build CLR from non-negative data
   Xclr <- if (any(X < 0, na.rm = TRUE)) {
     sweep(X, 1, rowMeans(X, na.rm = TRUE), "-")
@@ -201,7 +210,26 @@ compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id","p
   plot.df <- data.frame(sample_id = dfm$sample_id, as.data.frame(sc), check.names = FALSE)
   present <- intersect(model.vars, names(dfm))
   for (v in present) plot.df[[v]] <- factor(as.character(dfm[[v]]), levels = unique(as.character(metadata[[v]])))
-  list(plot.df = plot.df, stress = fit$stress, used.vars = present)
+  ord_dist <- stats::dist(sc)
+  shepard_r2 <- tryCatch({
+    orig <- as.numeric(Da)
+    fitted <- as.numeric(ord_dist)
+    valid <- is.finite(orig) & is.finite(fitted)
+    if (!any(valid)) NA_real_ else stats::cor(orig[valid], fitted[valid], method = "pearson")^2
+  }, error = function(e) NA_real_)
+  site_gof_vals <- tryCatch(vegan::goodness(fit), error = function(e) rep(NA_real_, nrow(sc)))
+  site_gof_vals <- as.numeric(site_gof_vals)
+  site_gof_median <- suppressWarnings(stats::median(site_gof_vals, na.rm = TRUE))
+  if (!is.finite(site_gof_median)) site_gof_median <- NA_real_
+  list(
+    plot.df = plot.df,
+    stress = fit$stress,
+    used.vars = present,
+    n_features_total = n_features_total,
+    n_features_used = n_features_used,
+    shepard_r2 = shepard_r2,
+    site_gof_median = site_gof_median
+  )
 }
 
 # ==== NMDS frames: Bray-Curtis on TSS ====
@@ -214,8 +242,12 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
   dfm <- inner_join(df, metadata, by = "sample_id")
   
   feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
+  numeric_df <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric))
+  n_features_total <- as.integer(ncol(numeric_df))
+  if (is.null(n_features_total) || length(n_features_total) == 0) n_features_total <- 0L
+  X <- as.matrix(numeric_df)
   Xtss <- safe_closure(X)
+  n_features_used <- as.integer(ncol(Xtss))
   Db <- vegan::vegdist(Xtss, method = "bray")
   
   set.seed(123)
@@ -224,7 +256,26 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
   plot.df <- data.frame(sample_id = dfm$sample_id, as.data.frame(sc), check.names = FALSE)
   present <- intersect(model.vars, names(dfm))
   for (v in present) plot.df[[v]] <- factor(as.character(dfm[[v]]), levels = unique(as.character(metadata[[v]])))
-  list(plot.df = plot.df, stress = fit$stress, used.vars = present)
+  ord_dist <- stats::dist(sc)
+  shepard_r2 <- tryCatch({
+    orig <- as.numeric(Db)
+    fitted <- as.numeric(ord_dist)
+    valid <- is.finite(orig) & is.finite(fitted)
+    if (!any(valid)) NA_real_ else stats::cor(orig[valid], fitted[valid], method = "pearson")^2
+  }, error = function(e) NA_real_)
+  site_gof_vals <- tryCatch(vegan::goodness(fit), error = function(e) rep(NA_real_, nrow(sc)))
+  site_gof_vals <- as.numeric(site_gof_vals)
+  site_gof_median <- suppressWarnings(stats::median(site_gof_vals, na.rm = TRUE))
+  if (!is.finite(site_gof_median)) site_gof_median <- NA_real_
+  list(
+    plot.df = plot.df,
+    stress = fit$stress,
+    used.vars = present,
+    n_features_total = n_features_total,
+    n_features_used = n_features_used,
+    shepard_r2 = shepard_r2,
+    site_gof_median = site_gof_median
+  )
 }
 
 # ==== NMDS panel (scatter with ellipses) with per-panel limits ====
@@ -429,6 +480,115 @@ ggsave(file.path(output_folder, "nmds_braycurtis.tif"),
 # NMDS assessment (with baseline-only option)
 # =========================
 
+prepare_batch_scores <- function(plot_df, metadata, axes = c("NMDS1", "NMDS2"), batch_var = "batch_id") {
+  if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
+  if (!batch_var %in% names(metadata)) return(NULL)
+  idx <- match(plot_df$sample_id, metadata$sample_id)
+  batch <- metadata[[batch_var]][idx]
+  coords <- as.matrix(plot_df[, axes, drop = FALSE])
+  if (!nrow(coords) || ncol(coords) < 2) return(NULL)
+  valid <- apply(coords, 1, function(row) all(is.finite(row))) & !is.na(batch)
+  if (!any(valid)) return(NULL)
+  coords <- coords[valid, , drop = FALSE]
+  batch <- droplevels(factor(batch[valid]))
+  if (!nrow(coords) || !nlevels(batch)) return(NULL)
+  list(coords = coords, batch = batch)
+}
+
+mean_centroid_distance <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  levs <- levels(groups)
+  centroids <- lapply(levs, function(lev) {
+    idx <- which(groups == lev)
+    if (!length(idx)) return(NULL)
+    sub <- coords[idx, , drop = FALSE]
+    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
+    if (!nrow(sub)) return(NULL)
+    colMeans(sub, na.rm = TRUE)
+  })
+  centroids <- centroids[!vapply(centroids, is.null, logical(1))]
+  if (length(centroids) < 2) return(NA_real_)
+  centroid_mat <- do.call(rbind, centroids)
+  if (!all(is.finite(centroid_mat))) return(NA_real_)
+  as.numeric(mean(dist(centroid_mat, method = "euclidean")))
+}
+
+mean_within_radius <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  levs <- levels(groups)
+  total <- 0
+  count <- 0
+  for (lev in levs) {
+    idx <- which(groups == lev)
+    if (!length(idx)) next
+    sub <- coords[idx, , drop = FALSE]
+    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
+    if (!nrow(sub)) next
+    centroid <- colMeans(sub, na.rm = TRUE)
+    dists <- sqrt(rowSums((sub - matrix(centroid, nrow = nrow(sub), ncol = ncol(sub), byrow = TRUE))^2))
+    dists <- dists[is.finite(dists)]
+    total <- total + sum(dists)
+    count <- count + length(dists)
+  }
+  if (!count) return(NA_real_)
+  total / count
+}
+
+compute_knn_mixing <- function(coords, groups, k = 10L) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  n <- nrow(coords)
+  if (n <= 1) return(NA_real_)
+  k <- min(as.integer(k), n - 1L)
+  if (k <= 0) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  if (!nlevels(groups)) return(NA_real_)
+  dmat <- as.matrix(dist(coords, method = "euclidean", diag = TRUE, upper = TRUE))
+  diag(dmat) <- Inf
+  mixing <- numeric(n)
+  valid_rows <- rep(FALSE, n)
+  group_vals <- as.character(groups)
+  for (i in seq_len(n)) {
+    row <- dmat[i, ]
+    if (all(!is.finite(row))) next
+    ord <- order(row, na.last = NA)
+    ord <- ord[ord != i]
+    if (!length(ord)) next
+    take <- ord[seq_len(min(k, length(ord)))]
+    if (!length(take)) next
+    neigh <- group_vals[take]
+    if (!length(neigh)) next
+    mixing[i] <- mean(neigh != group_vals[i])
+    valid_rows[i] <- TRUE
+  }
+  if (!any(valid_rows)) return(NA_real_)
+  mean(mixing[valid_rows])
+}
+
+summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
+                                   axes = c("NMDS1", "NMDS2"), batch_var = "batch_id") {
+  prep <- prepare_batch_scores(fr$plot.df, metadata, axes = axes, batch_var = batch_var)
+  if (is.null(prep)) return(NULL)
+  coords <- prep$coords
+  batch <- prep$batch
+  tibble::tibble(
+    Method = method_name,
+    Geometry = geometry_label,
+    NMDS_Stress = fr$stress,
+    Shepard_R2 = if (is.null(fr$shepard_r2)) NA_real_ else fr$shepard_r2,
+    Site_GoF_Median = if (is.null(fr$site_gof_median)) NA_real_ else fr$site_gof_median,
+    Batch_Distance_NMDS = mean_centroid_distance(coords, batch),
+    R_within_NMDS = mean_within_radius(coords, batch),
+    Mixing_k10_NMDS = compute_knn_mixing(coords, batch, k = 10L),
+    n_features_used_NMDS = if (is.null(fr$n_features_used)) NA_integer_ else fr$n_features_used,
+    n_features_total_NMDS = if (is.null(fr$n_features_total)) NA_integer_ else fr$n_features_total
+  )
+}
+
 methods_clr <- names(frames_cache_clr)
 methods_tss <- names(frames_cache_tss)
 all_methods <- union(methods_clr, methods_tss)
@@ -442,27 +602,19 @@ if (only_baseline) {
 
   if ("Before correction" %in% methods_clr) {
     fr <- frames_cache_clr[["Before correction"]]
-    stress <- fr$stress
-
-    assess_rows[["Ait"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "Ait",
-      NMDS_Stress       = stress
-    )
+    row <- summarise_nmds_method(fr, "Before correction", "Ait", metadata,
+                                 axes = c("NMDS1", "NMDS2"), batch_var = batch_var)
+    if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
-    stress <- fr$stress
-
-    assess_rows[["BC"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "BC",
-      NMDS_Stress       = stress
-    )
+    row <- summarise_nmds_method(fr, "Before correction", "BC", metadata,
+                                 axes = c("NMDS1", "NMDS2"), batch_var = batch_var)
+    if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
-  assess_df <- dplyr::bind_rows(assess_rows)
+  assess_df <- if (length(assess_rows)) dplyr::bind_rows(assess_rows) else tibble::tibble()
 
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, output_name))
@@ -471,53 +623,27 @@ if (only_baseline) {
 
 } else {
   # ===== Multi-method assessment without ranking =====
-  rank_tbl <- dplyr::tibble(
-    Method = character(),
-    NMDS_Stress_Ait = numeric(),
-    NMDS_Stress_BC  = numeric()
-  )
-
+  rows <- list()
   for (m in all_methods) {
-    # CLR NMDS
-    stress_a <- NA_real_
     if (m %in% methods_clr) {
       fr_a <- frames_cache_clr[[m]]
-      stress_a <- fr_a$stress
+      row_a <- summarise_nmds_method(fr_a, m, "Ait", metadata,
+                                     axes = c("NMDS1", "NMDS2"), batch_var = batch_var)
+      if (!is.null(row_a)) rows[[length(rows) + 1L]] <- row_a
     }
-
-    # TSS NMDS
-    stress_b <- NA_real_
     if (m %in% methods_tss) {
       fr_b <- frames_cache_tss[[m]]
-      stress_b <- fr_b$stress
+      row_b <- summarise_nmds_method(fr_b, m, "BC", metadata,
+                                     axes = c("NMDS1", "NMDS2"), batch_var = batch_var)
+      if (!is.null(row_b)) rows[[length(rows) + 1L]] <- row_b
     }
-
-    rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
-      Method = m,
-      NMDS_Stress_Ait = stress_a,
-      NMDS_Stress_BC  = stress_b
-    ))
   }
 
-  assessment_rows <- list()
-  if (any(is.finite(rank_tbl$NMDS_Stress_Ait))) {
-    assessment_rows[["Ait"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "Ait",
-      NMDS_Stress = rank_tbl$NMDS_Stress_Ait
-    )
+  assessment_tbl <- if (length(rows)) {
+    dplyr::bind_rows(rows) %>% dplyr::arrange(Geometry, Method)
+  } else {
+    tibble::tibble()
   }
-  if (any(is.finite(rank_tbl$NMDS_Stress_BC))) {
-    assessment_rows[["BC"]] <- tibble::tibble(
-      Method = rank_tbl$Method,
-      Geometry = "BC",
-      NMDS_Stress = rank_tbl$NMDS_Stress_BC
-    )
-  }
-
-  assessment_tbl <- dplyr::bind_rows(assessment_rows)
-  assessment_tbl <- assessment_tbl %>%
-    dplyr::arrange(Geometry, Method)
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))

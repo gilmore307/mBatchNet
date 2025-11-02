@@ -205,10 +205,17 @@ compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch_id","p
   df  <- df %>% mutate(sample_id = as.character(sample_id))
   dfm <- inner_join(df, metadata, by = "sample_id")
   feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric))
-  keep <- vapply(X, function(x) sd(x, na.rm = TRUE) > 0, logical(1))
-  X <- as.matrix(X[, keep, drop = FALSE])
+  numeric_df <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric))
+  n_features_total <- as.integer(ncol(numeric_df))
+  if (is.null(n_features_total) || length(n_features_total) == 0) n_features_total <- 0L
+  keep <- if (n_features_total) {
+    vapply(numeric_df, function(x) sd(x, na.rm = TRUE) > 0, logical(1))
+  } else {
+    logical(0)
+  }
+  X <- as.matrix(numeric_df[, keep, drop = FALSE])
   if (!ncol(X)) stop("No variable numeric features remain for PCoA (CLR).")
+  n_features_used <- as.integer(ncol(X))
   
   # If negatives exist, assume already CLR; else do CLR from positive data
   has_neg <- any(X < 0, na.rm = TRUE)
@@ -244,7 +251,13 @@ compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch_id","p
     levs <- unique(as.character(metadata[[v]]))
     plot.df[[v]] <- factor(as.character(dfm[[v]]), levels = levs)
   }
-  list(plot.df = plot.df, metric.df = metric.df, used.vars = present)
+  list(
+    plot.df = plot.df,
+    metric.df = metric.df,
+    used.vars = present,
+    n_features_total = n_features_total,
+    n_features_used = n_features_used
+  )
 }
 
 # ==== PCoA frames (Bray–Curtis on TSS) ====
@@ -257,12 +270,16 @@ compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
   df  <- df %>% mutate(sample_id = as.character(sample_id))
   dfm <- inner_join(df, metadata, by = "sample_id")
   feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
+  numeric_df <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric))
+  n_features_total <- as.integer(ncol(numeric_df))
+  if (is.null(n_features_total) || length(n_features_total) == 0) n_features_total <- 0L
+  X <- as.matrix(numeric_df)
   
   # Ensure non-negative & close rows to TSS (proportions)
   X[!is.finite(X)] <- 0
   X[X < 0] <- 0
   Xtss <- safe_closure(X)
+  n_features_used <- as.integer(ncol(Xtss))
   
   # Bray–Curtis (vegan::vegdist)
   d <- vegan::vegdist(Xtss, method = "bray")
@@ -296,7 +313,13 @@ compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch_id","ph
     levs <- unique(as.character(metadata[[v]]))
     plot.df[[v]] <- factor(as.character(dfm[[v]]), levels = levs)
   }
-  list(plot.df = plot.df, metric.df = metric.df, used.vars = present)
+  list(
+    plot.df = plot.df,
+    metric.df = metric.df,
+    used.vars = present,
+    n_features_total = n_features_total,
+    n_features_used = n_features_used
+  )
 }
 
 # ==== PCoA panel (scatter + marginals) with per-panel limits ====
@@ -586,6 +609,116 @@ compute_centroid_distances <- function(centroids) {
   as.numeric(mean(dist(centroids[, c("PCo1", "PCo2")], method = "euclidean")))
 }
 
+prepare_batch_scores <- function(plot_df, metadata, axes = c("PCo1", "PCo2"), batch_var = "batch_id") {
+  if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
+  if (!batch_var %in% names(metadata)) return(NULL)
+  idx <- match(plot_df$sample_id, metadata$sample_id)
+  batch <- metadata[[batch_var]][idx]
+  coords <- as.matrix(plot_df[, axes, drop = FALSE])
+  if (!nrow(coords) || ncol(coords) < 2) return(NULL)
+  valid <- apply(coords, 1, function(row) all(is.finite(row))) & !is.na(batch)
+  if (!any(valid)) return(NULL)
+  coords <- coords[valid, , drop = FALSE]
+  batch <- droplevels(factor(batch[valid]))
+  if (!nrow(coords) || !nlevels(batch)) return(NULL)
+  list(coords = coords, batch = batch)
+}
+
+mean_centroid_distance <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  levs <- levels(groups)
+  centroids <- lapply(levs, function(lev) {
+    idx <- which(groups == lev)
+    if (!length(idx)) return(NULL)
+    sub <- coords[idx, , drop = FALSE]
+    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
+    if (!nrow(sub)) return(NULL)
+    colMeans(sub, na.rm = TRUE)
+  })
+  centroids <- centroids[!vapply(centroids, is.null, logical(1))]
+  if (length(centroids) < 2) return(NA_real_)
+  centroid_mat <- do.call(rbind, centroids)
+  if (!all(is.finite(centroid_mat))) return(NA_real_)
+  as.numeric(mean(dist(centroid_mat, method = "euclidean")))
+}
+
+mean_within_radius <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  levs <- levels(groups)
+  total <- 0
+  count <- 0
+  for (lev in levs) {
+    idx <- which(groups == lev)
+    if (!length(idx)) next
+    sub <- coords[idx, , drop = FALSE]
+    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
+    if (!nrow(sub)) next
+    centroid <- colMeans(sub, na.rm = TRUE)
+    dists <- sqrt(rowSums((sub - matrix(centroid, nrow = nrow(sub), ncol = ncol(sub), byrow = TRUE))^2))
+    dists <- dists[is.finite(dists)]
+    total <- total + sum(dists)
+    count <- count + length(dists)
+  }
+  if (!count) return(NA_real_)
+  total / count
+}
+
+compute_knn_mixing <- function(coords, groups, k = 10L) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
+  if (ncol(coords) < 2) return(NA_real_)
+  n <- nrow(coords)
+  if (n <= 1) return(NA_real_)
+  k <- min(as.integer(k), n - 1L)
+  if (k <= 0) return(NA_real_)
+  groups <- droplevels(factor(groups))
+  if (!nlevels(groups)) return(NA_real_)
+  dmat <- as.matrix(dist(coords, method = "euclidean", diag = TRUE, upper = TRUE))
+  diag(dmat) <- Inf
+  mixing <- numeric(n)
+  valid_rows <- rep(FALSE, n)
+  group_vals <- as.character(groups)
+  for (i in seq_len(n)) {
+    row <- dmat[i, ]
+    if (all(!is.finite(row))) next
+    ord <- order(row, na.last = NA)
+    ord <- ord[ord != i]
+    if (!length(ord)) next
+    take <- ord[seq_len(min(k, length(ord)))]
+    if (!length(take)) next
+    neigh <- group_vals[take]
+    if (!length(neigh)) next
+    mixing[i] <- mean(neigh != group_vals[i])
+    valid_rows[i] <- TRUE
+  }
+  if (!any(valid_rows)) return(NA_real_)
+  mean(mixing[valid_rows])
+}
+
+summarise_pcoa_method <- function(fr, method_name, geometry_label, metadata,
+                                   axes = c("PCo1", "PCo2"), batch_var = "batch_id") {
+  prep <- prepare_batch_scores(fr$plot.df, metadata, axes = axes, batch_var = batch_var)
+  if (is.null(prep)) return(NULL)
+  coords <- prep$coords
+  batch <- prep$batch
+  var_vals <- fr$metric.df$var.explained
+  top_two <- min(2L, length(var_vals))
+  var12 <- if (top_two) sum(var_vals[seq_len(top_two)], na.rm = TRUE) else NA_real_
+  tibble::tibble(
+    Method = method_name,
+    Geometry = geometry_label,
+    Var12_PCoA = var12,
+    Batch_Distance_PCoA = mean_centroid_distance(coords, batch),
+    R_within_PCoA = mean_within_radius(coords, batch),
+    Mixing_k10_PCoA = compute_knn_mixing(coords, batch, k = 10L),
+    n_features_used_PCoA = if (is.null(fr$n_features_used)) NA_integer_ else fr$n_features_used,
+    n_features_total_PCoA = if (is.null(fr$n_features_total)) NA_integer_ else fr$n_features_total
+  )
+}
+
 methods_clr <- names(frames_cache_clr)
 methods_tss <- names(frames_cache_tss)
 all_methods <- union(methods_clr, methods_tss)
@@ -596,105 +729,52 @@ output_name <- if (only_baseline) "pcoa_raw_assessment_pre.csv" else "pcoa_raw_a
 if (only_baseline) {
   # ===== Baseline-only assessment (no ranking) =====
   assess_rows <- list()
-  
+
   if ("Before correction" %in% methods_clr) {
     fr <- frames_cache_clr[["Before correction"]]
-    md <- metadata[match(fr$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-    scores <- fr$plot.df %>%
-      dplyr::select(sample_id, PCo1, PCo2) %>%
-      dplyr::mutate(batch_id = factor(md$batch_id))
-    cents <- compute_centroids_pcoa(scores, "batch_id")
-    D_between <- compute_centroid_distances(cents)
-
-    assess_rows[["Ait"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "Ait",
-      Batch_Distance    = D_between
-    )
+    row <- summarise_pcoa_method(fr, "Before correction", "Ait", metadata,
+                                 axes = c("PCo1", "PCo2"), batch_var = batch_var)
+    if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
-    md <- metadata[match(fr$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-    scores <- fr$plot.df %>%
-      dplyr::select(sample_id, PCo1, PCo2) %>%
-      dplyr::mutate(batch_id = factor(md$batch_id))
-    cents <- compute_centroids_pcoa(scores, "batch_id")
-    D_between <- compute_centroid_distances(cents)
-
-    assess_rows[["BC"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "BC",
-      Batch_Distance    = D_between
-    )
+    row <- summarise_pcoa_method(fr, "Before correction", "BC", metadata,
+                                 axes = c("PCo1", "PCo2"), batch_var = batch_var)
+    if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
-    assess_df <- dplyr::bind_rows(assess_rows)
+  assess_df <- if (length(assess_rows)) dplyr::bind_rows(assess_rows) else tibble::tibble()
 
-    print(assess_df, n = nrow(assess_df))
-    readr::write_csv(assess_df, file.path(output_folder, output_name))
+  print(assess_df, n = nrow(assess_df))
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
 
   # No correction recommendation messages
 
 } else {
   # ===== Multi-method assessment without ranking =====
-  rank_tbl <- dplyr::tibble(
-    Method = character(),
-    Batch_Distance_Ait = numeric(),
-    Batch_Distance_BC  = numeric()
-  )
-  
-  for (m in union(names(frames_cache_clr), names(frames_cache_tss))) {
-    # ----- CLR -----
-    D_a <- NA_real_
+  methods_all <- union(names(frames_cache_clr), names(frames_cache_tss))
+  rows <- list()
+  for (m in methods_all) {
     if (m %in% names(frames_cache_clr)) {
       fr_a <- frames_cache_clr[[m]]
-      md_a <- metadata[match(fr_a$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-      scores_a <- fr_a$plot.df %>%
-        dplyr::select(sample_id, PCo1, PCo2) %>%
-        dplyr::mutate(batch_id = factor(md_a$batch_id))
-      cents_a <- compute_centroids_pcoa(scores_a, "batch_id")
-      D_a <- compute_centroid_distances(cents_a)
+      row_a <- summarise_pcoa_method(fr_a, m, "Ait", metadata,
+                                     axes = c("PCo1", "PCo2"), batch_var = batch_var)
+      if (!is.null(row_a)) rows[[length(rows) + 1L]] <- row_a
     }
-
-    # ----- TSS -----
-    D_b <- NA_real_
     if (m %in% names(frames_cache_tss)) {
       fr_b <- frames_cache_tss[[m]]
-      md_b <- metadata[match(fr_b$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
-      scores_b <- fr_b$plot.df %>%
-        dplyr::select(sample_id, PCo1, PCo2) %>%
-        dplyr::mutate(batch_id = factor(md_b$batch_id))
-      cents_b <- compute_centroids_pcoa(scores_b, "batch_id")
-      D_b <- compute_centroid_distances(cents_b)
+      row_b <- summarise_pcoa_method(fr_b, m, "BC", metadata,
+                                     axes = c("PCo1", "PCo2"), batch_var = batch_var)
+      if (!is.null(row_b)) rows[[length(rows) + 1L]] <- row_b
     }
-
-    rank_tbl <- dplyr::bind_rows(rank_tbl, dplyr::tibble(
-      Method = m,
-      Batch_Distance_Ait = D_a,
-      Batch_Distance_BC  = D_b
-    ))
   }
 
-    assessment_rows <- list()
-    if (any(is.finite(rank_tbl$Batch_Distance_Ait))) {
-      assessment_rows[["Ait"]] <- tibble::tibble(
-        Method = rank_tbl$Method,
-        Geometry = "Ait",
-        Batch_Distance = rank_tbl$Batch_Distance_Ait
-      )
-    }
-    if (any(is.finite(rank_tbl$Batch_Distance_BC))) {
-      assessment_rows[["BC"]] <- tibble::tibble(
-        Method = rank_tbl$Method,
-        Geometry = "BC",
-        Batch_Distance = rank_tbl$Batch_Distance_BC
-      )
-    }
-
-    assessment_tbl <- dplyr::bind_rows(assessment_rows)
-    assessment_tbl <- assessment_tbl %>%
-    dplyr::arrange(Geometry, Method)
+  assessment_tbl <- if (length(rows)) {
+    dplyr::bind_rows(rows) %>% dplyr::arrange(Geometry, Method)
+  } else {
+    tibble::tibble()
+  }
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
