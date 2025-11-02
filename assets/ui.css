@@ -199,6 +199,7 @@ body {
 }
 
 /* Ensure correction action columns occupy full cell width during loading */
+
 .be-column-loading {
   display: block;
   width: 100%;
@@ -206,6 +207,39 @@ body {
 
 .be-column-loading .dash-loading-spinner {
   margin: 0 auto;
+}
+
+.be-method-actions-loading {
+  display: block;
+  position: relative;
+}
+
+.be-method-actions-loading.dash-loading-parent {
+  position: relative;
+}
+
+.be-method-actions-loading .dash-loading-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.be-method-actions-loading .dash-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.65);
+  border-radius: 0.5rem;
+}
+
+.be-method-table-wrapper {
+  position: relative;
+}
+
+.be-run-cell,
+.be-delete-cell {
+  position: relative;
 }
 
 .be-ag-grid .ag-cell {

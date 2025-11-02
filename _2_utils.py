@@ -773,7 +773,7 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
     elif s == "lisi":
         bases = ["LISI", "lisi"]
     elif s == "alignment_score":
-        bases = ["alignment"]
+        bases = ["alignment_score", "alignment"]
     elif s == "ebm":
         bases = ["ebm"]
     elif s == "silhouette":

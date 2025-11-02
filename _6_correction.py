@@ -92,24 +92,8 @@ def register_correction_callbacks(app):
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
                     html.Th("Status"),
-                    html.Th(
-                        dcc.Loading(
-                            html.Span("Run Correction", id="run-column-loading-indicator"),
-                            type="default",
-                            parent_className="be-column-loading",
-                            className="be-column-loading",
-                        ),
-                        className="text-center",
-                    ),
-                    html.Th(
-                        dcc.Loading(
-                            html.Span("Delete", id="delete-column-loading-indicator"),
-                            type="default",
-                            parent_className="be-column-loading",
-                            className="be-column-loading",
-                        ),
-                        className="text-center",
-                    ),
+                    html.Th("Run Correction", className="text-center"),
+                    html.Th("Delete", className="text-center"),
                 ]
             )
         )
@@ -157,13 +141,8 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             run_cell = html.Td(
-                dcc.Loading(
-                    html.Div(run_button, className="d-grid gap-1"),
-                    type="default",
-                    parent_className="be-column-loading",
-                    className="be-column-loading",
-                ),
-                className="text-center",
+                html.Div(run_button, className="d-grid gap-1"),
+                className="text-center be-run-cell",
             )
             delete_button = dbc.Button(
                 "Delete",
@@ -175,13 +154,8 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             delete_cell = html.Td(
-                dcc.Loading(
-                    html.Div(delete_button, className="d-grid gap-1"),
-                    type="default",
-                    parent_className="be-column-loading",
-                    className="be-column-loading",
-                ),
-                className="text-center",
+                html.Div(delete_button, className="d-grid gap-1"),
+                className="text-center be-delete-cell",
             )
             row = html.Tr(
                 [
@@ -197,10 +171,24 @@ def register_correction_callbacks(app):
             row_stores.append(
                 dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
             )
-        table = dbc.Table([header, html.Tbody(body_rows)], bordered=True, hover=True, responsive=True, striped=True, className="align-middle")
+        table = dbc.Table(
+            [header, html.Tbody(body_rows)],
+            bordered=True,
+            hover=True,
+            responsive=True,
+            striped=True,
+            className="align-middle",
+        )
+        children: List[object] = [table]
         if row_stores:
-            return html.Div([table, *row_stores])
-        return table
+            children.extend(row_stores)
+        table_wrapper = html.Div(children, className="be-method-table-wrapper")
+        return dcc.Loading(
+            table_wrapper,
+            type="default",
+            parent_className="be-method-actions-loading",
+            className="be-method-actions-loading",
+        )
 
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
