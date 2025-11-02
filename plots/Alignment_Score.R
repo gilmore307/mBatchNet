@@ -192,7 +192,7 @@ if (only_baseline) {
     geom_text(aes(label = sprintf("%.3f", AS)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score (baseline)",
-         x = "Method", y = "AS (0- , higher = better mixing)") +
+         x = "Method", y = "AS (0-1)") +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
@@ -223,7 +223,7 @@ if (only_baseline) {
     geom_text(aes(label = sprintf("%.3f", AS)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score",
-         x = "Method", y = "AS (0-1, higher = better mixing)") +
+         x = "Method", y = "AS (0-1)") +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),

@@ -151,8 +151,8 @@ p <- ggplot(plot_df, aes(x = Method, y = R2, fill = Method)) +
   geom_text(aes(label = sprintf("%.3f", R2)), vjust = -0.4, size = 3.2) +
   scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
   labs(
-    title = "PERMANOVA R\u00B2 (Aitchison, batch effect)",
-    subtitle = "Lower is better (less batch effect)",
+    title = "PERMANOVA R\u00B2",
+    subtitle = "Lower is less batch effect",
     x = "Method", y = "R\u00B2"
   ) +
   theme_bw() +
