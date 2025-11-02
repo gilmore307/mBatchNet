@@ -10,6 +10,7 @@ import dash_bootstrap_components as dbc
 from _1_components import build_navbar
 from _2_utils import (
     CODE_TO_DISPLAY,
+    METHOD_REFERENCE_BY_CODE,
     SUPPORTED_METHODS,
     any_method_outputs,
     compute_integrated_summary,
@@ -87,9 +88,10 @@ def register_correction_callbacks(app):
         header = html.Thead(
             html.Tr(
                 [
-                    html.Th("Method"),
+                    html.Th("Methods"),
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
+                    html.Th("Citation"),
                     html.Th("Status"),
                     html.Th("Run Correction", className="text-center"),
                     html.Th("Delete", className="text-center"),
@@ -168,11 +170,39 @@ def register_correction_callbacks(app):
                 ),
                 className="text-center be-delete-cell",
             )
+            metadata = METHOD_REFERENCE_BY_CODE.get(code, {})
+            package_url = (metadata.get("package") or "").strip()
+            citation_text = (metadata.get("citation") or "").strip()
+            citation_url = (metadata.get("url") or "").strip()
+            method_display = (
+                html.A(
+                    display,
+                    href=package_url,
+                    target="_blank",
+                    rel="noopener noreferrer",
+                )
+                if package_url
+                else display
+            )
+            citation_content: object
+            if citation_text and citation_url:
+                citation_content = html.A(
+                    citation_text,
+                    href=citation_url,
+                    target="_blank",
+                    rel="noopener noreferrer",
+                )
+            elif citation_text:
+                citation_content = citation_text
+            else:
+                citation_content = "-"
+            citation_cell = html.Td(citation_content)
             row = html.Tr(
                 [
-                    html.Td(display),
+                    html.Td(method_display),
                     html.Td(str(selections)),
                     html.Td(avg_display),
+                    citation_cell,
                     status_cell,
                     run_cell,
                     delete_cell,
