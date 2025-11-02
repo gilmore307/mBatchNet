@@ -37,6 +37,21 @@ CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
 
+RSCRIPT_BASE_COMMAND: Tuple[str, ...] = (
+    "Rscript",
+    "--no-save",
+    "--no-restore",
+    "--no-site-file",
+)
+
+
+def build_rscript_command(script_path: Path, *args: object) -> Tuple[str, ...]:
+    """Compose an Rscript command that keeps user profiles for non-interactive runs."""
+
+    tail = tuple(str(arg) for arg in args)
+    return RSCRIPT_BASE_COMMAND + (str(script_path),) + tail
+
+
 # ---- Dataclasses & config ----
 @dataclass
 class FigureSpec:
@@ -409,7 +424,7 @@ def run_r_scripts(
         if not script_path.exists():
             logs.append(f"Warning: Script not found: {script}")
             continue
-        cmd = ("Rscript", "--vanilla", str(script_path), str(output_dir), *args)
+        cmd = build_rscript_command(script_path, output_dir, *args)
         if log_path is not None:
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -452,7 +467,7 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     if not script_path.exists():
         return False, f"Script not found for method {canonical_code}: {script_path.name}"
 
-    command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
+    command = build_rscript_command(script_path, session_dir)
     if log_path is not None:
         success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     else:
@@ -655,7 +670,7 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
     if not PREPROCESS_SCRIPT.exists():
         return False, f"Script not found: {PREPROCESS_SCRIPT.name}"
     matrix_path = session_dir / "raw.csv"
-    command = ("Rscript", "--vanilla", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
+    command = build_rscript_command(PREPROCESS_SCRIPT, session_dir, matrix_path)
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)
