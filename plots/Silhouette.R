@@ -204,15 +204,17 @@ for (nm in names(file_list)) {
 
 # ---- Save + Plot (handle baseline-only specially; keep bar order for multi) ----
 only_baseline <- length(method_levels) == 1L && identical(method_levels, "Before correction")
+output_name <- if (only_baseline) "silhouette_raw_assessment_pre.csv" else "silhouette_raw_assessment_post.csv"
 
 if (only_baseline) {
   # Baseline-only assessment: no ranking, just evaluate value and recommend correction if low
   base_row <- sil_tbl %>% filter(Method == "Before correction")
   if (nrow(base_row) == 0) stop("No Silhouette computed for 'Before correction'.")
-  base_row <- base_row
-  
-  readr::write_csv(base_row, file.path(output_folder, "silhouette_raw_assessment.csv"))
-  print(base_row)
+  base_summary <- base_row %>%
+    mutate(Relative_to_Baseline = ifelse(is.finite(Silhouette) & Silhouette != 0, 1, NA_real_))
+
+  readr::write_csv(base_summary, file.path(output_folder, output_name))
+  print(base_summary)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
@@ -220,7 +222,7 @@ if (only_baseline) {
     geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(
-      title = "Silhouette Score (UMAP) - baseline",
+      title = "Silhouette (UMAP) - baseline",
       subtitle = sprintf("Labels=%s - UMAP(metric=%s, n_neighbors=%d, min_dist=%.2f)",
                          LABEL_COL_NAME, pretty_metric(UMAP_METRIC), UMAP_NEIGHB, UMAP_MIN_DIST),
       x = "Method", y = "Silhouette (0-1, higher = tighter class separation)"
@@ -239,26 +241,15 @@ if (only_baseline) {
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   
 } else {
-  # Multiple methods - write a ranking CSV but KEEP ORIGINAL ORDER IN THE PLOT
-  sil_ranked <- sil_tbl %>%
-    filter(is.finite(Silhouette)) %>%
-    mutate(`Absolute score` = Silhouette)
-
-  baseline_abs <- sil_ranked$`Absolute score`[sil_ranked$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
-
-  sil_ranked <- sil_ranked %>%
+  # Multiple methods - summarise but KEEP ORIGINAL ORDER IN THE PLOT
+  baseline_val <- sil_tbl$Silhouette[sil_tbl$Method == "Before correction"][1]
+  sil_summary <- sil_tbl %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
-  
-  readr::write_csv(sil_ranked, file.path(output_folder, "silhouette_ranking.csv"))
-  print(sil_ranked, n = nrow(sil_ranked))
+      Relative_to_Baseline = if (!is.finite(baseline_val) || baseline_val == 0) NA_real_ else Silhouette / baseline_val
+    )
+
+  readr::write_csv(sil_summary, file.path(output_folder, output_name))
+  print(sil_summary, n = nrow(sil_summary))
   
   plot_df <- sil_tbl %>% mutate(Method = factor(Method, levels = method_levels))
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
@@ -266,7 +257,7 @@ if (only_baseline) {
     geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(
-      title = "Silhouette Score (UMAP)",
+      title = "Silhouette (UMAP)",
       subtitle = sprintf("Labels=%s - UMAP(metric=%s, n_neighbors=%d)",
                          LABEL_COL_NAME, pretty_metric(UMAP_METRIC), UMAP_NEIGHB),
       x = "Method", y = "Silhouette (0- , higher = tighter class separation)"

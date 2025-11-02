@@ -220,23 +220,15 @@ batch_entropy_mixing_knn <- function(
   res
 }
 
-rank_methods_ebm <- function(ebm_table) {
-  scored <- ebm_table %>%
-    filter(is.finite(EBM)) %>%
-    mutate(`Absolute score` = EBM)
-
-  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+summarise_methods_ebm <- function(ebm_table) {
+  scored <- ebm_table %>% filter(is.finite(EBM))
+  baseline_row <- scored %>% filter(Method == "Before correction")
+  baseline_val <- if (nrow(baseline_row)) baseline_row$EBM[1] else NA_real_
 
   scored %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
+      Relative_to_Baseline = if (!is.finite(baseline_val) || baseline_val == 0) NA_real_ else EBM / baseline_val
+    )
 }
 
 pretty_metric <- function(m) {
@@ -296,14 +288,15 @@ for (nm in names(file_list)) {
 
 # --------- Save/plot with special handling for baseline-only ---------
 only_baseline <- length(method_levels) == 1L && identical(method_levels, "Before correction")
+output_name <- if (only_baseline) "ebm_raw_assessment_pre.csv" else "ebm_raw_assessment_post.csv"
 
 if (only_baseline) {
   base_row <- ebm_tbl %>% filter(Method == "Before correction")
   if (nrow(base_row) == 0) stop("No EBM computed for 'Before correction'.")
   
-  base_row <- base_row
-  readr::write_csv(base_row, file.path(output_folder, "ebm_raw_assessment.csv"))
-  print(base_row)
+  base_summary <- summarise_methods_ebm(base_row)
+  readr::write_csv(base_summary, file.path(output_folder, output_name))
+  print(base_summary)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
   p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +
@@ -335,10 +328,10 @@ if (only_baseline) {
   # No correction recommendation messages
   
 } else {
-  # Multiple methods: write a numeric ranking CSV, but KEEP ORIGINAL ORDER in the plot
-  ebm_ranked <- rank_methods_ebm(ebm_tbl)
-  readr::write_csv(ebm_ranked, file.path(output_folder, "ebm_ranking.csv"))
-  print(ebm_ranked, n = nrow(ebm_ranked))
+  # Multiple methods: summarise without ranking, KEEP ORIGINAL ORDER in the plot
+  ebm_summary <- summarise_methods_ebm(ebm_tbl)
+  readr::write_csv(ebm_summary, file.path(output_folder, output_name))
+  print(ebm_summary, n = nrow(ebm_summary))
   
   plot_df <- ebm_tbl %>% mutate(Method = factor(Method, levels = method_levels))
   p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +

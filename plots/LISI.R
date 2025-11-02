@@ -199,29 +199,19 @@ global_lisi_norm <- function(lbl) {
   (LISI - 1) / (L - 1)
 }
 
-# -------- Your ranking function (unchanged): higher iLISI, lower cLISI ----------
-rank_lisi_methods <- function(summary_df) {
+# -------- Summaries for LISI metrics: higher iLISI, lower cLISI ----------
+summarise_lisi_methods <- function(summary_df) {
   stopifnot(all(c("Method","median_iLISI","median_cLISI") %in% names(summary_df)))
-  scored <- summary_df %>%
-    transmute(
-      Method,
-      iLISI = pmin(pmax(median_iLISI, 0), 1),
-      cLISI = pmin(pmax(median_cLISI, 0), 1),
-      `Absolute score` = 0.5 * (iLISI + (1 - cLISI))
-    )
 
-  baseline_abs <- scored$`Absolute score`[scored$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  baseline_row <- summary_df %>% filter(Method == "Before correction")
+  baseline_i <- if (nrow(baseline_row)) baseline_row$median_iLISI[1] else NA_real_
+  baseline_c <- if (nrow(baseline_row)) baseline_row$median_cLISI[1] else NA_real_
 
-  scored %>%
+  summary_df %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
-    ) %>%
-    arrange(desc(`Absolute score`), desc(iLISI), cLISI, Method) %>%
-    mutate(Rank = dplyr::row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
+      Relative_iLISI_to_Baseline = if (!is.finite(baseline_i) || baseline_i == 0) NA_real_ else median_iLISI / baseline_i,
+      Relative_cLISI_to_Baseline = if (!is.finite(baseline_c) || baseline_c == 0) NA_real_ else median_cLISI / baseline_c
+    )
 }
 
 ## Auto-select k removed
@@ -249,6 +239,10 @@ method_names <- ifelse(basename(clr_paths) == "raw_clr.csv",
                        gsub("^normalized_|_clr\\.csv$", "", basename(clr_paths)))
 file_list <- setNames(clr_paths, method_names)
 
+method_levels <- names(file_list)
+only_baseline <- length(method_levels) == 1L && identical(method_levels, "Before correction")
+output_name <- if (only_baseline) "LISI_raw_assessment_pre.csv" else "LISI_raw_assessment_post.csv"
+
 # Optionally auto-select k
 # no auto-selection; use provided k
 
@@ -263,10 +257,10 @@ lisi_long <- lapply(names(file_list), function(nm) {
     k_nn  = opt_k
   )
 }) %>% bind_rows() %>%
-  mutate(Method = factor(Method, levels = names(file_list)),
+  mutate(Method = factor(Method, levels = method_levels),
          Metric = factor(Metric, levels = c("iLISI","cLISI")))
 
-# -------------------------- Summaries + Ranking ---------------------------------
+# -------------------------- Summaries -------------------------------------------
 summary_df <- lisi_long %>%
   group_by(Method, Metric) %>%
   summarise(
@@ -276,9 +270,9 @@ summary_df <- lisi_long %>%
   ) %>%
   pivot_wider(names_from = Metric, values_from = c(median, se))
 
-ranked <- rank_lisi_methods(summary_df)   # <-- your ranking function
-print(ranked)
-write_csv(ranked, file.path(output_folder, "LISI_ranking.csv"))
+lisi_summary <- summarise_lisi_methods(summary_df)
+print(lisi_summary)
+write_csv(lisi_summary, file.path(output_folder, output_name))
 
 # ------------------------------------ Plots -------------------------------------
 # 1) Scatter: iLISI (y) vs 1-cLISI (x)

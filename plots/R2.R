@@ -259,57 +259,49 @@ if (!is.null(p_clr)) {
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
 }
 
-# ----------------- Unified ranking or baseline-only assessment -----------------
-score_from_long <- function(df) {
-  if (!nrow(df)) return(tibble(Method = character(), Score = numeric()))
-  df %>%
-    group_by(Method, Effect) %>%
-    summarise(median_R2 = median(R2, na.rm = TRUE), .groups = "drop") %>%
-    tidyr::pivot_wider(names_from = Effect, values_from = median_R2) %>%
-    mutate(Score = pmax(0, Treatment) * pmax(0, 1 - Batch)) %>%
-    select(Method, Score)
-}
-
-score_clr <- score_from_long(r2_long_clr) %>% rename(Score_CLR = Score)
+# ----------------- Unified assessment table -----------------
+median_r2_by_method <- r2_long_clr %>%
+  group_by(Method, Effect) %>%
+  summarise(median_R2 = median(R2, na.rm = TRUE), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = Effect, values_from = median_R2)
 
 all_methods <- sort(unique(levels(r2_long_clr$Method)))
 only_baseline <- length(all_methods) == 1L && identical(all_methods, "Before correction")
+output_name <- if (only_baseline) "R2_raw_assessment_pre.csv" else "R2_raw_assessment_post.csv"
 
 if (only_baseline) {
-  assess_rows <- list()
-  if (nrow(r2_long_clr)) {
-    med_tbl <- r2_long_clr %>% group_by(Effect) %>% summarise(median_R2 = median(R2), .groups = "drop")
-    mb <- med_tbl$median_R2[med_tbl$Effect == "Batch"]
-    mt <- med_tbl$median_R2[med_tbl$Effect == "Treatment"]
-    assess_rows[["Ait"]] <- tibble::tibble(
-      Geometry = "Ait",
-      Median_R2_Batch = mb,
-      Median_R2_Treatment = mt
-    )
-  }
-  assess_df <- dplyr::bind_rows(assess_rows)
+  assess_df <- median_r2_by_method %>%
+    mutate(
+      Median_R2_Batch = Batch,
+      Median_R2_Treatment = Treatment
+    ) %>%
+    mutate(
+      Relative_Batch_to_Baseline = ifelse(is.finite(Median_R2_Batch) & Median_R2_Batch != 0, 1, NA_real_),
+      Relative_Treatment_to_Baseline = ifelse(is.finite(Median_R2_Treatment) & Median_R2_Treatment != 0, 1, NA_real_)
+    ) %>%
+    select(Method, Median_R2_Batch, Median_R2_Treatment, Relative_Batch_to_Baseline, Relative_Treatment_to_Baseline)
+
   print(assess_df, n = nrow(assess_df))
-readr::write_csv(assess_df, file.path(output_folder, "R2_raw_assessment.csv"))
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
 
   # No correction recommendation messages
 
 } else {
-  ranking_unified <- score_clr %>%
-    mutate(`Absolute score` = Score_CLR)
+  baseline_row <- median_r2_by_method %>%
+    filter(Method == "Before correction")
 
-  baseline_abs <- ranking_unified$`Absolute score`[ranking_unified$Method == "Before correction"][1]
-  rel_divisor <- if (length(baseline_abs) && is.finite(baseline_abs) && baseline_abs != 0) baseline_abs else NA_real_
+  baseline_batch <- baseline_row$Batch[1]
+  baseline_treat <- baseline_row$Treatment[1]
 
-  ranking_unified <- ranking_unified %>%
+  assessment_tbl <- median_r2_by_method %>%
     mutate(
-      `Relative score` = if (is.na(rel_divisor)) NA_real_ else `Absolute score` / rel_divisor
+      Median_R2_Batch = Batch,
+      Median_R2_Treatment = Treatment,
+      Relative_Batch_to_Baseline = if (!is.finite(baseline_batch) || baseline_batch == 0) NA_real_ else Batch / baseline_batch,
+      Relative_Treatment_to_Baseline = if (!is.finite(baseline_treat) || baseline_treat == 0) NA_real_ else Treatment / baseline_treat
     ) %>%
-    arrange(desc(`Absolute score`), Method) %>%
-    mutate(Rank = row_number()) %>%
-    relocate(`Absolute score`, .after = Method) %>%
-    relocate(`Relative score`, .after = `Absolute score`) %>%
-    relocate(Rank, .after = `Relative score`)
+    select(Method, Median_R2_Batch, Median_R2_Treatment, Relative_Batch_to_Baseline, Relative_Treatment_to_Baseline)
 
-readr::write_csv(ranking_unified, file.path(output_folder, "R2_ranking.csv"))
-  print(ranking_unified, n = nrow(ranking_unified))
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }

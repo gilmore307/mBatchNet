@@ -573,7 +573,7 @@ ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 
 # =========================
-# Unified PCoA ranking (Aitchison + Bray combined)
+# Unified PCoA summaries (Aitchison + Bray combined)
 # =========================
 
 compute_centroids_pcoa <- function(scores, batch_var = "batch_id") {
@@ -585,16 +585,13 @@ compute_centroid_distances <- function(centroids) {
   if (nrow(centroids) < 2) return(NA_real_)
   as.numeric(mean(dist(centroids[, c("PCo1", "PCo2")], method = "euclidean")))
 }
-pcoa_metric_score <- function(batch_distance) {
-  if (is.na(batch_distance)) return(NA_real_)
-  batch_distance
-}
 
 methods_clr <- names(frames_cache_clr)
 methods_tss <- names(frames_cache_tss)
 all_methods <- union(methods_clr, methods_tss)
 
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
+output_name <- if (only_baseline) "pcoa_raw_assessment_pre.csv" else "pcoa_raw_assessment_post.csv"
 
 if (only_baseline) {
   # ===== Baseline-only assessment (no ranking) =====
@@ -608,16 +605,14 @@ if (only_baseline) {
       dplyr::mutate(batch_id = factor(md$batch_id))
     cents <- compute_centroids_pcoa(scores, "batch_id")
     D_between <- compute_centroid_distances(cents)
-    score <- pcoa_metric_score(D_between)
 
     assess_rows[["Ait"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Ait",
-      Batch_Distance    = D_between,
-      Score             = score
+      Batch_Distance    = D_between
     )
   }
-  
+
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
     md <- metadata[match(fr$plot.df$sample_id, metadata$sample_id), , drop = FALSE]
@@ -626,13 +621,11 @@ if (only_baseline) {
       dplyr::mutate(batch_id = factor(md$batch_id))
     cents <- compute_centroids_pcoa(scores, "batch_id")
     D_between <- compute_centroid_distances(cents)
-    score <- pcoa_metric_score(D_between)
 
     assess_rows[["BC"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "BC",
-      Batch_Distance    = D_between,
-      Score             = score
+      Batch_Distance    = D_between
     )
   }
 
@@ -652,18 +645,22 @@ if (only_baseline) {
     tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Combined",
-      Batch_Distance    = comb_distance,
-      Score             = comb_distance
+      Batch_Distance    = comb_distance
     )
   )
-  
+
+  assess_df <- assess_df %>%
+    dplyr::mutate(
+      Relative_to_Baseline = ifelse(is.finite(Batch_Distance) & Batch_Distance != 0, 1, NA_real_)
+    )
+
   print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, "pcoa_raw_assessment.csv"))
-  
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
+
   # No correction recommendation messages
-  
+
 } else {
-  # ===== Multi-method ranking =====
+  # ===== Multi-method assessment without ranking =====
   rank_tbl <- dplyr::tibble(
     Method = character(),
     Batch_Distance_Ait = numeric(),
@@ -720,44 +717,55 @@ if (only_baseline) {
     if (is.finite(rank_tbl$Batch_Distance_BC[baseline_idx])) rel_tss[baseline_idx] <- 1
   }
 
-  rank_clr <- rep(NA_real_, nrow(rank_tbl))
-  valid_clr <- which(is.finite(rank_tbl$Batch_Distance_Ait))
-  if (length(valid_clr)) {
-    rank_clr[valid_clr] <- rank(rank_tbl$Batch_Distance_Ait[valid_clr], ties.method = "average")
-  }
-
-  rank_tss <- rep(NA_real_, nrow(rank_tbl))
-  valid_tss <- which(is.finite(rank_tbl$Batch_Distance_BC))
-  if (length(valid_tss)) {
-    rank_tss[valid_tss] <- rank(rank_tbl$Batch_Distance_BC[valid_tss], ties.method = "average")
-  }
-
-  avg_rank <- vapply(seq_len(nrow(rank_tbl)), function(i) {
-    vals <- c(rank_clr[i], rank_tss[i])
+  combine_distance <- function(a, b) {
+    vals <- c(a, b)
     vals <- vals[is.finite(vals)]
     if (!length(vals)) NA_real_ else mean(vals)
-  }, numeric(1))
+  }
 
-  ranked_pcoa_unified <- rank_tbl %>%
-    dplyr::mutate(
-      `Relative score (Ait)` = rel_clr,
-      `Relative score (BC)` = rel_tss,
-      Rank_Ait = rank_clr,
-      Rank_BC  = rank_tss,
-      Rank = avg_rank
-    ) %>%
-    dplyr::arrange(is.na(Rank), Rank, Method) %>%
-    dplyr::select(
-      Method,
-      Batch_Distance_Ait,
-      `Relative score (Ait)`,
-      Rank_Ait,
-      Batch_Distance_BC,
-      `Relative score (BC)`,
-      Rank_BC,
-      Rank
+  combined_dist <- mapply(combine_distance,
+                          rank_tbl$Batch_Distance_Ait,
+                          rank_tbl$Batch_Distance_BC)
+
+  baseline_combined <- combined_dist[baseline_idx]
+  rel_combined <- rep(NA_real_, length(combined_dist))
+  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
+    rel_combined <- combined_dist / baseline_combined
+  }
+  if (length(baseline_idx) == 1L && is.finite(combined_dist[baseline_idx])) {
+    rel_combined[baseline_idx] <- 1
+  }
+
+  assessment_rows <- list()
+  if (any(is.finite(rank_tbl$Batch_Distance_Ait))) {
+    assessment_rows[["Ait"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "Ait",
+      Batch_Distance = rank_tbl$Batch_Distance_Ait,
+      Relative_to_Baseline = rel_clr
     )
+  }
+  if (any(is.finite(rank_tbl$Batch_Distance_BC))) {
+    assessment_rows[["BC"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "BC",
+      Batch_Distance = rank_tbl$Batch_Distance_BC,
+      Relative_to_Baseline = rel_tss
+    )
+  }
+  if (any(is.finite(combined_dist))) {
+    assessment_rows[["Combined"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "Combined",
+      Batch_Distance = combined_dist,
+      Relative_to_Baseline = rel_combined
+    )
+  }
 
-  print(ranked_pcoa_unified, n = nrow(ranked_pcoa_unified))
-  readr::write_csv(ranked_pcoa_unified, file.path(output_folder, "pcoa_ranking.csv"))
+  assessment_tbl <- dplyr::bind_rows(assessment_rows)
+  assessment_tbl <- assessment_tbl %>%
+    dplyr::arrange(Geometry, Method)
+
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }

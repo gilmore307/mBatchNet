@@ -23,7 +23,6 @@ from dash import html, dcc
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 
-from _7_description import RANKING_SCORE_DESCRIPTIONS
 
 # Paths & constants
 BASE_DIR = Path(__file__).resolve().parent
@@ -789,7 +788,11 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         # ranking summary across methods
         candidates.append(f"{b}_ranking.csv")
     for b in bases:
-        # baseline-only assessment
+        # raw assessment tables (stage-specific names first)
+        candidates.append(f"{b}_raw_assessment_pre.csv")
+    for b in bases:
+        candidates.append(f"{b}_raw_assessment_post.csv")
+    for b in bases:
         candidates.append(f"{b}_raw_assessment.csv")
     # Special LISI grid file
     for b in bases:
@@ -798,13 +801,152 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
     return candidates
 
 
+RAW_ASSESSMENT_SUFFIXES: Tuple[str, ...] = (
+    "_raw_assessment_pre.csv",
+    "_raw_assessment_post.csv",
+    "_raw_assessment.csv",
+)
+
+
+_RAW_ASSESSMENT_STAGE_ORDER = {
+    "pre": ("_raw_assessment_pre.csv", "_raw_assessment.csv", "_raw_assessment_post.csv"),
+    "post": ("_raw_assessment_post.csv", "_raw_assessment.csv", "_raw_assessment_pre.csv"),
+}
+
+
+def _raw_assessment_stage_suffixes(stage: str) -> Tuple[str, ...]:
+    return _RAW_ASSESSMENT_STAGE_ORDER.get(stage, _RAW_ASSESSMENT_STAGE_ORDER["post"])
+
+
+_RAW_ASSESSMENT_STRIP_SUFFIXES = ("_raw_assessment_pre", "_raw_assessment_post", "_raw_assessment")
+
+
+def _raw_assessment_metric_title(path: Path) -> str:
+    stem = path.stem
+    lower = stem.lower()
+    base = stem
+    for suffix in _RAW_ASSESSMENT_STRIP_SUFFIXES:
+        if lower.endswith(suffix):
+            base = stem[: -len(suffix)]
+            break
+    return base.replace("_", " ").strip().title()
+
+
+def _raw_assessment_group_key(path: Path) -> str:
+    name = path.name
+    lower = name.lower()
+    for suffix in RAW_ASSESSMENT_SUFFIXES:
+        if lower.endswith(suffix):
+            return lower[: -len(suffix)]
+    return Path(name).stem.lower()
+
+
+def _sort_raw_assessment_names(names: Iterable[str], stage: str) -> List[str]:
+    order = _raw_assessment_stage_suffixes(stage)
+    order_index = {suffix: idx for idx, suffix in enumerate(order)}
+    def sort_key(name: str) -> Tuple[int, str]:
+        lower = name.lower()
+        for suffix, idx in order_index.items():
+            if lower.endswith(suffix):
+                return idx, lower
+        return len(order), lower
+    return sorted(names, key=sort_key)
+
+
+def _load_info_table_for_key(
+    session_dir: Path,
+    stage: str,
+    key: str,
+    representative: Optional[str],
+) -> Optional[dag.AgGrid]:
+    """Load an informational table for the given metric, excluding score/rank columns."""
+
+    if not representative:
+        return None
+
+    candidates = [
+        cand
+        for cand in _candidate_csvs_for_image(representative)
+        if any(cand.lower().endswith(sfx) for sfx in RAW_ASSESSMENT_SUFFIXES)
+    ]
+    if not candidates:
+        return None
+
+    for cand in _sort_raw_assessment_names(candidates, stage):
+        found = _find_file_case_insensitive(session_dir, cand)
+        if not (found and found.exists()):
+            continue
+
+        header, data = _read_csv_rows(found)
+        if not header:
+            continue
+
+        column_info: List[Tuple[int, str]] = []
+        display_headers: List[str] = []
+        seen_headers: Set[str] = set()
+        for idx, column_name in enumerate(header):
+            display = _display_column_name(column_name)
+            display_lower = display.lower()
+            if "score" in display_lower or "rank" in display_lower:
+                continue
+            if display in seen_headers:
+                continue
+            seen_headers.add(display)
+            column_info.append((idx, display))
+            display_headers.append(display)
+
+        if not column_info:
+            continue
+
+        formatted_rows: List[Dict[str, object]] = []
+        for raw_row in data:
+            row_dict: Dict[str, object] = {}
+            for idx, display in column_info:
+                cell = raw_row[idx] if idx < len(raw_row) else ""
+                key_lower = display.lower()
+                if key_lower == "method":
+                    row_dict[display] = method_formal_name(str(cell))
+                elif key_lower == "geometry":
+                    row_dict[display] = _format_geometry_value(cell)
+                else:
+                    numeric_value = _safe_float(cell)
+                    row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
+            formatted_rows.append(row_dict)
+
+        numeric_headers = {
+            col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
+        }
+
+        column_defs: List[Dict[str, object]] = []
+        for display in display_headers:
+            col_def: Dict[str, object] = {
+                "headerName": display,
+                "field": display,
+                "minWidth": 160 if display.lower() != "method" else 200,
+            }
+            if display.lower() == "method":
+                col_def["pinned"] = "left"
+            if display in numeric_headers:
+                col_def["type"] = "numericColumn"
+            column_defs.append(col_def)
+
+        return _make_ag_grid(
+            grid_id=f"{stage}-{key}-details",
+            column_defs=column_defs,
+            row_data=formatted_rows,
+            default_col_def={"minWidth": 140},
+        )
+
+    return None
+
+
 def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], stage: str = "pre", extra_tabs: Sequence = ()):  # extra dcc.Tab items appended
     """Render a vertical tab set of assessment outputs.
 
     Group metrics by base (e.g., PCoA, NMDS, R2, pRDA, Dissimilarity heatmaps).
     For groups with multiple geometries (Aitchison/Bray-Curtis), show a single
     top-level tab with sub-tabs: Aitchison, Bray-Curtis, and a third
-    sub-tab that is either Assessment (stage='pre') or Rank (stage='post').
+    "Details" sub-tab containing contextual tables without scores or ranks.
     Single-geometry plots also include the third sub-tab accordingly.
     """
 
@@ -953,83 +1095,21 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
 
         # Build sub-tab definitions first so we can size them evenly later
         sub_defs = []
-        if g["ait"]:
-            sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
-        if g["bray"]:
-            sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
-        if g["single"] and not (g["ait"] or g["bray"]):
+        has_ait = bool(g["ait"])
+        has_bray = bool(g["bray"])
+        has_single = bool(g["single"])
+        if has_ait:
+            label = "Plot" if not has_bray and not has_single else "Aitchison"
+            sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
+        if has_bray:
+            label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
+            sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
+        if has_single and not (has_ait or has_bray):
             sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
-        # Third sub-tab: Assessment (pre) or Rank (post)
-        third_label = "Assessment" if stage == "pre" else "Rank"
-        third_content = None
-        if stage == "pre" and rep:
-            for cand in _candidate_csvs_for_image(rep):
-                if not cand.endswith("_raw_assessment.csv"):
-                    continue
-                found = _find_file_case_insensitive(session_dir, cand)
-                if not (found and found.exists()):
-                    continue
-                header, data = _read_csv_rows(found)
-                if not header:
-                    break
-                column_info: List[Tuple[int, str]] = []
-                display_headers: List[str] = []
-                seen_headers: Set[str] = set()
-                for idx, column_name in enumerate(header):
-                    if column_name.lower() == "score":
-                        continue
-                    display = _display_column_name(column_name)
-                    display_lower = display.lower()
-                    if display_lower == "score" or display_lower.startswith("score ("):
-                        continue
-                    if display.lower() == "rank":
-                        display = "Average rank"
-                    if display in seen_headers:
-                        continue
-                    seen_headers.add(display)
-                    column_info.append((idx, display))
-                    display_headers.append(display)
-
-                formatted_rows: List[Dict[str, object]] = []
-                for raw_row in data:
-                    row_dict: Dict[str, object] = {}
-                    for idx, display in column_info:
-                        cell = raw_row[idx] if idx < len(raw_row) else ""
-                        key_lower = display.lower()
-                        if key_lower == "method":
-                            row_dict[display] = method_formal_name(str(cell))
-                        elif key_lower == "geometry":
-                            row_dict[display] = _format_geometry_value(cell)
-                        else:
-                            numeric_value = _safe_float(cell)
-                            row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
-                    formatted_rows.append(row_dict)
-                numeric_headers = {
-                    col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
-                }
-                column_defs: List[Dict[str, object]] = []
-                for display in display_headers:
-                    col_def: Dict[str, object] = {
-                        "headerName": display,
-                        "field": display,
-                        "minWidth": 160 if display.lower() != "method" else 200,
-                    }
-                    if display.lower() == "method":
-                        col_def["pinned"] = "left"
-                    if display in numeric_headers:
-                        col_def["type"] = "numericColumn"
-                    column_defs.append(col_def)
-                third_content = _make_ag_grid(
-                    grid_id=f"{stage}-{key}-assessment",
-                    column_defs=column_defs,
-                    row_data=formatted_rows,
-                    default_col_def={"minWidth": 140},
-                )
-                break
-        if stage == "post":
-            third_content = _load_ranking_table_for_key(session_dir, key)
-        # Only include the third tab when a corresponding table exists
+        # Third sub-tab: informational summary table (no scoring)
+        third_label = "Details"
+        third_content = _load_info_table_for_key(session_dir, stage, key, rep)
         if third_content is not None:
             sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
 
@@ -1062,7 +1142,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     if not tabs and not extra_tabs:
         return html.Div("No figures available yet. Run the analysis to generate outputs.")
 
-    # Append any extra tabs (e.g., raw assessments, ranking)
+    # Append any extra tabs (e.g., additional summaries)
     for extra in extra_tabs:
         if first_value is None:
             first_value = getattr(extra, 'value', None) or 'extra-0'
@@ -1150,88 +1230,23 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["single"] = spec.filename; g["title"] = "Silhouette score"
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
-    if g["ait"]:
-        sub_defs.append(("Aitchison", f"{key}-ait", content_for_image(g["ait"])) )
-    if g["bray"]:
-        sub_defs.append(("Bray-Curtis", f"{key}-bray", content_for_image(g["bray"])) )
-    if g["single"] and not (g["ait"] or g["bray"]):
+    has_ait = bool(g["ait"])
+    has_bray = bool(g["bray"])
+    has_single = bool(g["single"])
+    if has_ait:
+        label = "Plot" if not has_bray and not has_single else "Aitchison"
+        sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
+    if has_bray:
+        label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
+        sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
+    if has_single and not (has_ait or has_bray):
         sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
 
-    # Third subtab content (Assessment/Rank)
-    third_label = "Assessment" if stage == "pre" else "Rank"
-    third_content = None
-    if stage == "pre":
-        rep = g["ait"] or g["bray"] or g["single"]
-        if rep:
-            for cand in _candidate_csvs_for_image(rep):
-                if not cand.endswith("_raw_assessment.csv"):
-                    continue
-                found = _find_file_case_insensitive(session_dir, cand)
-                if found and found.exists():
-                    header, data = _read_csv_rows(found)
-                    if header:
-                        lower = [h.lower() for h in header]
-                        def _fmt3(v):
-                            try:
-                                return f"{float(v):.3f}"
-                            except Exception:
-                                return v
-                        data = [[_fmt3(cell) for cell in row] for row in data]
-                        formatted_rows: List[Dict[str, object]] = []
-                        for row in data:
-                            record: Dict[str, object] = {}
-                            for idx, col_name in enumerate(header):
-                                cell = row[idx] if idx < len(row) else ""
-                                if col_name.lower() == "method":
-                                    record[col_name] = method_formal_name(str(cell))
-                                else:
-                                    numeric_value = _safe_float(cell)
-                                    record[col_name] = numeric_value if numeric_value is not None else cell
-                            formatted_rows.append(record)
-                        numeric_headers = {
-                            col for col in header if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
-                        }
-                        column_defs: List[Dict[str, object]] = []
-                        for col in header:
-                            col_def: Dict[str, object] = {
-                                "headerName": col,
-                                "field": col,
-                                "minWidth": 160 if col.lower() != "method" else 200,
-                            }
-                            if col.lower() == "method":
-                                col_def["pinned"] = "left"
-                                col_def["flex"] = 0
-                            if col in numeric_headers:
-                                col_def["type"] = "numericColumn"
-                            column_defs.append(col_def)
-                        third_content = _make_ag_grid(
-                            grid_id=f"{stage}-{key}-assessment",
-                            column_defs=column_defs,
-                            row_data=formatted_rows,
-                            default_col_def={"minWidth": 140},
-                        )
-                    break
-    else:
-        third_content = _load_ranking_table_for_key(session_dir, key)
+    rep = g["ait"] or g["bray"] or g["single"]
+    third_label = "Details"
+    third_content = _load_info_table_for_key(session_dir, stage, key, rep)
 
     if third_content is not None:
-        description = RANKING_SCORE_DESCRIPTIONS.get(key)
-        if description:
-            third_content = html.Div(
-                [
-                    third_content,
-                    dcc.Markdown(
-                        description,
-                        className="text-muted be-score-description",
-                        mathjax=True,
-                        style={
-                            "marginTop": "12px",
-                            "fontSize": "16pt",
-                        },
-                    ),
-                ],
-                style={"width": "100%"},
-            )
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
 
     return sub_defs
@@ -1834,7 +1849,27 @@ def build_ranking_tab(session_dir: Path):
 def build_assessment_overview_table(session_dir: Path, stage: str):
     # Build a single integrated table: Test | Criteria | Test Result | Comment
     csv_files = list(session_dir.glob("*.csv"))
-    candidates = [p for p in csv_files if p.name.lower().endswith("_raw_assessment.csv")]
+    grouped: Dict[str, Dict[str, Path]] = {}
+    for path in csv_files:
+        lower = path.name.lower()
+        for suffix in RAW_ASSESSMENT_SUFFIXES:
+            if lower.endswith(suffix):
+                base_key = lower[: -len(suffix)]
+                grouped.setdefault(base_key, {})[suffix] = path
+                break
+
+    chosen_paths: List[Path] = []
+    priority = _raw_assessment_stage_suffixes(stage)
+    for base_key, suffix_map in grouped.items():
+        selected = None
+        for suffix in priority:
+            candidate = suffix_map.get(suffix)
+            if candidate is not None:
+                selected = candidate
+                break
+        if selected is not None:
+            chosen_paths.append(selected)
+
     rows: List[Dict[str, str]] = []
 
     def pick_value(header: List[str], data_row: List[str]) -> str:
@@ -1856,8 +1891,8 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
                 continue
         return "-"
 
-    for path in sorted(candidates):
-        test_name = path.stem.replace("_raw_assessment", "").replace("_", " ").title()
+    for path in sorted(chosen_paths, key=_raw_assessment_metric_title):
+        test_name = _raw_assessment_metric_title(path)
         header, data = _read_csv_rows(path)
         if not header or not data:
             continue
@@ -1871,7 +1906,8 @@ def build_assessment_overview_table(session_dir: Path, stage: str):
         if method_idx is not None:
             for r in data:
                 if (r[method_idx] or "").strip().lower() == "before correction":
-                    row = r; break
+                    row = r
+                    break
         if row is None:
             row = data[0]
         # Criteria
@@ -2003,17 +2039,21 @@ def build_overall_div(session_dir: Path, stage: str):
 
 
 def build_raw_assessments_tab(session_dir: Path):
-    # Collect all *_raw_assessment.csv files (case-insensitive)
+    # Collect all *_raw_assessment*.csv files (case-insensitive)
     csv_files = list(session_dir.glob("*.csv"))
-    candidates = [p for p in csv_files if p.name.lower().endswith("_raw_assessment.csv")]
+    candidates = [
+        p
+        for p in csv_files
+        if any(p.name.lower().endswith(sfx) for sfx in RAW_ASSESSMENT_SUFFIXES)
+    ]
     if not candidates:
         body = html.Div("No raw assessment files found.")
         return dcc.Tab(label="Raw Assessments", value="tab-raw", children=html.Div(body))
 
     items = []
-    for path in sorted(candidates):
+    for path in sorted(candidates, key=lambda p: (_raw_assessment_group_key(p), p.name.lower())):
         # Derive metric name from filename
-        metric = path.stem.replace("_raw_assessment", "").replace("_", " ").title()
+        metric = _raw_assessment_metric_title(path)
         header, data = _read_csv_rows(path)
         if not header:
             continue

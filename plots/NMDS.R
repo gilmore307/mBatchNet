@@ -426,47 +426,39 @@ ggsave(file.path(output_folder, "nmds_braycurtis.tif"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
 
 # =========================
-# NMDS ranking (with baseline-only assessment)
+# NMDS assessment (with baseline-only option)
 # =========================
-
-nmds_metric_score <- function(stress) {
-  if (is.na(stress)) return(NA_real_)
-  stress
-}
 
 methods_clr <- names(frames_cache_clr)
 methods_tss <- names(frames_cache_tss)
 all_methods <- union(methods_clr, methods_tss)
 
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
+output_name <- if (only_baseline) "nmds_raw_assessment_pre.csv" else "nmds_raw_assessment_post.csv"
 
 if (only_baseline) {
   # ===== Baseline-only assessment (no ranking) =====
   assess_rows <- list()
-  
+
   if ("Before correction" %in% methods_clr) {
     fr <- frames_cache_clr[["Before correction"]]
     stress <- fr$stress
-    score  <- nmds_metric_score(stress)
 
     assess_rows[["Ait"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Ait",
-      NMDS_Stress       = stress,
-      Score             = score
+      NMDS_Stress       = stress
     )
   }
 
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
     stress <- fr$stress
-    score  <- nmds_metric_score(stress)
 
     assess_rows[["BC"]] <- tibble::tibble(
       Method            = "Before correction",
       Geometry          = "BC",
-      NMDS_Stress       = stress,
-      Score             = score
+      NMDS_Stress       = stress
     )
   }
 
@@ -486,18 +478,22 @@ if (only_baseline) {
     tibble::tibble(
       Method            = "Before correction",
       Geometry          = "Combined",
-      NMDS_Stress       = comb_stress,
-      Score             = comb_stress
+      NMDS_Stress       = comb_stress
     )
   )
-  
+
+  assess_df <- assess_df %>%
+    dplyr::mutate(
+      Relative_to_Baseline = ifelse(is.finite(NMDS_Stress) & NMDS_Stress != 0, 1, NA_real_)
+    )
+
   print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, "nmds_raw_assessment.csv"))
-  
+  readr::write_csv(assess_df, file.path(output_folder, output_name))
+
   # No correction recommendation messages
-  
+
 } else {
-  # ===== Multi-method ranking =====
+  # ===== Multi-method assessment without ranking =====
   rank_tbl <- dplyr::tibble(
     Method = character(),
     NMDS_Stress_Ait = numeric(),
@@ -544,44 +540,55 @@ if (only_baseline) {
     if (is.finite(rank_tbl$NMDS_Stress_BC[baseline_idx])) rel_tss[baseline_idx] <- 1
   }
 
-  rank_clr <- rep(NA_real_, nrow(rank_tbl))
-  valid_clr <- which(is.finite(rank_tbl$NMDS_Stress_Ait))
-  if (length(valid_clr)) {
-    rank_clr[valid_clr] <- rank(rank_tbl$NMDS_Stress_Ait[valid_clr], ties.method = "average")
-  }
-
-  rank_tss <- rep(NA_real_, nrow(rank_tbl))
-  valid_tss <- which(is.finite(rank_tbl$NMDS_Stress_BC))
-  if (length(valid_tss)) {
-    rank_tss[valid_tss] <- rank(rank_tbl$NMDS_Stress_BC[valid_tss], ties.method = "average")
-  }
-
-  avg_rank <- vapply(seq_len(nrow(rank_tbl)), function(i) {
-    vals <- c(rank_clr[i], rank_tss[i])
+  combine_stress <- function(a, b) {
+    vals <- c(a, b)
     vals <- vals[is.finite(vals)]
     if (!length(vals)) NA_real_ else mean(vals)
-  }, numeric(1))
+  }
 
-  ranked_nmds_only <- rank_tbl %>%
-    dplyr::mutate(
-      `Relative score (Ait)` = rel_clr,
-      `Relative score (BC)` = rel_tss,
-      Rank_Ait = rank_clr,
-      Rank_BC  = rank_tss,
-      Rank = avg_rank
-    ) %>%
-    dplyr::arrange(is.na(Rank), Rank, Method) %>%
-    dplyr::select(
-      Method,
-      NMDS_Stress_Ait,
-      `Relative score (Ait)`,
-      Rank_Ait,
-      NMDS_Stress_BC,
-      `Relative score (BC)`,
-      Rank_BC,
-      Rank
+  combined_stress <- mapply(combine_stress,
+                             rank_tbl$NMDS_Stress_Ait,
+                             rank_tbl$NMDS_Stress_BC)
+
+  baseline_combined <- combined_stress[baseline_idx]
+  rel_combined <- rep(NA_real_, length(combined_stress))
+  if (length(baseline_combined) && is.finite(baseline_combined) && baseline_combined != 0) {
+    rel_combined <- combined_stress / baseline_combined
+  }
+  if (length(baseline_idx) == 1L && is.finite(combined_stress[baseline_idx])) {
+    rel_combined[baseline_idx] <- 1
+  }
+
+  assessment_rows <- list()
+  if (any(is.finite(rank_tbl$NMDS_Stress_Ait))) {
+    assessment_rows[["Ait"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "Ait",
+      NMDS_Stress = rank_tbl$NMDS_Stress_Ait,
+      Relative_to_Baseline = rel_clr
     )
+  }
+  if (any(is.finite(rank_tbl$NMDS_Stress_BC))) {
+    assessment_rows[["BC"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "BC",
+      NMDS_Stress = rank_tbl$NMDS_Stress_BC,
+      Relative_to_Baseline = rel_tss
+    )
+  }
+  if (any(is.finite(combined_stress))) {
+    assessment_rows[["Combined"]] <- tibble::tibble(
+      Method = rank_tbl$Method,
+      Geometry = "Combined",
+      NMDS_Stress = combined_stress,
+      Relative_to_Baseline = rel_combined
+    )
+  }
 
-  print(ranked_nmds_only, n = nrow(ranked_nmds_only))
-  readr::write_csv(ranked_nmds_only, file.path(output_folder, "nmds_ranking.csv"))
+  assessment_tbl <- dplyr::bind_rows(assessment_rows)
+  assessment_tbl <- assessment_tbl %>%
+    dplyr::arrange(Geometry, Method)
+
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }
