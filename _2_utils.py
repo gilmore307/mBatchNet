@@ -52,7 +52,8 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("NMDS (Bray-Curtis)", "nmds_braycurtis.png"),
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("R^2 (Aitchison)", "R2_aitchison.png"),
+    FigureSpec("PERMANOVA R² (Aitchison)", "permanova.png"),
+    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.png"),
     FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
     FigureSpec("PVCA", "PVCA.png"),
 )
@@ -72,7 +73,8 @@ PRE_SCRIPTS: Sequence[str] = (
     "pcoa.R",
     "NMDS.R",
     "Dissimilarity_Heatmaps.R",
-    "R2.R",
+    "PERMANOVA.R",
+    "ANOVA.R",
     "pRDA.R",
     "pvca.R",
 )
@@ -90,6 +92,7 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
     "pcoa": "PCoA score",
     "nmds": "NMDS score",
     "dissimilarity": "Dissimilarity score",
+    "permanova": "PERMANOVA score",
     "r2": "R² score",
     "prda": "pRDA score",
     "pvca": "PVCA score",
@@ -759,8 +762,10 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["nmds"]
     elif s.startswith("dissimilarity_") or s.startswith("dissimilarity-") or s.startswith("dissimilarity"):
         bases = ["dissimilarity"]
-    elif s.startswith("r2_"):
-        bases = ["r2"]
+    elif s.startswith("permanova"):
+        bases = ["permanova"]
+    elif s.startswith("anova_") or s == "anova":
+        bases = ["anova", "r2"]
     elif s.startswith("prda_") or s.startswith("prda"):
         bases = ["pRDA", "prda"]
     elif s == "pvca":
@@ -939,7 +944,7 @@ def _load_info_table_for_key(
 def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], stage: str = "pre", extra_tabs: Sequence = ()):  # extra dcc.Tab items appended
     """Render a vertical tab set of assessment outputs.
 
-    Group metrics by base (e.g., PCoA, NMDS, R2, pRDA, Dissimilarity heatmaps).
+    Group metrics by base (e.g., PCoA, NMDS, ANOVA, pRDA, Dissimilarity heatmaps).
     For groups with multiple geometries (Aitchison/Bray-Curtis), show a single
     top-level tab with sub-tabs: Aitchison, Bray-Curtis, and a third
     "Details" sub-tab containing contextual tables without scores or ranks.
@@ -1067,9 +1072,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "ait", fn)
         elif low.startswith("dissimilarity_heatmaps_braycurtis"):
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "bray", fn)
-        elif low.startswith("r2_aitchison"):
+        elif low.startswith("permanova"):
+            add_group_item("permanova", "PERMANOVA R²", "single", fn)
+        elif low.startswith("anova_aitchison"):
             add_group_item("r2", "Feature-wise ANOVA R²", "ait", fn)
-        elif low.startswith("r2_braycurtis"):
+        elif low.startswith("anova_braycurtis"):
             add_group_item("r2", "Feature-wise ANOVA R²", "bray", fn)
         elif low.startswith("prda_aitchison"):
             add_group_item("prda", "pRDA", "ait", fn)
@@ -1198,10 +1205,14 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             elif low.startswith("dissimilarity_heatmaps_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "Dissimilarity heatmaps"
+        elif key == "permanova":
+            if low.startswith("permanova"):
+                g["single"] = spec.filename
+            g["title"] = "PERMANOVA R²"
         elif key == "r2":
-            if low.startswith("r2_aitchison"):
+            if low.startswith("anova_aitchison"):
                 g["ait"] = spec.filename
-            elif low.startswith("r2_braycurtis"):
+            elif low.startswith("anova_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "Feature-wise ANOVA R²"
         elif key == "prda":
@@ -1487,7 +1498,7 @@ RANKING_FILE_ALIASES: Dict[str, List[str]] = {
     "pcoa": ["pcoa"],
     "prda": ["prda"],
     "pvca": ["pvca"],
-    "r2": ["r2"],
+    "r2": ["r2", "anova"],
     "silhouette": ["silhouette"],
 }
 
