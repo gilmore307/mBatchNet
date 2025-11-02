@@ -208,8 +208,6 @@ def register_correction_callbacks(app):
         Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
-        Output("run-column-loading-indicator", "children", allow_duplicate=True),
-        Output("delete-column-loading-indicator", "children", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
@@ -234,8 +232,6 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
-                "Run Correction",
-                "Delete",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -248,8 +244,6 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
-                "Run Correction",
-                "Delete",
                 payload,
             )
         log_path = session_dir / "run.log"
@@ -283,8 +277,6 @@ def register_correction_callbacks(app):
             run_color,
             delete_disabled,
             delete_color,
-            "Run Correction",
-            "Delete",
             payload,
         )
 
@@ -350,8 +342,6 @@ def register_correction_callbacks(app):
         Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
-        Output("run-column-loading-indicator", "children", allow_duplicate=True),
-        Output("delete-column-loading-indicator", "children", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
@@ -376,8 +366,6 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
-                "Run Correction",
-                "Delete",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -401,7 +389,5 @@ def register_correction_callbacks(app):
             run_color,
             delete_disabled,
             delete_color,
-            "Run Correction",
-            "Delete",
             payload,
         )
