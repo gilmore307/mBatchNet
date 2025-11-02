@@ -7,6 +7,11 @@ HELP_MODAL_SECTIONS: List = []
 
 # Parameter tooltips for assessment configuration controls.
 ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
+    "alignment": {
+        "k_neighbors": "k for k-NN graph when computing Alignment Score.",
+        "var_prop_min": "Minimum cumulative variance proportion to retain when selecting PCs.",
+        "max_pcs": "Maximum number of PCs considered when computing Alignment Score.",
+    },
     "ebm": {
         "umap_neighbors": "UMAP: Number of neighbors (local connectivity).",
         "umap_min_dist": "UMAP: Minimum distance between points in embedding.",
@@ -35,6 +40,10 @@ FIGURE_DPI_TOOLTIP = "Dots per inch used when saving figures."
 FIGURE_SUBPLOTS_TOOLTIP = "Number of method panels per row (where applicable)."
 
 RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
+    "alignment": (
+        "**Score formula:** $S = \\overline{1 - p_{\\text{same-batch}}}$ where $p_{\\text{same-batch}}$ is the fraction of each sample's k-NN drawn from its own batch.\\n\\n"
+        "**Interpretation:** Higher scores indicate stronger batch mixing after correction, as fewer neighbours belong to the original batch."
+    ),
     "pca": (
         "**Score formula:** $S = c_{1:2} \\times \\frac{w_{\\text{batch}}}{w_{\\text{batch}} + d_{\\text{batch}}}$\n\n"
         "**Symbols:** $c_{1:2}$ = variance coverage of PC1 and PC2; $w_{\\text{batch}}$ = mean within-batch dispersion on PC1-2; "

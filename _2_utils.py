@@ -58,6 +58,7 @@ PRE_FIGURES: Sequence[FigureSpec] = (
 )
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
+    FigureSpec("Alignment score", "alignment_score.png"),
     FigureSpec("LISI", "LISI.png"),
     FigureSpec("Entropy score", "ebm.png"),
     FigureSpec("Silhouette score", "silhouette.png"),
@@ -77,12 +78,14 @@ PRE_SCRIPTS: Sequence[str] = (
 )
 
 POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
+    "Alignment_Score.R",
     "LISI.R",
     "Entropy_Score.R",
     "Silhouette.R",
 )
 
 RANKING_SCORE_LABELS: Dict[str, str] = {
+    "alignment": "Alignment score",
     "pca": "PCA score",
     "pcoa": "PCoA score",
     "nmds": "NMDS score",
@@ -764,6 +767,8 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["PVCA", "pvca"]
     elif s == "lisi":
         bases = ["LISI", "lisi"]
+    elif s == "alignment_score":
+        bases = ["alignment"]
     elif s == "ebm":
         bases = ["ebm"]
     elif s == "silhouette":
@@ -1205,6 +1210,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             elif low.startswith("prda_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "pRDA"
+        elif key == "alignment" and spec.filename.lower() == "alignment_score.png":
+            g["single"] = spec.filename; g["title"] = "Alignment score"
         elif key == "pca" and spec.filename.lower() == "pca.png":
             g["single"] = spec.filename; g["title"] = "PCA"
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
@@ -1456,6 +1463,7 @@ def _score_from_fields(row: Dict[str, str], *candidates: str) -> Optional[float]
 
 
 RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
+    "alignment": ScoreSpec(field="absolute score"),
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
     "lisi": ScoreSpec(field="absolute score"),
@@ -1470,6 +1478,7 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
 
 
 RANKING_FILE_ALIASES: Dict[str, List[str]] = {
+    "alignment": ["alignment", "alignment_score"],
     "dissimilarity": ["dissimilarity"],
     "ebm": ["ebm", "entropy_score"],
     "lisi": ["lisi"],

@@ -32,6 +32,7 @@ from _2_utils import (
 
 
 FIGURE_DEFAULTS = {
+    "alignment": {"width": 2550, "height": 1560, "dpi": 300},
     "pca": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
     "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
@@ -153,6 +154,34 @@ def _param_controls(stage: str, key: str):
                 step=1,
                 min_=1,
                 tooltip=tooltips.get("knn_per_label", ""),
+            ),
+        ]
+    elif key == "alignment":
+        controls = [
+            num_input(
+                f"{sid}-param-k",
+                "k (neighbors)",
+                10,
+                step=1,
+                min_=1,
+                tooltip=tooltips.get("k_neighbors", ""),
+            ),
+            num_input(
+                f"{sid}-param-var-prop-min",
+                "Variance proportion",
+                0.95,
+                step=0.01,
+                min_=0.1,
+                max_=1.0,
+                tooltip=tooltips.get("var_prop_min", ""),
+            ),
+            num_input(
+                f"{sid}-param-max-pcs",
+                "Max PCs",
+                10,
+                step=1,
+                min_=2,
+                tooltip=tooltips.get("max_pcs", ""),
             ),
         ]
     elif key == "lisi":
@@ -311,6 +340,7 @@ def assessment_layout(active_path: str, stage: str):
         ("pvca", "PVCA", "pvca.R"),
     ]
     post_extra = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
@@ -424,6 +454,7 @@ def register_pre_post_callbacks(app):
         ("pvca", "PVCA", "pvca.R"),
     ]
     post_extra = [
+        ("alignment", "Alignment score", "Alignment_Score.R"),
         ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
@@ -454,7 +485,18 @@ def register_pre_post_callbacks(app):
         # Parameter States by group
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
-        if key == "ebm":
+        if key == "alignment":
+            param_state_ids.extend([
+                f"{sid}-param-k",
+                f"{sid}-param-var-prop-min",
+                f"{sid}-param-max-pcs",
+            ])
+            states += [
+                State(f"{sid}-param-k", "value"),
+                State(f"{sid}-param-var-prop-min", "value"),
+                State(f"{sid}-param-max-pcs", "value"),
+            ]
+        elif key == "ebm":
             param_state_ids.extend([
                 f"{sid}-param-umap-nn",
                 f"{sid}-param-umap-min-dist",
@@ -599,7 +641,14 @@ def register_pre_post_callbacks(app):
 
             pv = param_vals
             idx = 0
-            if _key == "ebm":
+            if _key == "alignment":
+                _add("k", pv[idx], int)
+                idx += 1
+                _add("var_prop_min", pv[idx], float)
+                idx += 1
+                _add("max_pcs", pv[idx], int)
+                idx += 1
+            elif _key == "ebm":
                 _add("umap_neighbors", pv[idx], int)
                 idx += 1
                 _add("umap_min_dist", pv[idx], float)

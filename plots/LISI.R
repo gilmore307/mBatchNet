@@ -202,16 +202,7 @@ global_lisi_norm <- function(lbl) {
 # -------- Summaries for LISI metrics: higher iLISI, lower cLISI ----------
 summarise_lisi_methods <- function(summary_df) {
   stopifnot(all(c("Method","median_iLISI","median_cLISI") %in% names(summary_df)))
-
-  baseline_row <- summary_df %>% filter(Method == "Before correction")
-  baseline_i <- if (nrow(baseline_row)) baseline_row$median_iLISI[1] else NA_real_
-  baseline_c <- if (nrow(baseline_row)) baseline_row$median_cLISI[1] else NA_real_
-
-  summary_df %>%
-    mutate(
-      Relative_iLISI_to_Baseline = if (!is.finite(baseline_i) || baseline_i == 0) NA_real_ else median_iLISI / baseline_i,
-      Relative_cLISI_to_Baseline = if (!is.finite(baseline_c) || baseline_c == 0) NA_real_ else median_cLISI / baseline_c
-    )
+  summary_df
 }
 
 ## Auto-select k removed

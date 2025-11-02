@@ -408,16 +408,7 @@ summarise_pvca_methods <- function(df_long) {
       Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
       .groups = "drop"
     )
-
-  baseline_row <- summary_tbl %>% filter(Method == "Before correction")
-  baseline_treat <- if (nrow(baseline_row)) baseline_row$Treatment[1] else NA_real_
-  baseline_batch <- if (nrow(baseline_row)) baseline_row$Batch[1] else NA_real_
-
-  summary_tbl %>%
-    mutate(
-      Relative_Treatment_to_Baseline = if (!is.finite(baseline_treat) || baseline_treat == 0) NA_real_ else Treatment / baseline_treat,
-      Relative_Batch_to_Baseline = if (!is.finite(baseline_batch) || baseline_batch == 0) NA_real_ else Batch / baseline_batch
-    )
+  summary_tbl
 }
 
 methods_present <- levels(pvca_plot_df$Method)

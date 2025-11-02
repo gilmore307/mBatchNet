@@ -371,27 +371,12 @@ if (only_baseline) {
   }
 
   assess_df <- dplyr::bind_rows(assess_rows)
-  assess_df <- assess_df %>%
-    dplyr::mutate(
-      Relative_Treatment_to_Baseline = ifelse(is.finite(Treatment) & Treatment != 0, 1, NA_real_),
-      Relative_Batch_to_Baseline = ifelse(is.finite(Batch) & Batch != 0, 1, NA_real_)
-    )
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, output_name))
 
 } else {
   # ---- Normal multi-method summary ----
   unified <- tibble::as_tibble(tb_clr)
-
-  baseline_row <- unified %>% filter(Method == "Before correction")
-  baseline_tr <- baseline_row$Treatment[1]
-  baseline_bt <- baseline_row$Batch[1]
-
-  unified <- unified %>%
-    mutate(
-      Relative_Treatment_to_Baseline = if (!is.finite(baseline_tr) || baseline_tr == 0) NA_real_ else Treatment / baseline_tr,
-      Relative_Batch_to_Baseline = if (!is.finite(baseline_bt) || baseline_bt == 0) NA_real_ else Batch / baseline_bt
-    )
 
   print(unified, n = nrow(unified))
   readr::write_csv(unified, file.path(output_folder, output_name))

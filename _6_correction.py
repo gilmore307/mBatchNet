@@ -92,8 +92,24 @@ def register_correction_callbacks(app):
                     html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
                     html.Th("Status"),
-                    html.Th("Run Correction"),
-                    html.Th("Delete"),
+                    html.Th(
+                        dcc.Loading(
+                            html.Span("Run Correction", id="run-column-loading-indicator"),
+                            type="default",
+                            parent_className="be-column-loading",
+                            className="be-column-loading",
+                        ),
+                        className="text-center",
+                    ),
+                    html.Th(
+                        dcc.Loading(
+                            html.Span("Delete", id="delete-column-loading-indicator"),
+                            type="default",
+                            parent_className="be-column-loading",
+                            className="be-column-loading",
+                        ),
+                        className="text-center",
+                    ),
                 ]
             )
         )
@@ -141,7 +157,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             run_cell = html.Td(
-                dcc.Loading(run_button, type="default"),
+                dcc.Loading(
+                    html.Div(run_button, className="d-grid gap-1"),
+                    type="default",
+                    parent_className="be-column-loading",
+                    className="be-column-loading",
+                ),
                 className="text-center",
             )
             delete_button = dbc.Button(
@@ -154,7 +175,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             delete_cell = html.Td(
-                dcc.Loading(delete_button, type="default"),
+                dcc.Loading(
+                    html.Div(delete_button, className="d-grid gap-1"),
+                    type="default",
+                    parent_className="be-column-loading",
+                    className="be-column-loading",
+                ),
                 className="text-center",
             )
             row = html.Tr(
@@ -182,6 +208,8 @@ def register_correction_callbacks(app):
         Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output("run-column-loading-indicator", "children", allow_duplicate=True),
+        Output("delete-column-loading-indicator", "children", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
@@ -206,6 +234,8 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
+                "Run Correction",
+                "Delete",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -218,6 +248,8 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
+                "Run Correction",
+                "Delete",
                 payload,
             )
         log_path = session_dir / "run.log"
@@ -251,6 +283,8 @@ def register_correction_callbacks(app):
             run_color,
             delete_disabled,
             delete_color,
+            "Run Correction",
+            "Delete",
             payload,
         )
 
@@ -316,6 +350,8 @@ def register_correction_callbacks(app):
         Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
+        Output("run-column-loading-indicator", "children", allow_duplicate=True),
+        Output("delete-column-loading-indicator", "children", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
@@ -340,6 +376,8 @@ def register_correction_callbacks(app):
                 "secondary",
                 True,
                 "secondary",
+                "Run Correction",
+                "Delete",
                 payload,
             )
         session_dir = get_session_dir(session_id)
@@ -363,5 +401,7 @@ def register_correction_callbacks(app):
             run_color,
             delete_disabled,
             delete_color,
+            "Run Correction",
+            "Delete",
             payload,
         )

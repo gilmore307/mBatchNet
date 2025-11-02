@@ -138,11 +138,7 @@ compute_alignment_score <- function(X, batch, k = 10, var_prop = 0.95, max_pcs =
 summarise_alignment_methods <- function(as_table) {
   baseline_row <- as_table %>% filter(Method == "Before correction")
   baseline_as <- if (nrow(baseline_row)) baseline_row$AS[1] else NA_real_
-
-  as_table %>%
-    mutate(
-      Relative_to_Baseline = if (!is.finite(baseline_as) || baseline_as == 0) NA_real_ else AS / baseline_as
-    )
+  as_table
 }
 
 # --------- Compute AS per method ---------
