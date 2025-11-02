@@ -131,7 +131,7 @@ def register_correction_callbacks(app):
             run_button = dbc.Button(
                 "Run Correction",
                 id={"type": "method-run-button", "code": code},
-                color="secondary",
+                color="success",
                 size="sm",
                 style={"width": "250px"},
                 disabled=run_disabled,
@@ -144,7 +144,7 @@ def register_correction_callbacks(app):
             delete_button = dbc.Button(
                 "Delete",
                 id={"type": "method-delete-button", "code": code},
-                color="secondary",
+                color="success",
                 size="sm",
                 style={"width": "250px"},
                 disabled=delete_disabled,
