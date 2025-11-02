@@ -1,71 +1,24 @@
-# ===============================
-# File: _6_correction.py
-# ===============================
-from typing import Dict, Sequence, List
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
+from typing import Dict, List
+
 import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output, State, MATCH
 import dash_bootstrap_components as dbc
-import dash_ag_grid as dag
 
 from _1_components import build_navbar
 from _2_utils import (
-    get_session_dir,
-    run_methods,
+    CODE_TO_DISPLAY,
     SUPPORTED_METHODS,
-    DEFAULT_METHODS,
+    any_method_outputs,
     compute_integrated_summary,
+    delete_method_outputs,
+    get_session_dir,
     load_integrated_summary,
+    mark_method_completed,
+    method_output_exists,
+    run_single_method,
+    clear_method_completion,
 )
-
-
-METHOD_GRID_COLUMNS = [
-    {
-        "headerName": "Method",
-        "field": "method",
-        "checkboxSelection": True,
-        "headerCheckboxSelection": True,
-        "flex": 1,
-        "minWidth": 200,
-        "pinned": "left",
-        "headerTooltip": "Display name of the batch-correction method. Use the checkboxes to select methods.",
-    },
-    {
-        "headerName": "Runs",
-        "field": "runs",
-        "type": "numericColumn",
-        "width": 90,
-        "headerTooltip": "Number of historical correction runs (excluding example sessions).",
-    },
-    {
-        "headerName": "Avg Time (s)",
-        "field": "avg_elapsed_sec",
-        "type": "numericColumn",
-        "width": 140,
-        "headerTooltip": "Average runtime in seconds, taken from session logs.",
-    },
-    {
-        "headerName": "Avg Δ (normalized)",
-        "field": "avg_score_delta",
-        "type": "numericColumn",
-        "width": 150,
-        "headerTooltip": "Average normalized score change relative to the uncorrected baseline (1.0).",
-    },
-    {
-        "headerName": "Best Metric",
-        "field": "best_metric",
-        "flex": 1,
-        "minWidth": 160,
-        "headerTooltip": "Metric for which the method achieved its highest average improvement.",
-    },
-    {
-        "headerName": "Worst Metric",
-        "field": "worst_metric",
-        "flex": 1,
-        "minWidth": 160,
-        "headerTooltip": "Metric where the method performed the weakest on average.",
-    },
-]
 
 
 def correction_layout(active_path: str):
@@ -73,53 +26,16 @@ def correction_layout(active_path: str):
         [
             build_navbar(active_path),
             dcc.Store(id="method-summary-store", data=None),
+            dcc.Store(id="method-operation-trigger", data=0),
             dbc.Container(
                 [
                     html.H2("Batch Effect Correction"),
                     html.P(
-                        "Select the correction methods to run. Historical performance statistics are used to help "
-                        "prioritise methods that typically perform well for your datasets."
+                        "Review available correction methods. Historical statistics highlight how often each method "
+                        "has been selected and the typical runtime."
                     ),
-                    dag.AgGrid(
-                        id="method-grid",
-                        columnDefs=METHOD_GRID_COLUMNS,
-                        rowData=[],
-                        className="ag-theme-alpine mb-3",
-                        dashGridOptions={
-                            "rowSelection": "multiple",
-                            "animateRows": False,
-                            "suppressRowClickSelection": False,
-                            "ensureDomOrder": True,
-                        },
-                        defaultColDef={
-                            "resizable": True,
-                            "sortable": True,
-                            "filter": True,
-                        },
-                        style={"height": "420px", "width": "100%"},
-                    ),
-                    dbc.Alert(
-                        "Results remain private unless you choose to share anonymised summaries using the consent prompt "
-                        "on this page.",
-                        color="info",
-                        dismissable=False,
-                        className="mb-3",
-                    ),
-                    dcc.Loading(
-                        [
-                            dbc.Button(
-                                "Run correction",
-                                id="run-correction",
-                                color="secondary",
-                                className="mb-2",
-                                disabled=True,
-                                size="sm",
-                                style={"width": "250px"},
-                            ),
-                            html.Div(id="correction-status", className="text-muted mb-3"),
-                        ],
-                        type="default",
-                    ),
+                    html.Div(id="method-table-container", className="mb-3"),
+                    html.Div(id="correction-status", className="text-muted"),
                 ],
                 fluid=True,
             ),
@@ -143,82 +59,239 @@ def register_correction_callbacks(app):
         if triggered is None and current_path != "/correction":
             return dash.no_update
         try:
-            # Recompute on demand to keep the cached summary fresh
             return compute_integrated_summary()
         except Exception:
             return load_integrated_summary()
 
     @app.callback(
-        Output("method-grid", "rowData"),
-        Output("method-grid", "selectedRows"),
+        Output("method-table-container", "children"),
         Input("method-summary-store", "data"),
-        State("selected-methods", "data"),
+        Input("session-id", "data"),
+        Input("method-operation-trigger", "data"),
         prevent_initial_call=False,
     )
-    def populate_method_grid(summary: Dict[str, object] | None, selected_codes: Sequence[str] | None):
-        rows: List[Dict[str, object]] = []
+    def render_method_table(summary: Dict[str, object] | None, session_id: str | None, _: int):
+        summary_lookup: Dict[str, Dict[str, object]] = {}
         if summary and isinstance(summary, dict):
-            rows = list(summary.get("table_rows", []))  # type: ignore[arg-type]
-        for row in rows:
-            for key in ("avg_elapsed_sec", "avg_score_delta"):
-                val = row.get(key)
-                if isinstance(val, (int, float)):
-                    row[key] = round(val, 3)
-        if not rows:
-            rows = [
-                {
-                    "code": code,
-                    "method": display,
-                    "runs": 0,
-                    "avg_elapsed_sec": None,
-                    "avg_score_delta": None,
-                    "best_metric": "-",
-                    "worst_metric": "-",
-                }
-                for code, display in SUPPORTED_METHODS
-            ]
-        selected_set = set(selected_codes or DEFAULT_METHODS)
-        selected_rows = [row for row in rows if row.get("code") in selected_set]
-        return rows, selected_rows
+            methods_block = summary.get("methods")
+            if isinstance(methods_block, dict):
+                for key, payload in methods_block.items():
+                    if isinstance(payload, dict):
+                        summary_lookup[str(key)] = payload
+                        summary_lookup[str(key).lower()] = payload
+        session_dir = get_session_dir(session_id) if session_id else None
+        session_ready = False
+        if session_dir and session_dir.exists():
+            session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th("Method"),
+                    html.Th("Times Selected"),
+                    html.Th("Avg Time (s)"),
+                    html.Th("Status"),
+                    html.Th("Run Correction"),
+                    html.Th("Delete"),
+                ]
+            )
+        )
+        body_rows: List[html.Tr] = []
+        for code, display in SUPPORTED_METHODS:
+            stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
+            selections = 0
+            avg_elapsed = None
+            if isinstance(stats, dict):
+                try:
+                    selections = int(
+                        stats.get("selections", stats.get("runs", 0))  # backward compatibility
+                    )
+                except (TypeError, ValueError):
+                    selections = 0
+                avg_elapsed = stats.get("avg_elapsed_sec")
+            if isinstance(avg_elapsed, str):
+                try:
+                    avg_elapsed = float(avg_elapsed)
+                except ValueError:
+                    avg_elapsed = None
+            avg_display = "-" if avg_elapsed in (None, "") else f"{float(avg_elapsed):.2f}"
+            outputs_present = bool(session_dir and method_output_exists(session_dir, code))
+            status_text = "Selected" if outputs_present else "Not selected"
+            run_disabled = not session_ready or outputs_present
+            delete_disabled = not outputs_present
+            status_cell = html.Td(
+                dcc.Loading(
+                    html.Span(status_text, id={"type": "method-status-label", "code": code}),
+                    type="default",
+                ),
+                className="text-center",
+            )
+            run_button = dbc.Button(
+                "Run Correction",
+                id={"type": "method-run-button", "code": code},
+                color="secondary",
+                size="sm",
+                style={"width": "250px"},
+                disabled=run_disabled,
+                n_clicks=0,
+            )
+            run_cell = html.Td(
+                dcc.Loading(run_button, type="default"),
+                className="text-center",
+            )
+            delete_button = dbc.Button(
+                "Delete",
+                id={"type": "method-delete-button", "code": code},
+                color="secondary",
+                size="sm",
+                style={"width": "250px"},
+                disabled=delete_disabled,
+                n_clicks=0,
+            )
+            delete_cell = html.Td(
+                dcc.Loading(delete_button, type="default"),
+                className="text-center",
+            )
+            row = html.Tr(
+                [
+                    html.Td(display),
+                    html.Td(str(selections)),
+                    html.Td(avg_display),
+                    status_cell,
+                    run_cell,
+                    delete_cell,
+                ]
+            )
+            body_rows.append(row)
+        table = dbc.Table([header, html.Tbody(body_rows)], bordered=True, hover=True, responsive=True, striped=True, className="align-middle")
+        return table
 
     @app.callback(
-        Output("selected-methods", "data", allow_duplicate=True),
-        Input("method-grid", "selectedRows"),
-        prevent_initial_call=True,
-    )
-    def sync_selected_methods(selected_rows: List[Dict[str, object]] | None):
-        if not selected_rows:
-            return []
-        codes = [row.get("code") for row in selected_rows if row.get("code")]
-        return codes
-
-    @app.callback(
+        Output({"type": "method-status-label", "code": MATCH}, "children"),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
         Output("correction-status", "children"),
         Output("correction-complete", "data"),
+        Output("method-operation-trigger", "data"),
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("runlog-interval", "disabled", allow_duplicate=True),
-        Input("run-correction", "n_clicks"),
-        State("selected-methods", "data"),
+        Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
+        State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
+        State("method-operation-trigger", "data"),
         prevent_initial_call=True,
     )
-    def perform_correction(n_clicks: int, methods: Sequence[str], session_id: str):
+    def run_correction_method(n_clicks: int, component_id: Dict[str, str], session_id: str | None, refresh_token: int | None):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
+        method_code = component_id.get("code") if isinstance(component_id, dict) else None
+        if not method_code:
+            raise dash.exceptions.PreventUpdate
+        refresh_value = int(refresh_token or 0)
+        display_name = CODE_TO_DISPLAY.get(method_code, method_code)
         if not session_id:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            message = "Session not initialised. Upload data before running corrections."
+            return (
+                "Not selected",
+                True,
+                True,
+                message,
+                dash.no_update,
+                refresh_value,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-        methods = methods or []
-        if not methods:
-            return dash.no_update, False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-
-        # Append all correction logs to a single session-wide log file
+            message = "Upload data before running corrections."
+            return (
+                "Not selected",
+                True,
+                True,
+                message,
+                dash.no_update,
+                refresh_value,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
         log_path = session_dir / "run.log"
-        success, log = run_methods(session_dir, methods, log_path=log_path)
-        # Do not auto-open logs modal; user can open manually
-        status_msg = "Correction complete." if success else "Correction failed. Check Logs."
-        return status_msg, bool(success), str(log_path), None, dash.no_update, dash.no_update
+        success, _ = run_single_method(session_dir, method_code, log_path=log_path)
+        new_refresh = refresh_value + 1
+        if success:
+            mark_method_completed(session_dir, method_code)
+            status_text = "Selected"
+            run_disabled = True
+            delete_disabled = False
+            message = f"{display_name} correction complete."
+        else:
+            clear_method_completion(session_dir, method_code)
+            status_text = "Not selected"
+            run_disabled = False
+            delete_disabled = True
+            message = f"{display_name} correction failed. Check logs."
+        complete_flag = any_method_outputs(session_dir)
+        return (
+            status_text,
+            run_disabled,
+            delete_disabled,
+            message,
+            bool(complete_flag),
+            new_refresh,
+            str(log_path),
+            None,
+            dash.no_update,
+            dash.no_update,
+        )
+
+    @app.callback(
+        Output({"type": "method-status-label", "code": MATCH}, "children"),
+        Output({"type": "method-run-button", "code": MATCH}, "disabled"),
+        Output({"type": "method-delete-button", "code": MATCH}, "disabled"),
+        Output("correction-status", "children"),
+        Output("correction-complete", "data"),
+        Output("method-operation-trigger", "data"),
+        Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
+        State({"type": "method-delete-button", "code": MATCH}, "id"),
+        State("session-id", "data"),
+        State("method-operation-trigger", "data"),
+        prevent_initial_call=True,
+    )
+    def delete_correction_outputs(n_clicks: int, component_id: Dict[str, str], session_id: str | None, refresh_token: int | None):
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        method_code = component_id.get("code") if isinstance(component_id, dict) else None
+        if not method_code:
+            raise dash.exceptions.PreventUpdate
+        refresh_value = int(refresh_token or 0)
+        display_name = CODE_TO_DISPLAY.get(method_code, method_code)
+        if not session_id:
+            message = "Session not initialised."
+            return (
+                "Not selected",
+                True,
+                True,
+                message,
+                dash.no_update,
+                refresh_value,
+            )
+        session_dir = get_session_dir(session_id)
+        removed = delete_method_outputs(session_dir, method_code)
+        session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+        status_text = "Not selected"
+        run_disabled = not session_ready
+        delete_disabled = True
+        message = f"Removed outputs for {display_name}." if removed else f"No outputs found for {display_name}."
+        complete_flag = any_method_outputs(session_dir)
+        return (
+            status_text,
+            run_disabled,
+            delete_disabled,
+            message,
+            bool(complete_flag),
+            refresh_value + 1,
+        )

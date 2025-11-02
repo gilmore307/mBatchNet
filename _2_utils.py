@@ -196,6 +196,24 @@ CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_
 DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE_LOWER: Dict[str, str] = {display.lower(): code for code, display in SUPPORTED_METHODS}
 
+METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
+    _normalize_method_code("QN"): "normalized_qn",
+    _normalize_method_code("BMC"): "normalized_bmc",
+    _normalize_method_code("limma"): "normalized_limma",
+    _normalize_method_code("ConQuR"): "normalized_conqur",
+    _normalize_method_code("PLSDA"): "normalized_plsda",
+    _normalize_method_code("ComBat"): "normalized_combat",
+    _normalize_method_code("FSQN"): "normalized_fsqn",
+    _normalize_method_code("MMUPHin"): "normalized_mmuphin",
+    _normalize_method_code("RUV"): "normalized_ruv",
+    _normalize_method_code("MetaDICT"): "normalized_metadict",
+    _normalize_method_code("SVD"): "normalized_svd",
+    _normalize_method_code("PN"): "normalized_pn",
+    _normalize_method_code("FAbatch"): "normalized_fabatch",
+    _normalize_method_code("ComBatSeq"): "normalized_combatseq",
+    _normalize_method_code("DEBIAS"): "normalized_debias",
+}
+
 
 # ---- General helpers ----
 
@@ -482,6 +500,103 @@ def _append_log_message(log_path: Path, message: str) -> None:
         pass
 
 
+def mark_method_completed(session_dir: Path, method: str) -> None:
+    code = _normalize_method_code(method)
+    if not code:
+        return
+    completed = _load_completed_methods(session_dir)
+    if code in completed:
+        return
+    completed.add(code)
+    _save_completed_methods(session_dir, completed)
+
+
+def clear_method_completion(session_dir: Path, method: str) -> None:
+    code = _normalize_method_code(method)
+    if not code:
+        return
+    completed = _load_completed_methods(session_dir)
+    if code not in completed:
+        return
+    completed.discard(code)
+    _save_completed_methods(session_dir, completed)
+
+
+def method_output_paths(session_dir: Path, method: str) -> List[Path]:
+    code = _normalize_method_code(method)
+    base = METHOD_OUTPUT_BASENAMES.get(code)
+    if not base:
+        return []
+    return [
+        session_dir / f"{base}_tss.csv",
+        session_dir / f"{base}_clr.csv",
+    ]
+
+
+def method_output_exists(session_dir: Path, method: str) -> bool:
+    for path in method_output_paths(session_dir, method):
+        if path.exists():
+            return True
+    return False
+
+
+def _remove_method_from_summary(session_dir: Path, method: str) -> bool:
+    summary_path = session_dir / "session_summary.json"
+    if not summary_path.exists():
+        return False
+    try:
+        data = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    methods = data.get("methods")
+    if not isinstance(methods, list):
+        return False
+    target = _normalize_method_code(method)
+    changed = False
+    filtered: List[object] = []
+    for entry in methods:
+        if not isinstance(entry, dict):
+            filtered.append(entry)
+            continue
+        name = entry.get("name")
+        if _normalize_method_code(str(name)) == target:
+            changed = True
+            continue
+        filtered.append(entry)
+    if not changed:
+        return False
+    data["methods"] = filtered
+    try:
+        summary_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def delete_method_outputs(session_dir: Path, method: str) -> bool:
+    removed = False
+    for path in method_output_paths(session_dir, method):
+        try:
+            if path.exists():
+                path.unlink()
+                removed = True
+        except OSError:
+            pass
+    if _remove_method_from_summary(session_dir, method):
+        removed = True
+    clear_method_completion(session_dir, method)
+    return removed
+
+
+def any_method_outputs(session_dir: Path) -> bool:
+    for method_code, _ in SUPPORTED_METHODS:
+        if method_output_exists(session_dir, method_code):
+            return True
+    return False
+
+
 def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Path] = None) -> Tuple[bool, str]:
     """Run correction methods sequentially, one R subprocess per method."""
 
@@ -494,8 +609,9 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
             continue
 
         canonical_code, _ = _normalize_method_name(method)
-        if canonical_code:
-            if canonical_code in completed_codes:
+        normalized_code = _normalize_method_code(canonical_code) if canonical_code else None
+        if normalized_code:
+            if normalized_code in completed_codes:
                 display = CODE_TO_DISPLAY.get(canonical_code, canonical_code)
                 message = f"Skipping {display}: already completed."
                 logs.append(message)
@@ -507,9 +623,9 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         if log:
             logs.append(log)
         if success:
-            if canonical_code:
-                completed_codes.add(canonical_code)
-                _save_completed_methods(session_dir, completed_codes)
+            if normalized_code:
+                completed_codes.add(normalized_code)
+                mark_method_completed(session_dir, canonical_code or normalized_code)
         else:
             overall_success = False
 
@@ -2120,10 +2236,8 @@ def compute_integrated_summary() -> Dict[str, object]:
         code: {
             "code": code,
             "display": CODE_TO_DISPLAY.get(code, code),
-            "runs": 0,
+            "selections": 0,
             "elapsed": [],
-            "deltas": [],
-            "metric_deltas": defaultdict(list),
             "sessions": set(),
         }
         for code, _ in SUPPORTED_METHODS
@@ -2137,29 +2251,25 @@ def compute_integrated_summary() -> Dict[str, object]:
             if signature in known_signatures or signature in seen_signatures:
                 continue
         summary = _load_session_summary(session_dir)
-        ranking = _load_ranking_deltas(session_dir)
-        metrics_seen = _collect_ranking_metric_keys(session_dir)
-        if not summary or not ranking:
+        if not summary:
             continue
-        if not _all_methods_selected(summary):
+        methods_block = summary.get("methods")
+        if not isinstance(methods_block, list):
             continue
-        if not REQUIRED_RANKING_KEYS.issubset(metrics_seen):
-            continue
-        if signature:
-            seen_signatures.add(signature)
-            known_signatures.add(signature)
         session_id = session_dir.name
-        included_sessions.append(session_id)
-        for entry in summary.get("methods", []):
-            name = entry.get("name")
+        session_contributed = False
+        for entry in methods_block:
+            if not isinstance(entry, dict):
+                continue
             status = (entry.get("status") or "").lower()
             if status != "success":
                 continue
+            name = entry.get("name")
             code = name if name in method_stats else _method_code_from_display(str(name))
             if not code or code not in method_stats:
                 continue
             stat = method_stats[code]
-            stat["runs"] = int(stat["runs"]) + 1
+            stat["selections"] = int(stat.get("selections", 0)) + 1
             stat["sessions"].add(session_id)
             elapsed_val = entry.get("elapsed_sec")
             try:
@@ -2168,62 +2278,41 @@ def compute_integrated_summary() -> Dict[str, object]:
                 elapsed_float = None
             if elapsed_float is not None:
                 stat["elapsed"].append(elapsed_float)
-        if ranking:
-            for code, metric_map in ranking.items():
-                if code not in method_stats:
-                    continue
-                stat = method_stats[code]
-                stat["sessions"].add(session_id)
-                for metric_name, delta in metric_map.items():
-                    stat["deltas"].append(delta)
-                    stat["metric_deltas"][metric_name].append(delta)
+            session_contributed = True
+        if session_contributed:
+            included_sessions.append(session_id)
+            if signature:
+                seen_signatures.add(signature)
+                known_signatures.add(signature)
 
     rows: List[Dict[str, object]] = []
     methods_payload: Dict[str, Dict[str, object]] = {}
     for code, payload in method_stats.items():
         elapsed_vals: List[float] = payload["elapsed"]  # type: ignore[assignment]
-        delta_vals: List[float] = payload["deltas"]  # type: ignore[assignment]
-        metric_map = payload["metric_deltas"]  # type: ignore[assignment]
         avg_elapsed = mean(elapsed_vals) if elapsed_vals else None
-        avg_delta = mean(delta_vals) if delta_vals else None
-        metric_avgs = {metric: mean(vals) for metric, vals in metric_map.items() if vals}
-        best_metric = max(metric_avgs, key=metric_avgs.get) if metric_avgs else None
-        worst_metric = min(metric_avgs, key=metric_avgs.get) if metric_avgs else None
+        selections = int(payload.get("selections", 0))
         methods_payload[code] = {
             "code": code,
             "display": payload["display"],
-            "runs": int(payload["runs"]),
+            "selections": selections,
             "sessions": sorted(payload["sessions"]),
             "avg_elapsed_sec": avg_elapsed,
-            "avg_score_delta": avg_delta,
-            "best_metric": best_metric,
-            "worst_metric": worst_metric,
-            "metrics": {
-                metric: {
-                    "avg_delta": metric_avgs[metric],
-                    "count": len(metric_map[metric]),
-                }
-                for metric in metric_avgs
-            },
         }
         rows.append(
             {
                 "code": code,
                 "method": payload["display"],
-                "runs": int(payload["runs"]),
+                "selections": selections,
                 "avg_elapsed_sec": round(avg_elapsed, 3) if avg_elapsed is not None else None,
-                "avg_score_delta": round(avg_delta, 3) if avg_delta is not None else None,
-                "best_metric": best_metric or "-",
-                "worst_metric": worst_metric or "-",
             }
         )
-    rows.sort(key=lambda item: (-(item["avg_score_delta"] or 0.0), item["method"]))
+    rows.sort(key=lambda item: (-item["selections"], item["method"]))
     summary = {
         "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         "sessions": included_sessions,
         "methods": methods_payload,
         "table_rows": rows,
-        "notes": "Normalized score ratios use the uncorrected baseline (Before correction) as 1.0.",
+        "notes": "Statistics capture selection counts and average runtime in seconds.",
     }
     try:
         integrated_path = OUTPUT_ROOT / "integrated_summary.json"
