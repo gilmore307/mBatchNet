@@ -37,6 +37,21 @@ CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 
 
+RSCRIPT_BASE_COMMAND: Tuple[str, ...] = (
+    "Rscript",
+    "--no-save",
+    "--no-restore",
+    "--no-site-file",
+)
+
+
+def build_rscript_command(script_path: Path, *args: object) -> Tuple[str, ...]:
+    """Compose an Rscript command that keeps user profiles for non-interactive runs."""
+
+    tail = tuple(str(arg) for arg in args)
+    return RSCRIPT_BASE_COMMAND + (str(script_path),) + tail
+
+
 # ---- Dataclasses & config ----
 @dataclass
 class FigureSpec:
@@ -113,7 +128,6 @@ SUPPORTED_METHODS: Sequence[Tuple[str, str]] = (
     ("MMUPHin", "MMUPHin"),
     ("RUV", "RUV-III-NB"),
     ("MetaDICT", "MetaDICT"),
-    ("SVD", "SVD"),
     ("PN", "PN"),
     ("FAbatch", "FAbatch"),
     ("ComBatSeq", "ComBat-seq"),
@@ -167,7 +181,6 @@ _FORMAL_ALIASES: Dict[str, str] = {
     "ruviiinb": _FORMAL_MAP["ruv"],
     "metadict": _FORMAL_MAP["metadict"],
     "meta-dict": _FORMAL_MAP["metadict"],
-    "svd": _FORMAL_MAP["svd"],
     "pn": _FORMAL_MAP["pn"],
     "percentilenormalization": _FORMAL_MAP["pn"],
     "fabatch": _FORMAL_MAP["fabatch"],
@@ -189,8 +202,8 @@ def method_formal_name(name: str) -> str:
 
 # Default correction methods (codes corresponding to SUPPORTED_METHODS)
 # Quantile normalization, Batch mean centering, Limma removeBatchEffect,
-# Surrogate variable decomposition, Percentile normalization
-DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "SVD", "PN")
+# Percentile normalization
+DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "PN")
 
 CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
@@ -207,7 +220,6 @@ METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
     _normalize_method_code("MMUPHin"): "normalized_mmuphin",
     _normalize_method_code("RUV"): "normalized_ruv",
     _normalize_method_code("MetaDICT"): "normalized_metadict",
-    _normalize_method_code("SVD"): "normalized_svd",
     _normalize_method_code("PN"): "normalized_pn",
     _normalize_method_code("FAbatch"): "normalized_fabatch",
     _normalize_method_code("ComBatSeq"): "normalized_combatseq",
@@ -409,7 +421,7 @@ def run_r_scripts(
         if not script_path.exists():
             logs.append(f"Warning: Script not found: {script}")
             continue
-        cmd = ("Rscript", "--vanilla", str(script_path), str(output_dir), *args)
+        cmd = build_rscript_command(script_path, output_dir, *args)
         if log_path is not None:
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
@@ -452,7 +464,7 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     if not script_path.exists():
         return False, f"Script not found for method {canonical_code}: {script_path.name}"
 
-    command = ("Rscript", "--vanilla", str(script_path), str(session_dir))
+    command = build_rscript_command(script_path, session_dir)
     if log_path is not None:
         success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     else:
@@ -655,7 +667,7 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
     if not PREPROCESS_SCRIPT.exists():
         return False, f"Script not found: {PREPROCESS_SCRIPT.name}"
     matrix_path = session_dir / "raw.csv"
-    command = ("Rscript", "--vanilla", str(PREPROCESS_SCRIPT), str(session_dir), str(matrix_path))
+    command = build_rscript_command(PREPROCESS_SCRIPT, session_dir, matrix_path)
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)
@@ -2166,24 +2178,46 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
-def _load_known_signatures() -> Set[tuple[str, str]]:
+def _load_signature_sessions() -> Dict[tuple[str, str], Set[str]]:
     if not SESSION_SIGNATURES_PATH.exists():
-        return set()
+        return {}
     try:
         data = json.loads(SESSION_SIGNATURES_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return set()
-    signatures: Set[tuple[str, str]] = set()
+        return {}
+    sessions_map: Dict[tuple[str, str], Set[str]] = {}
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, (list, tuple)) and len(item) == 2:
-                signatures.add((str(item[0]), str(item[1])))
-    return signatures
+            if isinstance(item, dict):
+                raw = item.get("raw")
+                meta = item.get("meta")
+                recorded_sessions = item.get("sessions", [])
+            elif isinstance(item, (list, tuple)) and len(item) == 2:
+                raw, meta = item
+                recorded_sessions = []
+            else:
+                continue
+            if raw is None or meta is None:
+                continue
+            raw_hash = str(raw)
+            meta_hash = str(meta)
+            key = (raw_hash, meta_hash)
+            if key not in sessions_map:
+                sessions_map[key] = set()
+            if isinstance(recorded_sessions, (list, tuple)):
+                for session_id in recorded_sessions:
+                    if session_id is None:
+                        continue
+                    sessions_map[key].add(str(session_id))
+    return sessions_map
 
 
-def _store_known_signatures(signatures: Set[tuple[str, str]]) -> None:
+def _store_signature_sessions(sessions_map: Dict[tuple[str, str], Set[str]]) -> None:
     try:
-        serialisable = sorted([list(sig) for sig in signatures])
+        serialisable = [
+            {"raw": raw, "meta": meta, "sessions": sorted(session_ids)}
+            for (raw, meta), session_ids in sorted(sessions_map.items())
+        ]
         SESSION_SIGNATURES_PATH.write_text(json.dumps(serialisable, indent=2), encoding="utf-8")
     except Exception:
         pass
@@ -2253,8 +2287,7 @@ def compute_integrated_summary() -> Dict[str, object]:
     """Aggregate cross-session performance statistics and persist the summary."""
     ensure_output_root()
     example_signatures = set(_example_signatures())
-    known_signatures = _load_known_signatures()
-    seen_signatures: Set[tuple[str, str]] = set()
+    signature_sessions = _load_signature_sessions()
     method_stats: Dict[str, Dict[str, object]] = {
         code: {
             "code": code,
@@ -2268,11 +2301,8 @@ def compute_integrated_summary() -> Dict[str, object]:
     included_sessions: List[str] = []
     for session_dir in sorted(p for p in OUTPUT_ROOT.iterdir() if p.is_dir()):
         signature = _session_signature(session_dir)
-        if signature:
-            if signature in example_signatures:
-                continue
-            if signature in known_signatures or signature in seen_signatures:
-                continue
+        if signature and signature in example_signatures:
+            continue
         summary = _load_session_summary(session_dir)
         if not summary:
             continue
@@ -2305,8 +2335,7 @@ def compute_integrated_summary() -> Dict[str, object]:
         if session_contributed:
             included_sessions.append(session_id)
             if signature:
-                seen_signatures.add(signature)
-                known_signatures.add(signature)
+                signature_sessions.setdefault(signature, set()).add(session_id)
 
     rows: List[Dict[str, object]] = []
     methods_payload: Dict[str, Dict[str, object]] = {}
@@ -2342,7 +2371,7 @@ def compute_integrated_summary() -> Dict[str, object]:
         integrated_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     except Exception:
         pass
-    _store_known_signatures(known_signatures)
+    _store_signature_sessions(signature_sessions)
     return summary
 
 

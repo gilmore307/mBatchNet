@@ -56,7 +56,7 @@ if (.can_json && file.exists(summary_file)) {
 
 record_methods <- c(
   "QN","BMC","limma","ConQuR","PLSDAbatch","ComBat","FSQN","MMUPHin",
-  "fastRUV-III-NB","MetaDICT","SVD","PN","FAbatch","ComBat-Seq","DEBIAS"
+  "fastRUV-III-NB","MetaDICT","PN","FAbatch","ComBat-Seq","DEBIAS"
 )
 
 save_summary <- function(){
@@ -166,7 +166,6 @@ expected_input <- list(
   MMUPHin   = "tss",
   RUV       = "counts",
   MetaDICT  = "tss",
-  SVD       = "log",
   PN        = "tss",
   FAbatch   = "log",
   ComBatSeq = "counts",
@@ -277,7 +276,7 @@ expected_outputs <- list(
   QN="normalized_qn.csv", BMC="normalized_bmc.csv", limma="normalized_limma.csv",
   ConQuR="normalized_conqur.csv", PLSDA="normalized_plsda.csv", ComBat="normalized_combat.csv",
   FSQN="normalized_fsqn.csv", MMUPHin="normalized_mmuphin.csv",
-  RUV="normalized_ruv.csv", MetaDICT="normalized_metadict.csv", SVD="normalized_svd.csv",
+  RUV="normalized_ruv.csv", MetaDICT="normalized_metadict.csv",
   PN="normalized_pn.csv", FAbatch="normalized_fabatch.csv", ComBatSeq="normalized_combatseq.csv",
   DEBIAS = "normalized_debias.csv"
 )
