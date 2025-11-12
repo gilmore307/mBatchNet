@@ -1378,6 +1378,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     rep = g["ait"] or g["bray"] or g["single"]
     third_label = "Details"
     third_content = _load_info_table_for_key(session_dir, stage, key, rep)
+    if third_content is None and key.lower() == "r2":
+        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
 
     if third_content is not None:
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
@@ -1561,6 +1563,8 @@ def _display_column_name(name: str) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = re.sub(r"\s*-\s*", " ", cleaned)
     cleaned = cleaned.strip(" -")
+
+    cleaned = re.sub(r"\bR\^?2\b", "R\u00B2", cleaned)
 
     if geometry:
         if cleaned:

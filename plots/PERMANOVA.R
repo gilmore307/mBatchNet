@@ -103,13 +103,13 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id else stop("need sample_id")
   }
   dfx <- dplyr::inner_join(df |> mutate(sample_id = as.character(sample_id)), meta, by = "sample_id")
-  if (!nrow(dfx)) return(c(R2 = NA_real_))
+  if (!nrow(dfx)) return(c(`R²` = NA_real_))
 
   X <- safe_numeric_matrix(dfx[, setdiff(names(df), "sample_id"), drop = FALSE])
-  if (nrow(X) < 3 || ncol(X) < 2) return(c(R2 = NA_real_))
+  if (nrow(X) < 3 || ncol(X) < 2) return(c(`R²` = NA_real_))
 
   g <- factor(dfx[[batch_col]])
-  if (nlevels(g) < 2) return(c(R2 = 0))
+  if (nlevels(g) < 2) return(c(`R²` = 0))
 
   if (geometry == "aitchison") {
     has_neg <- any(X < 0, na.rm = TRUE)
@@ -120,14 +120,14 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     Xbc[!is.finite(Xbc)] <- 0
     Xbc[Xbc < 0] <- 0
     Xtss <- safe_closure(Xbc)
-    if (!ncol(Xtss)) return(c(R2 = NA_real_))
+    if (!ncol(Xtss)) return(c(`R²` = NA_real_))
     D <- tryCatch(vegan::vegdist(Xtss, method = "bray"), error = function(e) NULL)
-    if (is.null(D)) return(c(R2 = NA_real_))
+    if (is.null(D)) return(c(`R²` = NA_real_))
   }
 
   ad <- vegan::adonis2(D ~ g, permutations = permutations, by = "terms")
   R2 <- as.data.frame(ad)["g", "R2"]
-  c(R2 = unname(R2))
+  c(`R²` = unname(R2))
 }
 
 # --------- Compute PERMANOVA per method (both geometries) ---------
@@ -146,7 +146,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
   geom_key   <- geometry_specs$geometry_key[[idx]]
   geom_arg   <- geometry_specs$arg_value[[idx]]
 
-  geom_tbl <- tibble(Method = character(), Geometry = character(), R2 = numeric())
+  geom_tbl <- tibble(Method = character(), Geometry = character(), `R²` = numeric())
 
   for (nm in names(file_list)) {
     cat("PERMANOVA (", geom_label, "): ", nm, "\n", sep = "")
@@ -157,7 +157,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
       geom_tbl,
       tibble(Method = nm,
              Geometry = geom_label,
-             R2 = v["R2"])
+             `R²` = v[["R²"]])
     )
   }
 
@@ -168,9 +168,9 @@ for (idx in seq_len(nrow(geometry_specs))) {
   results_by_geom[[geom_key]] <- geom_tbl
 
   plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
-  p <- ggplot(plot_df, aes(x = Method, y = R2, fill = Method)) +
+  p <- ggplot(plot_df, aes(x = Method, y = `R²`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", R2)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `R²`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = sprintf("PERMANOVA R\u00B2 (Batch, %s)", geom_label),
