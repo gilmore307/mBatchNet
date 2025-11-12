@@ -263,33 +263,43 @@ if (!is.null(p_clr)) {
 median_r2_by_method <- r2_long_clr %>%
   group_by(Method, Effect) %>%
   summarise(median_R2 = median(R2, na.rm = TRUE), .groups = "drop") %>%
-  tidyr::pivot_wider(names_from = Effect, values_from = median_R2)
+  tidyr::pivot_wider(names_from = Effect, values_from = median_R2) %>%
+  mutate(Method = factor(Method, levels = method_levels_clr))
 
-all_methods <- sort(unique(levels(r2_long_clr$Method)))
-only_baseline <- length(all_methods) == 1L && identical(all_methods, "Before correction")
-output_name <- if (only_baseline) "anova_raw_assessment_pre.csv" else "anova_raw_assessment_post.csv"
-
-if (only_baseline) {
-  assess_df <- median_r2_by_method %>%
+format_assessment_tbl <- function(df) {
+  df <- df %>% ungroup()
+  if (!("Method" %in% names(df))) {
+    df$Method <- character(nrow(df))
+  }
+  if (!("Batch" %in% names(df))) {
+    df$Batch <- numeric(nrow(df))
+  }
+  if (!("Treatment" %in% names(df))) {
+    df$Treatment <- numeric(nrow(df))
+  }
+  df %>%
     mutate(
-      Median_R2_Batch = Batch,
-      Median_R2_Treatment = Treatment
+      `Median R\u00B2 (Batch)` = Batch,
+      `Median R\u00B2 (Treatment)` = Treatment
     ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment)
+    select(Method, `Median R\u00B2 (Batch)`, `Median R\u00B2 (Treatment)`) %>%
+    arrange(Method)
+}
 
-  print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, output_name))
+baseline_label <- "Before correction"
+pre_assessment <- median_r2_by_method %>%
+  filter(trimws(as.character(Method)) == baseline_label) %>%
+  format_assessment_tbl()
 
-  # No correction recommendation messages
+post_assessment <- median_r2_by_method %>%
+  format_assessment_tbl()
 
-} else {
-  assessment_tbl <- median_r2_by_method %>%
-    mutate(
-      Median_R2_Batch = Batch,
-      Median_R2_Treatment = Treatment
-    ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment)
+if (nrow(pre_assessment)) {
+  print(pre_assessment, n = nrow(pre_assessment))
+  readr::write_csv(pre_assessment, file.path(output_folder, "anova_raw_assessment_pre.csv"))
+}
 
-  print(assessment_tbl, n = nrow(assessment_tbl))
-  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
+if (nrow(post_assessment)) {
+  print(post_assessment, n = nrow(post_assessment))
+  readr::write_csv(post_assessment, file.path(output_folder, "anova_raw_assessment_post.csv"))
 }

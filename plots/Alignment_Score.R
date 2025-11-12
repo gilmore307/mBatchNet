@@ -137,12 +137,12 @@ compute_alignment_score <- function(X, batch, k = 10, var_prop = 0.95, max_pcs =
 # Simple summary (for CSV only; plotting keeps original order)
 summarise_alignment_methods <- function(as_table) {
   baseline_row <- as_table %>% filter(Method == "Before correction")
-  baseline_as <- if (nrow(baseline_row)) baseline_row$AS[1] else NA_real_
+  baseline_as <- if (nrow(baseline_row)) baseline_row$`Alignment Score`[1] else NA_real_
   as_table
 }
 
 # --------- Compute AS per method ---------
-as_tbl <- tibble(Method = character(), AS = numeric())
+as_tbl <- tibble(Method = character(), `Alignment Score` = numeric())
 
 for (nm in names(file_list)) {
   fp <- file_list[[nm]]
@@ -164,7 +164,7 @@ for (nm in names(file_list)) {
     compute_alignment_score(X, b, k = K_NEIGHBORS, var_prop = VAR_PROP_MIN, max_pcs = MAX_PCS),
     error = function(e) NA_real_
   )
-  as_tbl <- bind_rows(as_tbl, tibble(Method = nm, AS = ascore))
+  as_tbl <- bind_rows(as_tbl, tibble(Method = nm, `Alignment Score` = ascore))
 }
 
 # --------- Summaries (if applicable) + Save + Plot in original order ---------
@@ -186,18 +186,19 @@ if (only_baseline) {
   
   # single-bar plot in original order
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
-  
-  p_as <- ggplot(plot_df, aes(x = Method, y = AS, fill = Method)) +
+
+  p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", AS)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score (baseline)",
-         x = "Method", y = "AS (0-1)") +
+         x = "Method", y = "Score") +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank()
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(hjust = 0.5, face = "bold")
     )
   
   fig_dims <- apply_fig_overrides(6.5, 4.6, 300)
@@ -217,18 +218,19 @@ if (only_baseline) {
   # Plot bars in original method order (DO NOT reorder by AS)
   plot_df <- as_tbl %>%
     mutate(Method = factor(Method, levels = method_levels))
-  
-  p_as <- ggplot(plot_df, aes(x = Method, y = AS, fill = Method)) +
+
+  p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", AS)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score",
-         x = "Method", y = "AS (0-1)") +
+         x = "Method", y = "Score") +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank()
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(hjust = 0.5, face = "bold")
     )
   
   fig_dims <- apply_fig_overrides(8.5, 5.2, 300)

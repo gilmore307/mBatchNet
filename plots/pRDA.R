@@ -210,7 +210,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
       values = cols,
       breaks = component_order,   # c("Treatment","Intersection","Batch","Residuals")
       limits = component_order,   # lock the scale order
-      name   = "Variation sources"
+      name   = "Variance Components"
     )+
     scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                        limits = c(0, 1.05), expand = expansion(mult = c(0, 0))) +
@@ -308,7 +308,7 @@ if (length(file_list_clr)) {
   
   plot_prda_with_table(
     parts_df_aitch, file_list_clr,
-    title_prefix  = "pRDA variance partition",
+    title_prefix  = "Partial Redundant Analysis: Variance Partition.",
     outfile_prefix = "pRDA_aitchison"
   )
 }

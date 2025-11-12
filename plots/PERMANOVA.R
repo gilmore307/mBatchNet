@@ -1,4 +1,4 @@
-# ===================== PERMANOVA (CLR-only, Aitchison) =====================
+# ===================== PERMANOVA (Aitchison & Bray-Curtis) =====================
 suppressPackageStartupMessages({
   library(readr)
   library(dplyr)
@@ -96,74 +96,107 @@ clr_transform <- function(X, pseudocount = 1) {
   L  <- log(Xp)
   sweep(L, 1, rowMeans(L), "-")
 }
-permanova_one <- function(df, meta, batch_col = "batch_id", permutations = 999) {
+permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
+                          batch_col = "batch_id", permutations = 999) {
+  geometry <- match.arg(tolower(geometry), c("aitchison", "bray-curtis"))
   if (!("sample_id" %in% names(df))) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id else stop("need sample_id")
   }
   dfx <- dplyr::inner_join(df |> mutate(sample_id = as.character(sample_id)), meta, by = "sample_id")
-  if (!nrow(dfx)) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
+  if (!nrow(dfx)) return(c(`R²` = NA_real_))
 
-  # numeric features -> CLR if needed
   X <- safe_numeric_matrix(dfx[, setdiff(names(df), "sample_id"), drop = FALSE])
-  if (nrow(X) < 3 || ncol(X) < 2) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
-  has_neg <- any(X < 0, na.rm = TRUE)
-  Y <- if (has_neg) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
+  if (nrow(X) < 3 || ncol(X) < 2) return(c(`R²` = NA_real_))
 
   g <- factor(dfx[[batch_col]])
-  if (nlevels(g) < 2) return(c(R2 = 0, P_value = NA_real_, Dispersion_P = NA_real_))
+  if (nlevels(g) < 2) return(c(`R²` = 0))
 
-  D <- dist(Y, method = "euclidean")  # Aitchison via CLR+Euclidean
+  if (geometry == "aitchison") {
+    has_neg <- any(X < 0, na.rm = TRUE)
+    Y <- if (has_neg) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
+    D <- stats::dist(Y, method = "euclidean")
+  } else {
+    Xbc <- X
+    Xbc[!is.finite(Xbc)] <- 0
+    Xbc[Xbc < 0] <- 0
+    Xtss <- safe_closure(Xbc)
+    if (!ncol(Xtss)) return(c(`R²` = NA_real_))
+    D <- tryCatch(vegan::vegdist(Xtss, method = "bray"), error = function(e) NULL)
+    if (is.null(D)) return(c(`R²` = NA_real_))
+  }
+
   ad <- vegan::adonis2(D ~ g, permutations = permutations, by = "terms")
   R2 <- as.data.frame(ad)["g", "R2"]
-  P  <- as.data.frame(ad)["g", "Pr(>F)"]
-
-  # dispersion check (optional)
-  bd <- tryCatch(vegan::betadisper(D, group = g), error = function(e) NULL)
-  Pd <- if (!is.null(bd)) {
-    as.data.frame(vegan::permutest(bd, permutations = permutations)$tab)[1, "Pr(>F)"]
-  } else NA_real_
-
-  c(R2 = unname(R2), P_value = unname(P), Dispersion_P = unname(Pd))
+  c(`R²` = unname(R2))
 }
 
-# --------- Compute PERMANOVA per method ---------
-res_tbl <- tibble(Method = character(), R2 = numeric(), P_value = numeric(), Dispersion_P = numeric())
-for (nm in names(file_list)) {
-  cat("PERMANOVA (Ait): ", nm, "\n")
-  df <- read_csv(file_list[[nm]], show_col_types = FALSE)
-  v <- permanova_one(df, metadata, batch_col = "batch_id", permutations = 999)
-  res_tbl <- bind_rows(res_tbl, tibble(Method = nm, R2 = v["R2"], P_value = v["P_value"], Dispersion_P = v["Dispersion_P"]))
-}
-
-# --------- Save & plot (series naming like EBM) ---------
+# --------- Compute PERMANOVA per method (both geometries) ---------
 only_baseline <- (length(method_levels) == 1L && identical(method_levels, "Before correction"))
 output_name <- if (only_baseline) "permanova_raw_assessment_pre.csv" else "permanova_raw_assessment_post.csv"
 
-# write CSV (keep original order)
-summary_tbl <- res_tbl %>% mutate(Method = factor(Method, levels = method_levels)) %>% arrange(Method)
+geometry_specs <- tibble::tibble(
+  geometry_label = c("Aitchison", "Bray-Curtis"),
+  geometry_key   = c("aitchison", "braycurtis"),
+  arg_value      = c("aitchison", "bray-curtis")
+)
+
+results_by_geom <- list()
+for (idx in seq_len(nrow(geometry_specs))) {
+  geom_label <- geometry_specs$geometry_label[[idx]]
+  geom_key   <- geometry_specs$geometry_key[[idx]]
+  geom_arg   <- geometry_specs$arg_value[[idx]]
+
+  geom_tbl <- tibble(Method = character(), Geometry = character(), `R²` = numeric())
+
+  for (nm in names(file_list)) {
+    cat("PERMANOVA (", geom_label, "): ", nm, "\n", sep = "")
+    df <- read_csv(file_list[[nm]], show_col_types = FALSE)
+    v <- permanova_one(df, metadata, geometry = geom_arg,
+                       batch_col = "batch_id", permutations = 999)
+    geom_tbl <- bind_rows(
+      geom_tbl,
+      tibble(Method = nm,
+             Geometry = geom_label,
+             `R²` = v[["R²"]])
+    )
+  }
+
+  geom_tbl <- geom_tbl %>%
+    mutate(Method = factor(Method, levels = method_levels)) %>%
+    arrange(Method)
+
+  results_by_geom[[geom_key]] <- geom_tbl
+
+  plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
+  p <- ggplot(plot_df, aes(x = Method, y = `R²`, fill = Method)) +
+    geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
+    geom_text(aes(label = sprintf("%.3f", `R²`)), vjust = -0.4, size = 3.2) +
+    scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
+    labs(
+      title = sprintf("PERMANOVA R\u00B2 (Batch, %s)", geom_label),
+      x = "Method", y = "R\u00B2"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor   = element_blank()
+    )
+
+  fig_dims <- if (only_baseline) apply_fig_overrides(6.5, 4.6, 300) else apply_fig_overrides(8.5, 5.2, 300)
+  ggsave(file.path(output_folder, sprintf("permanova_%s.png", geom_key)), p,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, sprintf("permanova_%s.tif", geom_key)), p,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+}
+
+# --------- Save combined table ---------
+summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
+  mutate(
+    Method = factor(Method, levels = method_levels),
+    Geometry = factor(Geometry, levels = geometry_specs$geometry_label)
+  ) %>%
+  arrange(Geometry, Method)
+
 readr::write_csv(summary_tbl, file.path(output_folder, output_name))
 print(summary_tbl, n = nrow(summary_tbl))
-
-# simple bar chart (R²; lower is better)
-plot_df <- summary_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
-p <- ggplot(plot_df, aes(x = Method, y = R2, fill = Method)) +
-  geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-  geom_text(aes(label = sprintf("%.3f", R2)), vjust = -0.4, size = 3.2) +
-  scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
-  labs(
-    title = "PERMANOVA R\u00B2 (Batch)",
-    x = "Method", y = "R\u00B2"
-  ) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank()
-  )
-
-# figure export (same size style as EBM)
-fig_dims <- if (only_baseline) apply_fig_overrides(6.5, 4.6, 300) else apply_fig_overrides(8.5, 5.2, 300)
-ggsave(file.path(output_folder, "permanova.png"), p,
-       width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
-ggsave(file.path(output_folder, "permanova.tif"), p,
-       width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")

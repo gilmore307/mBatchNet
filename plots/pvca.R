@@ -319,14 +319,15 @@ p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
     values = cols,
     breaks = component_order,   # c("Treatment","Intersection","Batch","Residuals")
     limits = component_order,
-    name   = "Variation sources"
+    name   = "Variance Components"
   )+
   scale_y_continuous(
     labels = scales::percent_format(accuracy = 1),
     limits = c(0, 1.05),             # 105% headroom
     expand = expansion(mult = c(0, 0))
   ) +
-  labs(x = "Methods", y = "Explained variance (%)", title = "PVCA") +
+  labs(x = "Methods", y = "Explained variance (%)",
+       title = "Principal Variance Component Analysis: Variance Partition.") +
   theme_bw() +
   theme(
     legend.position    = "right",
