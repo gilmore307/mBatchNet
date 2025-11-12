@@ -272,10 +272,10 @@ output_name <- if (only_baseline) "anova_raw_assessment_pre.csv" else "anova_raw
 if (only_baseline) {
   assess_df <- median_r2_by_method %>%
     mutate(
-      Median_R2_Batch = Batch,
-      Median_R2_Treatment = Treatment
+      `Median R\u00B2 (Batch)` = Batch,
+      `Median R\u00B2 (Treatment)` = Treatment
     ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment)
+    select(Method, `Median R\u00B2 (Batch)`, `Median R\u00B2 (Treatment)`)
 
   print(assess_df, n = nrow(assess_df))
   readr::write_csv(assess_df, file.path(output_folder, output_name))
@@ -285,10 +285,10 @@ if (only_baseline) {
 } else {
   assessment_tbl <- median_r2_by_method %>%
     mutate(
-      Median_R2_Batch = Batch,
-      Median_R2_Treatment = Treatment
+      `Median R\u00B2 (Batch)` = Batch,
+      `Median R\u00B2 (Treatment)` = Treatment
     ) %>%
-    select(Method, Median_R2_Batch, Median_R2_Treatment)
+    select(Method, `Median R\u00B2 (Batch)`, `Median R\u00B2 (Treatment)`)
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))

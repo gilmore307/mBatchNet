@@ -103,13 +103,13 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id else stop("need sample_id")
   }
   dfx <- dplyr::inner_join(df |> mutate(sample_id = as.character(sample_id)), meta, by = "sample_id")
-  if (!nrow(dfx)) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
+  if (!nrow(dfx)) return(c(R2 = NA_real_))
 
   X <- safe_numeric_matrix(dfx[, setdiff(names(df), "sample_id"), drop = FALSE])
-  if (nrow(X) < 3 || ncol(X) < 2) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
+  if (nrow(X) < 3 || ncol(X) < 2) return(c(R2 = NA_real_))
 
   g <- factor(dfx[[batch_col]])
-  if (nlevels(g) < 2) return(c(R2 = 0, P_value = NA_real_, Dispersion_P = NA_real_))
+  if (nlevels(g) < 2) return(c(R2 = 0))
 
   if (geometry == "aitchison") {
     has_neg <- any(X < 0, na.rm = TRUE)
@@ -120,22 +120,14 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     Xbc[!is.finite(Xbc)] <- 0
     Xbc[Xbc < 0] <- 0
     Xtss <- safe_closure(Xbc)
-    if (!ncol(Xtss)) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
+    if (!ncol(Xtss)) return(c(R2 = NA_real_))
     D <- tryCatch(vegan::vegdist(Xtss, method = "bray"), error = function(e) NULL)
-    if (is.null(D)) return(c(R2 = NA_real_, P_value = NA_real_, Dispersion_P = NA_real_))
+    if (is.null(D)) return(c(R2 = NA_real_))
   }
 
   ad <- vegan::adonis2(D ~ g, permutations = permutations, by = "terms")
   R2 <- as.data.frame(ad)["g", "R2"]
-  P  <- as.data.frame(ad)["g", "Pr(>F)"]
-
-  # dispersion check (optional)
-  bd <- tryCatch(vegan::betadisper(D, group = g), error = function(e) NULL)
-  Pd <- if (!is.null(bd)) {
-    as.data.frame(vegan::permutest(bd, permutations = permutations)$tab)[1, "Pr(>F)"]
-  } else NA_real_
-
-  c(R2 = unname(R2), P_value = unname(P), Dispersion_P = unname(Pd))
+  c(R2 = unname(R2))
 }
 
 # --------- Compute PERMANOVA per method (both geometries) ---------
@@ -154,8 +146,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
   geom_key   <- geometry_specs$geometry_key[[idx]]
   geom_arg   <- geometry_specs$arg_value[[idx]]
 
-  geom_tbl <- tibble(Method = character(), Geometry = character(),
-                     R2 = numeric(), P_value = numeric(), Dispersion_P = numeric())
+  geom_tbl <- tibble(Method = character(), Geometry = character(), R2 = numeric())
 
   for (nm in names(file_list)) {
     cat("PERMANOVA (", geom_label, "): ", nm, "\n", sep = "")
@@ -166,9 +157,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
       geom_tbl,
       tibble(Method = nm,
              Geometry = geom_label,
-             R2 = v["R2"],
-             P_value = v["P_value"],
-             Dispersion_P = v["Dispersion_P"])
+             R2 = v["R2"])
     )
   }
 
