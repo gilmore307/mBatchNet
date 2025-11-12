@@ -17,7 +17,7 @@ method_short_label <- function(x) {
     ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
     fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
   )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
+  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v }, USE.NAMES = FALSE)
 }
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -64,25 +64,28 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   list(width = w, height = h, dpi = dpi)
 }
 
+# ----------------- Read metadata -----------------
 metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 
-if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
-  metadata$batch_id <- metadata$batch_id
-}
-
-# ---- Find normalized files ----
+# ----------------- Find normalized files -----------------
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
-
 # Fallback: if no suffix-specific outputs, use any normalized_*.csv as CLR
 if (!length(clr_paths)) {
   clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
 }
 
-name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
+name_from <- function(paths, suffix) {
+  base <- basename(paths)
+  base <- sub("^normalized_", "", base)
+  base <- sub(paste0("_", suffix, "\\.csv$"), "", base)  # handle ..._clr.csv
+  base <- sub("\\.csv$", "", base)                       # handle ... .csv
+  base
+}
+
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
 
 # Include raw_clr.csv as "Before correction" if present
@@ -90,8 +93,10 @@ raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
 if (file.exists(raw_clr_fp)) file_list_clr <- c("Before correction" = raw_clr_fp, file_list_clr)
 
 if (!length(file_list_clr)) {
-  stop("No normalized CLR files found (expected raw_clr.csv and/or normalized_*_clr.csv) in ", output_folder)
+  stop("No normalized CLR files found (expected raw_clr.csv and/or normalized_*_clr.csv or normalized_*.csv) in ", output_folder)
 }
+
+message("# files detected: ", length(file_list_clr), " -> ", paste(names(file_list_clr), collapse = ", "))
 
 # ----------------- Helpers -----------------
 safe_closure <- function(X) {
@@ -102,6 +107,7 @@ safe_closure <- function(X) {
   if (length(bad)) { X[bad, ] <- 1 / ncol(X); rs <- rowSums(X, na.rm = TRUE) }
   sweep(X, 1, rs, "/")
 }
+
 clr_transform <- function(X) {
   Xc <- safe_closure(X)
   for (i in seq_len(nrow(Xc))) {
@@ -117,6 +123,7 @@ clr_transform <- function(X) {
   L <- log(Xc)
   sweep(L, 1, rowMeans(L), "-")
 }
+
 # Unadjusted ANOVA R^2 = 1 - SSE/SST (clamped to [0,1])
 anova_r2 <- function(y, g) {
   ok <- is.finite(y) & !is.na(g)
@@ -139,23 +146,37 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "p
   df  <- df %>% mutate(sample_id = as.character(sample_id))
   dfx <- inner_join(df, meta, by = "sample_id")
   
-  if (!(batch_col %in% names(dfx))) stop(sprintf("Batch column '%s' not in metadata.", batch_col))
-  if (!(treat_col %in% names(dfx))) stop(sprintf("Treatment column '%s' not in metadata.", treat_col))
+  message("df rows/cols: ", nrow(df), "/", ncol(df))
+  message("after join rows: ", nrow(dfx))
+  
+  if (!("batch_id" %in% names(dfx))) stop("Batch column 'batch_id' not in metadata/joined data.")
+  if (!("phenotype" %in% names(dfx))) stop("Treatment column 'phenotype' not in metadata/joined data.")
   
   feat_cols <- setdiff(names(df), "sample_id")
-  X <- dfx %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
+  X0 <- dfx %>% select(all_of(feat_cols))
+  message("numeric features before keep: ", ncol(select(X0, where(is.numeric))))
+  X <- X0 %>% select(where(is.numeric)) %>% as.matrix()
   
-  # drop features that are non-finite or constant
-  keep <- apply(X, 2, function(z) all(is.finite(z)) && sd(z, na.rm = TRUE) > 0)
+  # --- 修复：先处理非有限值，再只按方差>0过滤 ---
+  X[!is.finite(X)] <- 0
+  keep <- apply(X, 2, function(z) sd(z, na.rm = TRUE) > 0)
+  
+  if (!any(keep)) {
+    message("kept features: 0  (all constant after cleaning)")
+    return(tibble(Feature = character(), Effect = character(), R2 = numeric()))
+  }
   X <- X[, keep, drop = FALSE]
-  if (!ncol(X)) return(tibble(Feature = character(), Effect = character(), R2 = numeric()))
+  message("kept features: ", ncol(X))
   
+  # transform
   Y <- if (any(X < 0, na.rm = TRUE)) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
   colnames(Y) <- colnames(X)
   
+  # rows to use
   keep_row <- !is.na(dfx[[batch_col]]) & !is.na(dfx[[treat_col]])
   dfx <- dfx[keep_row, , drop = FALSE]
   Y   <- Y[keep_row, , drop = FALSE]
+  message("rows used for ANOVA: ", nrow(Y))
   
   dfx[[batch_col]] <- factor(dfx[[batch_col]])
   dfx[[treat_col]] <- factor(dfx[[treat_col]])
@@ -173,17 +194,16 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "p
 }
 
 # ----------------- Build per-feature R^2 across all methods -----------------
-batch_col <- "batch_id"
-treat_col <- "phenotype"
 if (!("phenotype" %in% names(metadata))) stop("metadata.csv lacks 'phenotype'.")
 if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs at least 2 levels.")
+if (!("batch_id" %in% names(metadata))) stop("metadata.csv lacks 'batch_id'.")
 if (dplyr::n_distinct(metadata$batch_id)   < 2) stop("'batch_id' needs at least 2 levels.")
 
 # CLR set
 r2_long_clr <- lapply(names(file_list_clr), function(nm) {
   message("Per-feature ANOVA R^2 (CLR): ", nm)
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
-  out <- compute_anova_r2_BT(df, metadata, batch_col, treat_col)
+  out <- compute_anova_r2_BT(df, metadata, "batch_id", "phenotype")
   out$Method <- nm
   out
 }) %>% bind_rows()
@@ -196,7 +216,7 @@ tidy_long <- function(df, method_levels) {
   df %>%
     mutate(
       Effect = case_when(
-        tolower(Effect) %in% c("batch","batch_id","batch_id") ~ "Batch",
+        tolower(Effect) %in% c("batch","batch_id") ~ "Batch",
         tolower(Effect) %in% c("treatment","phenotype","group","trt") ~ "Treatment",
         TRUE ~ Effect
       ),
@@ -206,6 +226,9 @@ tidy_long <- function(df, method_levels) {
     filter(!is.na(R2), is.finite(R2), R2 >= 0, R2 <= 1)
 }
 r2_long_clr <- tidy_long(r2_long_clr, method_levels_clr)
+
+message("r2_long_clr nrow: ", nrow(r2_long_clr),
+        "; methods present: ", paste(unique(r2_long_clr$Method), collapse = ", "))
 
 # ----------------- Figure (auto facet only if >1 method) -----------------
 make_boxplot <- function(r2_long_df, method_levels, title) {
@@ -257,6 +280,9 @@ if (!is.null(p_clr)) {
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
   ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
+  message("Saved figures: anova_aitchison.png / .tif")
+} else {
+  message("No data to plot; skip figure export.")
 }
 
 # ----------------- Unified assessment table -----------------
@@ -266,27 +292,33 @@ median_r2_by_method <- r2_long_clr %>%
   tidyr::pivot_wider(names_from = Effect, values_from = median_R2) %>%
   mutate(Method = factor(Method, levels = method_levels_clr))
 
+# ASCII 临时列名（避免在代码里使用 \u 上标导致反引号解析问题）
 format_assessment_tbl <- function(df) {
   df <- df %>% ungroup()
-  if (!("Method" %in% names(df))) {
-    df$Method <- character(nrow(df))
-  }
-  if (!("Batch" %in% names(df))) {
-    df$Batch <- numeric(nrow(df))
-  }
-  if (!("Treatment" %in% names(df))) {
-    df$Treatment <- numeric(nrow(df))
-  }
+  if (!("Method" %in% names(df)))     df$Method <- character(nrow(df))
+  if (!("Batch" %in% names(df)))      df$Batch <- numeric(nrow(df))
+  if (!("Treatment" %in% names(df)))  df$Treatment <- numeric(nrow(df))
   df %>%
     mutate(
-      `Median R\u00B2 (Batch)` = Batch,
-      `Median R\u00B2 (Treatment)` = Treatment
+      `Median R2 (Batch)` = Batch,
+      `Median R2 (Treatment)` = Treatment
     ) %>%
-    select(Method, `Median R\u00B2 (Batch)`, `Median R\u00B2 (Treatment)`) %>%
+    select(Method, `Median R2 (Batch)`, `Median R2 (Treatment)`) %>%
     arrange(Method)
 }
 
+# 将列名中的 R2 改成真正的 R²（仅在输出/打印前替换）
+apply_R2_superscript_names <- function(df) {
+  R2_SUP <- enc2utf8("\u00B2")  # 上标 ²
+  nm <- names(df)
+  nm[nm == "Median R2 (Batch)"]     <- paste0("Median R", R2_SUP, " (Batch)")
+  nm[nm == "Median R2 (Treatment)"] <- paste0("Median R", R2_SUP, " (Treatment)")
+  names(df) <- nm
+  df
+}
+
 baseline_label <- "Before correction"
+
 pre_assessment <- median_r2_by_method %>%
   filter(trimws(as.character(Method)) == baseline_label) %>%
   format_assessment_tbl()
@@ -294,12 +326,22 @@ pre_assessment <- median_r2_by_method %>%
 post_assessment <- median_r2_by_method %>%
   format_assessment_tbl()
 
-if (nrow(pre_assessment)) {
-  print(pre_assessment, n = nrow(pre_assessment))
-  readr::write_csv(pre_assessment, file.path(output_folder, "anova_raw_assessment_pre.csv"))
-}
+# —— 改名为带 R² 再打印/写盘 ——
+pre_out  <- apply_R2_superscript_names(pre_assessment)
+post_out <- apply_R2_superscript_names(post_assessment)
 
-if (nrow(post_assessment)) {
-  print(post_assessment, n = nrow(post_assessment))
-  readr::write_csv(post_assessment, file.path(output_folder, "anova_raw_assessment_post.csv"))
-}
+message("pre_assessment rows: ", nrow(pre_out),
+        "; post_assessment rows: ", nrow(post_out))
+
+print(pre_out,  n = nrow(pre_out))
+print(post_out, n = nrow(post_out))
+
+# 始终写出 CSV（即使 0 行）
+readr::write_csv(pre_out,  file.path(output_folder, "anova_raw_assessment_pre.csv"))
+readr::write_csv(post_out, file.path(output_folder, "anova_raw_assessment_post.csv"))
+
+# 另外写一份 Excel 友好的 CSV（带 BOM，Windows Excel 打开更稳的 R² 显示）
+readr::write_excel_csv(pre_out,  file.path(output_folder, "anova_raw_assessment_pre_excel.csv"))
+readr::write_excel_csv(post_out, file.path(output_folder, "anova_raw_assessment_post_excel.csv"))
+
+message("Saved CSV: anova_raw_assessment_pre.csv / anova_raw_assessment_post.csv (+ *_excel.csv)")
