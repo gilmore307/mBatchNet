@@ -328,17 +328,19 @@ gmax_ait <- ifelse(is.finite(max(vals_ait, na.rm = TRUE)), max(vals_ait, na.rm =
 
 plots_ait <- list()
 for (nm in names(mat_list_ait)) {
+  nm_lbl <- unname(method_short_label(nm))
   plots_ait[[nm]] <- upper_heatmap_panel(
     Db = mat_list_ait[[nm]],
     ord = ord_list_ait[[nm]],
-    title_label = if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm,
-    fill_label = "Batch Similarity",
+    title_label = if (has_dual_geometries) sprintf("%s - Aitchison", nm_lbl) else nm_lbl,
+    fill_label = "Batch Dissimilarity",
     global_min = gmin_ait,
     global_max = gmax_ait,
     label_digits = label_digits,
     text_threshold_frac = text_threshold_frac
   )
 }
+
 
 # ---- Combine & save (Aitchison) ----
 n_panels_ait <- length(plots_ait)
@@ -382,11 +384,12 @@ gmax_bc <- ifelse(is.finite(max(vals_bc, na.rm = TRUE)), max(vals_bc, na.rm = TR
 
 plots_bc <- list()
 for (nm in names(mat_list_bc)) {
+  nm_lbl <- unname(method_short_label(nm))
   plots_bc[[nm]] <- upper_heatmap_panel(
     Db = mat_list_bc[[nm]],
     ord = ord_list_bc[[nm]],
-    title_label = if (has_dual_geometries) sprintf("%s - Bray–Curtis", nm) else nm,
-    fill_label = "Batch Similarity",
+    title_label = if (has_dual_geometries) sprintf("%s - Bray–Curtis", nm_lbl) else nm_lbl,
+    fill_label = "Batch Dissimilarity",
     global_min = gmin_bc,
     global_max = gmax_bc,
     label_digits = label_digits,
@@ -436,10 +439,10 @@ if (only_baseline) {
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
     assess_rows[["Ait"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "Ait",
-      Mean_Between      = between,
-      Mean_Within       = within
+      Method = "Before correction",
+      Geometry = "Ait",
+      Inter_Batch_Dissimilarity = between,
+      Intra_Batch_Dissimilarity = within
     )
   }
   
@@ -451,10 +454,10 @@ if (only_baseline) {
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
     assess_rows[["BC"]] <- tibble::tibble(
-      Method            = "Before correction",
-      Geometry          = "BC",
-      Mean_Between      = between,
-      Mean_Within       = within
+      Method = "Before correction",
+      Geometry = "BC",
+      Inter_Batch_Dissimilarity = between,
+      Intra_Batch_Dissimilarity = within
     )
   }
 
@@ -472,11 +475,11 @@ if (only_baseline) {
       tibble::tibble(
         Method = names(means_between),
         Geometry = geometry_label,
-        Mean_Between = unname(means_between),
-        Mean_Within = unname(means_within[names(means_between)])
+        Inter_Batch_Dissimilarity = unname(means_between),
+        Intra_Batch_Dissimilarity = unname(means_within[names(means_between)])
       )
     }
-
+    
     rows <- list(
       make_rows(mean_ait, within_means_ait, "Ait"),
       make_rows(mean_bc, within_means_bc, "BC")
