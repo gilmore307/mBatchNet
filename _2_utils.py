@@ -122,18 +122,18 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {
     "DEBIAS": "DEBIAS-M",
     "MetaDICT": "MetaDICT",
-    "BMC": "BMC (pamr)",
+    "BMC": "BMC",
     "PLSDA": "PLSDA-batch",
     "ConQuR": "ConQuR",
     "MMUPHin": "MMUPHin",
     "RUV": "RUV-III-NB",
     "ComBatSeq": "ComBat-seq",
     "FSQN": "FSQN",
-    "PN": "PN",
+    "PN": "Percentile Normalization",
     "FAbatch": "FAbatch",
     "limma": "Limma",
     "ComBat": "ComBat",
-    "QN": "QN",
+    "QN": "Quantile Normalization",
 }
 
 _METHOD_NAME_TO_CODE: Dict[str, str] = {display: code for code, display in _METHOD_DISPLAY_NAMES.items()}

@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 import json
+import re
 
 import dash
 from dash import dcc, html
@@ -24,6 +25,35 @@ from _2_utils import (
 )
 
 
+_ITALIC_PATTERN = re.compile(r"<(?:i|em)>(.*?)</(?:i|em)>", re.IGNORECASE)
+
+
+def _parse_italic_text(text: str) -> object:
+    if not text:
+        return "-"
+    match_found = False
+    parts: List[object] = []
+    last = 0
+    for match in _ITALIC_PATTERN.finditer(text):
+        match_found = True
+        start, end = match.span()
+        if start > last:
+            segment = text[last:start]
+            if segment:
+                parts.append(segment)
+        italic_content = match.group(1)
+        if italic_content:
+            parts.append(html.I(italic_content))
+        last = end
+    if last < len(text):
+        tail = text[last:]
+        if tail:
+            parts.append(tail)
+    if not match_found:
+        return text
+    return parts
+
+
 def correction_layout(active_path: str):
     return html.Div(
         [
@@ -34,8 +64,7 @@ def correction_layout(active_path: str):
                 [
                     html.H2("Batch Effect Correction"),
                     html.P(
-                        "Review available correction methods. Historical statistics highlight how often each method "
-                        "has been selected and the typical runtime."
+                        "Review available correction methods along with their average runtime and citation details."
                     ),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
@@ -89,12 +118,11 @@ def register_correction_callbacks(app):
             html.Tr(
                 [
                     html.Th("Methods"),
-                    html.Th("Times Selected"),
                     html.Th("Avg Time (s)"),
-                    html.Th("Citation"),
                     html.Th("Status"),
                     html.Th("Run Correction", className="text-center"),
                     html.Th("Delete", className="text-center"),
+                    html.Th("Citation"),
                 ]
             )
         )
@@ -105,15 +133,8 @@ def register_correction_callbacks(app):
             return "secondary" if disabled else "success"
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
-            selections = 0
             avg_elapsed = None
             if isinstance(stats, dict):
-                try:
-                    selections = int(
-                        stats.get("selections", stats.get("runs", 0))  # backward compatibility
-                    )
-                except (TypeError, ValueError):
-                    selections = 0
                 avg_elapsed = stats.get("avg_elapsed_sec")
             if isinstance(avg_elapsed, str):
                 try:
@@ -185,27 +206,27 @@ def register_correction_callbacks(app):
                 else display
             )
             citation_content: object
+            citation_children = _parse_italic_text(citation_text) if citation_text else "-"
             if citation_text and citation_url:
                 citation_content = html.A(
-                    citation_text,
+                    citation_children,
                     href=citation_url,
                     target="_blank",
                     rel="noopener noreferrer",
                 )
             elif citation_text:
-                citation_content = citation_text
+                citation_content = citation_children
             else:
                 citation_content = "-"
             citation_cell = html.Td(citation_content)
             row = html.Tr(
                 [
                     html.Td(method_display),
-                    html.Td(str(selections)),
                     html.Td(avg_display),
-                    citation_cell,
                     status_cell,
                     run_cell,
                     delete_cell,
+                    citation_cell,
                 ]
             )
             body_rows.append(row)

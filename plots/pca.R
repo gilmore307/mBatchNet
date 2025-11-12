@@ -13,7 +13,7 @@ mbecUpperCase <- function(x) paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar
 # Map method codes from filenames to short display labels for figures
 method_short_label <- function(x) {
   map <- c(
-    qn = "QN",
+    qn = "Quantile Normalization",
     bmc = "BMC",
     limma = "Limma",
     conqur = "ConQuR",
@@ -23,7 +23,7 @@ method_short_label <- function(x) {
     mmuphin = "MMUPHin",
     ruv = "RUV-III-NB",
     metadict = "MetaDICT",
-    pn = "PN",
+    pn = "Percentile Normalization",
     fabatch = "FAbatch",
     combatseq = "ComBat-seq",
     debias = "DEBIAS-M"
