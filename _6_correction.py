@@ -64,8 +64,7 @@ def correction_layout(active_path: str):
                 [
                     html.H2("Batch Effect Correction"),
                     html.P(
-                        "Review available correction methods. Historical statistics highlight how often each method "
-                        "has been selected and the typical runtime."
+                        "Review available correction methods along with their average runtime and citation details."
                     ),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
@@ -134,15 +133,8 @@ def register_correction_callbacks(app):
             return "secondary" if disabled else "success"
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
-            selections = 0
             avg_elapsed = None
             if isinstance(stats, dict):
-                try:
-                    selections = int(
-                        stats.get("selections", stats.get("runs", 0))  # backward compatibility
-                    )
-                except (TypeError, ValueError):
-                    selections = 0
                 avg_elapsed = stats.get("avg_elapsed_sec")
             if isinstance(avg_elapsed, str):
                 try:
