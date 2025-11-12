@@ -182,7 +182,7 @@ def gate_nav_buttons(preprocess_done, pre_started, pre_done, correction_done, po
         False,                 # Welcome
         False,                 # Upload always enabled
         not preprocess_done,   # Pre requires preprocess
-        not pre_started,       # Correction enabled after pre is started
+        not preprocess_done,   # Correction now available after preprocess
         not correction_done,   # Post requires correction
     )
 
@@ -384,13 +384,23 @@ def toggle_help_modal(open_clicks, close_clicks, help_shown):
     Output(NAV_ID_MAP["/post"], "color"), Output(NAV_ID_MAP["/post"], "outline"),
     Input("page-url", "pathname"),
     Input("upload-complete", "data"),
+    Input("preprocess-complete", "data"),
     Input("pre-started", "data"),
     Input("pre-complete", "data"),
     Input("correction-complete", "data"),
     Input("post-complete", "data"),
 )
-def highlight_next(pathname, upload_done, pre_started, pre_done, correction_done, post_done):
+def highlight_next(
+    pathname,
+    upload_done,
+    preprocess_done,
+    pre_started,
+    pre_done,
+    correction_done,
+    post_done,
+):
     upload_done = bool(upload_done)
+    preprocess_done = bool(preprocess_done)
     pre_started = bool(pre_started)
     pre_done = bool(pre_done)
     correction_done = bool(correction_done)
@@ -399,7 +409,7 @@ def highlight_next(pathname, upload_done, pre_started, pre_done, correction_done
     # Determine next step user can take
     if not upload_done:
         next_step = "/upload"
-    elif not pre_started:
+    elif not preprocess_done:
         next_step = "/pre"
     elif not correction_done:
         next_step = "/correction"
