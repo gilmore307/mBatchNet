@@ -6,10 +6,15 @@ run_method("MMUPHin", {
   require(MMUPHin)
   X_tss <- get_input_for("MMUPHin", base_M, base_form)
   feat_counts <- t(round(X_tss * 1e6))
+  covariate_names <- colnames(covar)
+  if (!length(covariate_names)) {
+    covariate_names <- NULL
+  }
+
   fit <- adjust_batch(
     feature_abd = feat_counts,
     batch       = "batch_id",
-    covariates  = colnames(covar),
+    covariates  = covariate_names,
     data        = transform(metadata, batch_id=factor(batch_id)),
     control     = list(verbose = FALSE, diagnostic_plot = NULL)
   )
