@@ -129,11 +129,11 @@ _METHOD_DISPLAY_NAMES: Dict[str, str] = {
     "RUV": "RUV-III-NB",
     "ComBatSeq": "ComBat-seq",
     "FSQN": "FSQN",
-    "PN": "PN",
+    "PN": "Percentile Normalization",
     "FAbatch": "FAbatch",
     "limma": "Limma",
     "ComBat": "ComBat",
-    "QN": "QN",
+    "QN": "Quantile Normalization",
 }
 
 _METHOD_NAME_TO_CODE: Dict[str, str] = {display: code for code, display in _METHOD_DISPLAY_NAMES.items()}
