@@ -5,7 +5,12 @@ prepare_method("ConQuR")
 run_method("ConQuR", {
   suppressPackageStartupMessages({ library(ConQuR); library(doParallel) })
   X_cnt <- get_input_for("ConQuR", base_M, base_form)
-  covariates <- metadata[, colnames(covar), drop = FALSE]; rownames(covariates) <- NULL
+  covariates <- metadata[, colnames(covar), drop = FALSE]
+  if (!ncol(covariates)) {
+    covariates <- NULL
+  } else {
+    rownames(covariates) <- NULL
+  }
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
   res_pos <- suppressWarnings(
     ConQuR(
