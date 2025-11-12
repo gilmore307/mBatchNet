@@ -69,7 +69,8 @@ PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("NMDS (Bray-Curtis)", "nmds_braycurtis.png"),
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("PERMANOVA R² (Aitchison)", "permanova.png"),
+    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
+    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.png"),
     FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.png"),
     FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
     FigureSpec("PVCA", "PVCA.png"),
@@ -1190,6 +1191,10 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "ait", fn)
         elif low.startswith("dissimilarity_heatmaps_braycurtis"):
             add_group_item("dissimilarity", "Dissimilarity heatmaps", "bray", fn)
+        elif low.startswith("permanova_aitchison"):
+            add_group_item("permanova", "PERMANOVA R²", "ait", fn)
+        elif low.startswith("permanova_braycurtis"):
+            add_group_item("permanova", "PERMANOVA R²", "bray", fn)
         elif low.startswith("permanova"):
             add_group_item("permanova", "PERMANOVA R²", "single", fn)
         elif low.startswith("anova_aitchison"):
@@ -1324,7 +1329,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
                 g["bray"] = spec.filename
             g["title"] = "Dissimilarity heatmaps"
         elif key == "permanova":
-            if low.startswith("permanova"):
+            if low.startswith("permanova_aitchison"):
+                g["ait"] = spec.filename
+            elif low.startswith("permanova_braycurtis"):
+                g["bray"] = spec.filename
+            elif low.startswith("permanova"):
                 g["single"] = spec.filename
             g["title"] = "PERMANOVA R²"
         elif key == "r2":
