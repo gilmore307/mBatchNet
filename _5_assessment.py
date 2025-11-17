@@ -31,18 +31,17 @@ from _2_utils import (
 
 
 FIGURE_DEFAULTS = {
-    "alignment": {"width": 2550, "height": 1560, "dpi": 300},
-    "pca": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
-    "pcoa": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
-    "nmds": {"width": 2850, "height": 1800, "dpi": 300, "ncol": 2},
-    "dissimilarity": {"width": 2550, "height": 1800, "dpi": 300, "ncol": 2},
-    "permanova": {"width": 2550, "height": 1560, "dpi": 300},
-    "r2": {"width": 3000, "height": 1560, "dpi": 300},
-    "prda": {"width": 2280, "height": 2070, "dpi": 300},
-    "pvca": {"width": 2160, "height": 2040, "dpi": 300},
-    "lisi": {"width": 2700, "height": 2400, "dpi": 300},
-    "ebm": {"width": 2550, "height": 1560, "dpi": 300},
-    "silhouette": {"width": 2550, "height": 1560, "dpi": 300},
+    "alignment": {"width": 2550, "height": 1560, "dpi": 600},
+    "pca": {"width": 2800, "height": 1800, "dpi": 600, "ncol": 3},
+    "pcoa": {"width": 2800, "height": 1800, "dpi": 600, "ncol": 3},
+    "nmds": {"width": 2800, "height": 1800, "dpi": 600, "ncol": 3},
+    "dissimilarity": {"width": 2800, "height": 1800, "dpi": 600, "ncol": 3},
+    "permanova": {"width": 2800, "height": 1800, "dpi": 600},
+    "r2": {"width": 4400, "height": 1200, "dpi": 600},
+    "prda": {"width": 2280, "height": 2070, "dpi": 600},
+    "pvca": {"width": 2160, "height": 2040, "dpi": 600},
+    "ebm": {"width": 2550, "height": 1560, "dpi": 600},
+    "silhouette": {"width": 2550, "height": 1560, "dpi": 600},
 }
 
 
@@ -184,32 +183,6 @@ def _param_controls(stage: str, key: str):
                 tooltip=tooltips.get("max_pcs", ""),
             ),
         ]
-    elif key == "lisi":
-        controls = [
-            num_input(
-                f"{sid}-param-k",
-                "k (neighbors)",
-                30,
-                step=1,
-                min_=1,
-                tooltip=tooltips.get("k_neighbors", ""),
-            ),
-            num_input(
-                f"{sid}-param-npcs",
-                "nPCs (PCA)",
-                50,
-                step=1,
-                min_=2,
-                tooltip=tooltips.get("n_pcs", ""),
-            ),
-            dropdown(
-                f"{sid}-param-coords",
-                "coords",
-                ["pca", "clr"],
-                "pca",
-                tooltip=tooltips.get("coords", ""),
-            ),
-        ]
     elif key == "silhouette":
         controls = [
             num_input(
@@ -342,7 +315,6 @@ def assessment_layout(active_path: str, stage: str):
     ]
     post_extra = [
         ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
@@ -445,7 +417,6 @@ def register_pre_post_callbacks(app):
     ]
     post_extra = [
         ("alignment", "Alignment score", "Alignment_Score.R"),
-        ("lisi", "LISI", "LISI.R"),
         ("ebm", "Entropy score", "Entropy_Score.R"),
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
@@ -499,17 +470,6 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-knn-k", "value"),
                 State(f"{sid}-param-knn-pools", "value"),
                 State(f"{sid}-param-knn-per-label", "value"),
-            ]
-        elif key == "lisi":
-            param_state_ids.extend([
-                f"{sid}-param-k",
-                f"{sid}-param-npcs",
-                f"{sid}-param-coords",
-            ])
-            states += [
-                State(f"{sid}-param-k", "value"),
-                State(f"{sid}-param-npcs", "value"),
-                State(f"{sid}-param-coords", "value"),
             ]
         elif key == "silhouette":
             param_state_ids.extend([
@@ -647,13 +607,6 @@ def register_pre_post_callbacks(app):
                 _add("knn_pools", pv[idx], int)
                 idx += 1
                 _add("knn_per_label", pv[idx], int)
-                idx += 1
-            elif _key == "lisi":
-                _add("k", pv[idx], int)
-                idx += 1
-                _add("npcs", pv[idx], int)
-                idx += 1
-                _add("coords", pv[idx], str)
                 idx += 1
             elif _key == "silhouette":
                 _add("umap_neighbors", pv[idx], int)

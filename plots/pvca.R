@@ -239,7 +239,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -389,14 +389,26 @@ if (length(header_rows)) {
 }
 
 # --------- Stack plot over table and save ----------
-combined <- gridExtra::arrangeGrob(p, tbl_grob, ncol = 1, heights = c(3, 1.35))
+spacer <- grid::nullGrob()
+spacer_height <- grid::unit(0.18, "in")
 
-fig_dims <- apply_fig_overrides(7.2, 6.8, 300)
+combined <- gridExtra::arrangeGrob(
+  p, spacer, tbl_grob, ncol = 1,
+  heights = grid::unit.c(grid::unit(1, "null"), spacer_height, sum(tbl_grob$heights))
+)
+
+hist_dims <- apply_fig_overrides(7.2, 5.2, 600)
+table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
+table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
+final_width  <- max(hist_dims$width, table_width_in)
+final_height <- hist_dims$height + table_height_in +
+  grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
+
 ggsave(file.path(output_folder, "PVCA.png"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi)
 
 ggsave(file.path(output_folder, "PVCA.tif"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")
 
 # --------- Summaries for PVCA components ----------
 summarise_pvca_methods <- function(df_long) {

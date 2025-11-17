@@ -71,7 +71,7 @@ if (length(args) > 1) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -190,7 +190,7 @@ if (only_baseline) {
   p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score (baseline)",
          x = "Method", y = "Score") +
     theme_bw() +
@@ -198,10 +198,10 @@ if (only_baseline) {
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "bold")
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
-  
-  fig_dims <- apply_fig_overrides(6.5, 4.6, 300)
+
+  fig_dims <- apply_fig_overrides(2800 / 600, 1800 / 600, 600)
   ggsave(file.path(output_folder, "alignment_score.png"), p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "alignment_score.tif"), p_as,
@@ -222,7 +222,7 @@ if (only_baseline) {
   p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score",
          x = "Method", y = "Score") +
     theme_bw() +
@@ -230,10 +230,10 @@ if (only_baseline) {
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "bold")
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
-  
-  fig_dims <- apply_fig_overrides(8.5, 5.2, 300)
+
+  fig_dims <- apply_fig_overrides(2800 / 600, 1800 / 600, 600)
   ggsave(file.path(output_folder, "alignment_score.png"), p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "alignment_score.tif"), p_as,

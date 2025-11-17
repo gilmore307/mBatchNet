@@ -20,6 +20,22 @@ method_short_label <- function(x) {
   sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v }, USE.NAMES = FALSE)
 }
 
+format_method_label <- function(label) {
+  if (identical(label, "Before correction")) {
+    return("Before\ncorrection")
+  }
+  if (identical(label, "Quantile Normalization")) {
+    return("Quantile\nNormalization")
+  }
+  if (identical(label, "Percentile Normalization")) {
+    return("Percentile\nNormalization")
+  }
+  if (identical(label, "PLSDA-batch")) {
+    return(sub("-", "\n-", label, fixed = TRUE))
+  }
+  label
+}
+
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
   args <- "output/example"  # default folder for quick runs
@@ -51,7 +67,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -91,6 +107,8 @@ file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "cl
 # Include raw_clr.csv as "Before correction" if present
 raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
 if (file.exists(raw_clr_fp)) file_list_clr <- c("Before correction" = raw_clr_fp, file_list_clr)
+
+names(file_list_clr) <- vapply(names(file_list_clr), format_method_label, character(1))
 
 if (!length(file_list_clr)) {
   stop("No normalized CLR files found (expected raw_clr.csv and/or normalized_*_clr.csv or normalized_*.csv) in ", output_folder)
@@ -275,7 +293,7 @@ p_clr <- make_boxplot(
   expression("Feature-wise ANOVA " * R^2 )
 )
 if (!is.null(p_clr)) {
-  fig_dims_clr <- apply_fig_overrides(10, 5.2, 300)
+  fig_dims_clr <- apply_fig_overrides(4400 / 600, 1200 / 600, 600)
   ggsave(file.path(output_folder, "anova_aitchison.png"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
   ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,

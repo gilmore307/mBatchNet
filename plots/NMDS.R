@@ -113,7 +113,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 600,
                                panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
@@ -338,7 +338,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
 batch_var  <- "batch_id"
 model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
-ncol_grid <- 2
+ncol_grid <- 3
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
   ncol_grid <- max(1, opt_fig_ncol)
 }
@@ -388,11 +388,15 @@ names(plots_clr) <- names(file_list_clr)
 n_panels_clr <- length(plots_clr)
 panel_cols_clr <- 1L
 panel_rows_clr <- 1L
+base_fig_width_in  <- 2800 / 600
+base_fig_height_in <- 1800 / 600
+base_col_width_in  <- base_fig_width_in / 3
+base_row_height_in <- base_fig_height_in
 if (n_panels_clr == 1L) {
   combined_clr <- plots_clr[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_clr <- 9.5; h_clr <- 6
+  w_clr <- base_fig_width_in; h_clr <- base_fig_height_in
 } else {
   panel_cols_clr <- min(ncol_grid, n_panels_clr)
   panel_rows_clr <- ceiling(n_panels_clr / ncol_grid)
@@ -400,11 +404,11 @@ if (n_panels_clr == 1L) {
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_clr <- 9.5 * panel_cols_clr
-  h_clr <- 6   * panel_rows_clr
+  w_clr <- base_col_width_in * panel_cols_clr
+  h_clr <- base_row_height_in * panel_rows_clr
 }
 
-fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 600, panel_cols_clr, panel_rows_clr)
 ggsave(file.path(output_folder, "nmds_aitchison.png"),
        plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "nmds_aitchison.tif"),
@@ -458,7 +462,7 @@ if (n_panels_tss == 1L) {
   combined_tss <- plots_tss[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_tss <- 9.5; h_tss <- 6
+  w_tss <- base_fig_width_in; h_tss <- base_fig_height_in
 } else {
   panel_cols_tss <- min(ncol_grid, n_panels_tss)
   panel_rows_tss <- ceiling(n_panels_tss / ncol_grid)
@@ -466,11 +470,11 @@ if (n_panels_tss == 1L) {
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           plot.margin = margin(8, 14, 8, 14))
-  w_tss <- 9.5 * panel_cols_tss
-  h_tss <- 6   * panel_rows_tss
+  w_tss <- base_col_width_in * panel_cols_tss
+  h_tss <- base_row_height_in * panel_rows_tss
 }
 
-fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 600, panel_cols_tss, panel_rows_tss)
 ggsave(file.path(output_folder, "nmds_braycurtis.png"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "nmds_braycurtis.tif"),

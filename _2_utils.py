@@ -78,7 +78,6 @@ PRE_FIGURES: Sequence[FigureSpec] = (
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("LISI", "LISI.png"),
     FigureSpec("Entropy score", "ebm.png"),
     FigureSpec("Silhouette score", "silhouette.png"),
 )
@@ -99,7 +98,6 @@ PRE_SCRIPTS: Sequence[str] = (
 
 POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
     "Alignment_Score.R",
-    "LISI.R",
     "Entropy_Score.R",
     "Silhouette.R",
 )
@@ -114,7 +112,6 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
     "r2": "R² score",
     "prda": "pRDA score",
     "pvca": "PVCA score",
-    "lisi": "LISI score",
     "ebm": "Entropy score",
     "silhouette": "Silhouette score",
 }
@@ -857,8 +854,6 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["pRDA", "prda"]
     elif s == "pvca":
         bases = ["PVCA", "pvca"]
-    elif s == "lisi":
-        bases = ["LISI", "lisi"]
     elif s == "alignment_score":
         bases = ["alignment_score", "alignment"]
     elif s == "ebm":
@@ -882,10 +877,6 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         candidates.append(f"{b}_raw_assessment_post.csv")
     for b in bases:
         candidates.append(f"{b}_raw_assessment.csv")
-    # Special LISI grid file
-    for b in bases:
-        if b.lower() == "lisi":
-            candidates.append(f"{b}_k_grid.csv")
     return candidates
 
 
@@ -1355,8 +1346,6 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["single"] = spec.filename; g["title"] = "PCA"
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
             g["single"] = spec.filename; g["title"] = "PVCA"
-        elif key == "lisi" and spec.filename.lower() == "lisi.png":
-            g["single"] = spec.filename; g["title"] = "LISI"
         elif key == "ebm" and spec.filename.lower() == "ebm.png":
             g["single"] = spec.filename; g["title"] = "Entropy score"
         elif key == "silhouette" and spec.filename.lower() == "silhouette.png":
@@ -1609,7 +1598,6 @@ RANKING_SCORE_SPECS: Dict[str, ScoreSpec] = {
     "alignment": ScoreSpec(field="absolute score"),
     "dissimilarity": ScoreSpec(field="absolute score"),
     "ebm": ScoreSpec(field="absolute score"),
-    "lisi": ScoreSpec(field="absolute score"),
     "nmds": ScoreSpec(),
     "pca": ScoreSpec(),
     "pcoa": ScoreSpec(),
@@ -1624,7 +1612,6 @@ RANKING_FILE_ALIASES: Dict[str, List[str]] = {
     "alignment": ["alignment", "alignment_score"],
     "dissimilarity": ["dissimilarity"],
     "ebm": ["ebm", "entropy_score"],
-    "lisi": ["lisi"],
     "nmds": ["nmds"],
     "pca": ["pca"],
     "pcoa": ["pcoa"],
@@ -1645,7 +1632,6 @@ REQUIRED_RANKING_KEYS: Set[str] = {
     "r2",
     "prda",
     "pvca",
-    "lisi",
     "ebm",
     "silhouette",
 }
