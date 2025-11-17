@@ -218,6 +218,7 @@ def upload_layout(active_path: str):
                                                             placeholder="Select an example dataset",
                                                             clearable=False,
                                                             style={"maxWidth": "420px"},
+                                                            className="mb-3",
                                                         ),
                                                         dbc.Row(
                                                             [
@@ -260,7 +261,7 @@ def upload_layout(active_path: str):
                                                                     className="mt-2",
                                                                 ),
                                                             ],
-                                                            className="g-3",
+                                                            className="g-3 mt-3",
                                                         ),
                                                         html.Div(id="example-preview", className="mt-3"),
                                                         dbc.Button(
