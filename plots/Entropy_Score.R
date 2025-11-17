@@ -136,7 +136,8 @@ if (!length(clr_paths)) stop("No CLR matrices found (expected 'raw_clr.csv' or '
 method_names <- ifelse(basename(clr_paths) == "raw_clr.csv",
                        "Before correction",
                        gsub("^normalized_|_clr\\.csv$", "", basename(clr_paths)))
-file_list <- setNames(clr_paths, method_names)
+method_labels <- method_short_label(method_names)
+file_list <- setNames(clr_paths, method_labels)
 method_levels <- names(file_list)  # lock original order for plotting
 
 # --------- Helpers ---------
@@ -292,27 +293,26 @@ if (only_baseline) {
   print(base_summary)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$EBM, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
   p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", EBM)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
-      title = "Batch Entropy Mixing (kNN on UMAP) - baseline",
-      subtitle = sprintf(
-        "Labels=%s - UMAP(metric=%s, n_neighbors=%d, min_dist=%.2f)",
-        LABEL_COL, pretty_metric(UMAP_METRIC), UMAP_NEIGHB, UMAP_MIN_DIST
-      ),
+      title = "Entropy Score (baseline)",
       x = "Method",
-      y = "EBM (0-1, higher = better mixing)"
+      y = "Score"
     ) +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank()
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
-  
-  fig_dims <- apply_fig_overrides(6.5, 4.6, 300)
+
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "ebm.png"), p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
@@ -327,27 +327,26 @@ if (only_baseline) {
   print(ebm_summary, n = nrow(ebm_summary))
   
   plot_df <- ebm_tbl %>% mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$EBM, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
   p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", EBM)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, 1.05), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
-      title = "Batch Entropy Mixing (kNN on UMAP)",
-      subtitle = sprintf(
-        "Labels=%s - UMAP(metric=%s, n_neighbors=%d, min_dist=%.2f)",
-        LABEL_COL, pretty_metric(UMAP_METRIC), UMAP_NEIGHB, UMAP_MIN_DIST
-      ),
+      title = "Entropy Score",
       x = "Method",
-      y = "EBM"
+      y = "Score"
     ) +
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank()
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
-  
-  fig_dims <- apply_fig_overrides(8.5, 5.2, 300)
+
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "ebm.png"), p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "ebm.tif"), p_ebm,

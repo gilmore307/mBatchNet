@@ -305,7 +305,7 @@ upper_mean <- function(M) {
 diag_mode <- "zero"
 label_digits <- 2
 text_threshold_frac <- 0.6
-ncol_grid <- 2
+ncol_grid <- 3
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
   ncol_grid <- max(1, opt_fig_ncol)
 }
@@ -346,18 +346,22 @@ for (nm in names(mat_list_ait)) {
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
 panel_rows_ait <- 1L
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
+base_col_width_in  <- base_fig_width_in / 3
+base_row_height_in <- base_fig_height_in
 if (n_panels_ait == 1L) {
   combined_ait <- plots_ait[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_ait <- 8.5; h_ait <- 6
+  w_ait <- base_fig_width_in; h_ait <- base_fig_height_in
 } else {
   panel_cols_ait <- min(ncol_grid, n_panels_ait)
   panel_rows_ait <- ceiling(n_panels_ait / ncol_grid)
   combined_ait <- wrap_plots(plots_ait, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_ait <- 8.5 * panel_cols_ait
-  h_ait <- 6   * panel_rows_ait
+  w_ait <- base_col_width_in * panel_cols_ait
+  h_ait <- base_row_height_in * panel_rows_ait
 }
 fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
@@ -404,15 +408,15 @@ panel_rows_bc <- 1L
 if (n_panels_bc == 1L) {
   combined_bc <- plots_bc[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_bc <- 8.5; h_bc <- 6
+  w_bc <- base_fig_width_in; h_bc <- base_fig_height_in
 } else {
   panel_cols_bc <- min(ncol_grid, n_panels_bc)
   panel_rows_bc <- ceiling(n_panels_bc / ncol_grid)
   combined_bc <- wrap_plots(plots_bc, ncol = ncol_grid) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_bc <- 8.5 * panel_cols_bc
-  h_bc <- 6   * panel_rows_bc
+  w_bc <- base_col_width_in * panel_cols_bc
+  h_bc <- base_row_height_in * panel_rows_bc
 }
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),

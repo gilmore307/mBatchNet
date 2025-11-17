@@ -439,7 +439,7 @@ CB
 batch_var  <- "batch_id"
 model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
-ncol_grid <- 2
+ncol_grid <- 3
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
   ncol_grid <- max(1, opt_fig_ncol)
 }
@@ -491,6 +491,10 @@ names(plots_clr) <- names(file_list_clr)
 n_panels_clr <- length(plots_clr)
 panel_cols_clr <- 1L
 panel_rows_clr <- 1L
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
+base_col_width_in  <- base_fig_width_in / 3
+base_row_height_in <- base_fig_height_in
 if (n_panels_clr == 1L) {
   combined_clr <- plots_clr[[1]] +
     theme(
@@ -499,7 +503,7 @@ if (n_panels_clr == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_clr <- 9.5; h_clr <- 6
+  w_clr <- base_fig_width_in; h_clr <- base_fig_height_in
 } else {
   panel_cols_clr <- min(ncol_grid, n_panels_clr)
   panel_rows_clr <- ceiling(n_panels_clr / ncol_grid)
@@ -511,8 +515,8 @@ if (n_panels_clr == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_clr <- 9.5 * panel_cols_clr
-  h_clr <- 6   * panel_rows_clr
+  w_clr <- base_col_width_in * panel_cols_clr
+  h_clr <- base_row_height_in * panel_rows_clr
 }
 fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
@@ -574,7 +578,7 @@ if (n_panels_tss == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_tss <- 9.5; h_tss <- 6
+  w_tss <- base_fig_width_in; h_tss <- base_fig_height_in
 } else {
   panel_cols_tss <- min(ncol_grid, n_panels_tss)
   panel_rows_tss <- ceiling(n_panels_tss / ncol_grid)
@@ -586,8 +590,8 @@ if (n_panels_tss == 1L) {
       legend.box       = "vertical",
       plot.margin = margin(8, 14, 8, 14)
     )
-  w_tss <- 9.5 * panel_cols_tss
-  h_tss <- 6   * panel_rows_tss
+  w_tss <- base_col_width_in * panel_cols_tss
+  h_tss <- base_row_height_in * panel_rows_tss
 }
 fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),

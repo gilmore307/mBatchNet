@@ -20,11 +20,6 @@ ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
         "knn_pools": "Number of anchor pools to average entropy over.",
         "knn_per_label": "Anchors sampled per batch label per pool.",
     },
-    "lisi": {
-        "k_neighbors": "k for k-NN graph when computing LISI.",
-        "n_pcs": "Number of PCs for LISI (set via coords=CLR to use none).",
-        "coords": "Coordinate space for LISI: PCA or CLR.",
-    },
     "silhouette": {
         "umap_neighbors": "UMAP: Number of neighbors (local connectivity).",
         "umap_min_dist": "UMAP: Minimum distance between points in embedding.",
@@ -79,11 +74,6 @@ RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
     "pvca": (
         "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\frac{T}{T + B}$\n\n"
         "**Symbols:** $T$ = PVCA-estimated treatment variance fraction; $B$ = PVCA-estimated batch variance fraction.\n\nLeverages PVCA variance components to favour low batch contribution."
-    ),
-    "lisi": (
-        "**Score formula:** $S = \\tfrac{1}{2}\\big(\\tilde{\\text{iLISI}} + 1 - \\tilde{\\text{cLISI}}\\big)$\n\n"
-        "**Symbols:** $\\tilde{\\text{iLISI}}$ = median batch LISI value; $\\tilde{\\text{cLISI}}$ = median treatment LISI value.\n\n"
-        "Balances batch mixing (iLISI) against treatment separation (cLISI)."
     ),
     "ebm": (
         "**Score formula:** $S = \\frac{1}{P} \\sum_{p=1}^{P} H_{\\text{batch}}(p)$\n\n"
