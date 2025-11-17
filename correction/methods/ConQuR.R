@@ -5,11 +5,48 @@ prepare_method("ConQuR")
 run_method("ConQuR", {
   suppressPackageStartupMessages({ library(ConQuR); library(doParallel) })
   X_cnt <- get_input_for("ConQuR", base_M, base_form)
+  batch_values <- unique(stats::na.omit(as.character(metadata$batch_id)))
+  if (length(batch_values) < 2) {
+    stop(
+      sprintf(
+        "ConQuR requires at least two batch levels; found %d level%s (%s).",
+        length(batch_values),
+        if (length(batch_values) == 1) "" else "s",
+        paste(batch_values, collapse = ", ")
+      )
+    )
+  }
+
   covariates <- metadata[, colnames(covar), drop = FALSE]
   if (!ncol(covariates)) {
     covariates <- NULL
   } else {
-    rownames(covariates) <- NULL
+    invariant_covariates <- vapply(
+      covariates,
+      function(col) {
+        if (is.numeric(col)) return(FALSE)
+        length(unique(stats::na.omit(as.character(col)))) < 2
+      },
+      logical(1)
+    )
+
+    if (any(invariant_covariates)) {
+      dropped <- names(invariant_covariates)[invariant_covariates]
+      warn_step(
+        "ConQuR",
+        sprintf(
+          "Dropped invariant covariate(s) with <2 levels: %s",
+          paste(dropped, collapse = ", ")
+        )
+      )
+      covariates <- covariates[, !invariant_covariates, drop = FALSE]
+    }
+
+    if (!ncol(covariates)) {
+      covariates <- NULL
+    } else {
+      rownames(covariates) <- NULL
+    }
   }
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
   res_pos <- suppressWarnings(
