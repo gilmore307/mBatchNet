@@ -232,12 +232,45 @@ try({
 metadata$batch_id <- factor(metadata$batch_id, levels = unique(metadata$batch_id))
 batch_id <- metadata$batch_id
 
+if ("phenotype" %in% names(metadata)) {
+  metadata$phenotype_label <- metadata$phenotype
+  pheno_vals <- unique(as.character(metadata$phenotype_label))
+  pheno_vals <- pheno_vals[!is.na(pheno_vals)]
+  if (length(pheno_vals) != 2) {
+    fail_step("Phenotype mapping", "'phenotype' must have exactly two unique, non-NA values to map to 0/1.")
+  }
+  if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% pheno_vals) {
+    level_order <- c(CONTROL_LABEL, setdiff(pheno_vals, CONTROL_LABEL))
+  } else {
+    level_order <- pheno_vals
+  }
+  metadata$phenotype <- as.numeric(factor(metadata$phenotype_label, levels = level_order)) - 1
+}
+
+# Persist metadata with preserved text phenotype for plotting
+metadata_for_plots <- metadata
+if ("phenotype" %in% names(metadata_for_plots)) {
+  metadata_for_plots$phenotype_numeric <- metadata_for_plots$phenotype
+}
+if ("phenotype_label" %in% names(metadata_for_plots)) {
+  metadata_for_plots$phenotype <- metadata_for_plots$phenotype_label
+}
+write.csv(metadata_for_plots, file.path(output_folder, "metadata.csv"), row.names = FALSE, quote = TRUE)
+
 covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id","phenotype")), drop = FALSE]
 covar <- as.data.frame(lapply(covar, function(col) {
   if (is.numeric(col))      col[is.na(col)] <- mean(col, na.rm = TRUE)
   else if (is.factor(col))  { if (anyNA(col)) col[is.na(col)] <- levels(col)[1] }
   else                      { if (anyNA(col)) { kept <- suppressWarnings(as.character(stats::na.omit(col))); if (length(kept)) col[is.na(col)] <- kept[1] } }
   col
+}))
+
+covar <- as.data.frame(lapply(covar, function(col) {
+  num_col <- suppressWarnings(as.numeric(as.character(col)))
+  if (!any(is.na(num_col))) return(num_col)
+  levels_in_order <- unique(as.character(col))
+  codes <- setNames(seq_along(levels_in_order) - 1, levels_in_order)
+  as.numeric(codes[as.character(col)])
 }))
 
 lvl <- levels(batch_id)

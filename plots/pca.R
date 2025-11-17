@@ -176,6 +176,9 @@ if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+if ("phenotype_label" %in% names(metadata)) {
+  metadata$phenotype <- metadata$phenotype_label
+}
 
 # --------- Collect CLR files ---------
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
@@ -400,7 +403,7 @@ for (nm in names(file_list)) {
 }
 
 # ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
-ncol_grid <- 2
+ncol_grid <- 3
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
   ncol_grid <- max(1, opt_fig_ncol)
 }
@@ -409,6 +412,10 @@ if (n_panels == 0L) stop("No PCA panels to plot.")
 
 panel_cols <- 1L
 panel_rows <- 1L
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
+base_col_width_in  <- base_fig_width_in / 3
+base_row_height_in <- base_fig_height_in
 if (n_panels == 1L) {
   combined <- plots[[1]] +
     theme(
@@ -417,7 +424,7 @@ if (n_panels == 1L) {
       legend.box       = "vertical",
       plot.margin      = margin(8, 14, 8, 14)
     )
-  w <- 9.5; h <- 6
+  w <- base_fig_width_in; h <- base_fig_height_in
 } else {
   panel_cols <- min(ncol_grid, n_panels)
   panel_rows <- ceiling(n_panels / ncol_grid)
@@ -429,8 +436,8 @@ if (n_panels == 1L) {
       legend.box       = "vertical",
       plot.margin      = margin(8, 14, 8, 14)
     )
-  w <- 9.5 * panel_cols
-  h <- 6   * panel_rows
+  w <- base_col_width_in * panel_cols
+  h <- base_row_height_in * panel_rows
 }
 
 fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)

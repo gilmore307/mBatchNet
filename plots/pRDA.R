@@ -73,6 +73,9 @@ if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+if ("phenotype_label" %in% names(metadata)) {
+  metadata$phenotype <- metadata$phenotype_label
+}
 
 if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
   metadata$batch_id <- metadata$batch_id
@@ -224,7 +227,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
       axis.text.x        = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "bold")
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
   
   # Values table
@@ -282,13 +285,25 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
     )
   }
   
-  combined <- gridExtra::arrangeGrob(p, tbl_grob, ncol = 1, heights = c(3, 1.35))
-  
-  fig_dims <- apply_fig_overrides(7.6, 6.9, 300)
+  spacer <- grid::nullGrob()
+  spacer_height <- grid::unit(0.18, "in")
+
+  combined <- gridExtra::arrangeGrob(
+    p, spacer, tbl_grob, ncol = 1,
+    heights = grid::unit.c(grid::unit(1, "null"), spacer_height, sum(tbl_grob$heights))
+  )
+
+  hist_dims <- apply_fig_overrides(10, 5, 300)
+  table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
+  table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
+  final_width  <- max(hist_dims$width, table_width_in)
+  final_height <- hist_dims$height + table_height_in +
+    grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
+
   ggsave(file.path(output_folder, paste0(outfile_prefix, ".png")),
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+         plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi)
   ggsave(file.path(output_folder, paste0(outfile_prefix, ".tif")),
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+         plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")
   
   invisible(list(plot = p, table = tbl))
 }
@@ -308,7 +323,7 @@ if (length(file_list_clr)) {
   
   plot_prda_with_table(
     parts_df_aitch, file_list_clr,
-    title_prefix  = "Partial Redundant Analysis: Variance Partition.",
+    title_prefix  = "Partial Redundant Analysis: Variance Partition",
     outfile_prefix = "pRDA_aitchison"
   )
 }

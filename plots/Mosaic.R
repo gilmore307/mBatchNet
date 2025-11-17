@@ -35,6 +35,9 @@ if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata %>% mutate(sample_id = as.character(sample_id))
+if ("phenotype_label" %in% names(metadata)) {
+  metadata$phenotype <- metadata$phenotype_label
+}
 
 # Check if the phenotype column exists
 if (!PHENO_COL %in% names(metadata))
