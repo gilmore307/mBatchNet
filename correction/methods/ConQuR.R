@@ -5,6 +5,25 @@ prepare_method("ConQuR")
 run_method("ConQuR", {
   suppressPackageStartupMessages({ library(ConQuR); library(doParallel) })
   X_cnt <- get_input_for("ConQuR", base_M, base_form)
+  covariates <- metadata[, colnames(covar), drop = FALSE]
+  complete_rows <- !is.na(metadata$batch_id)
+  if (ncol(covariates)) {
+    complete_rows <- complete_rows & stats::complete.cases(covariates)
+  }
+
+  if (!all(complete_rows)) {
+    warn_step(
+      "ConQuR",
+      sprintf(
+        "Dropped %d sample(s) with missing batch/covariate values before ConQuR.",
+        sum(!complete_rows)
+      )
+    )
+    metadata <- metadata[complete_rows, , drop = FALSE]
+    X_cnt <- X_cnt[complete_rows, , drop = FALSE]
+    covariates <- covariates[complete_rows, , drop = FALSE]
+  }
+
   batch_values <- unique(stats::na.omit(as.character(metadata$batch_id)))
   if (length(batch_values) < 2) {
     stop(
@@ -17,7 +36,6 @@ run_method("ConQuR", {
     )
   }
 
-  covariates <- metadata[, colnames(covar), drop = FALSE]
   if (!ncol(covariates)) {
     covariates <- NULL
   } else {
@@ -49,15 +67,34 @@ run_method("ConQuR", {
     }
   }
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
+  batch_id <- droplevels(as.factor(metadata$batch_id))
+  batch_counts <- table(batch_id)
+
   res_pos <- suppressWarnings(
-    ConQuR(
-      tax_tab = X_cnt,
-      batchid = as.factor(metadata$batch_id),
-      covariates = covariates,
-      batch_ref = as.character(reference_batch),
-      logistic_lasso = FALSE, quantile_type = "standard", simple_match = FALSE,
-      lambda_quantile = "2p/n", interplt = FALSE, delta = 0.4999,
-      taus = seq(0.05, 0.95, by = 0.05), num_core = num_cores
+    tryCatch(
+      ConQuR(
+        tax_tab = X_cnt,
+        batchid = batch_id,
+        covariates = covariates,
+        batch_ref = as.character(reference_batch),
+        logistic_lasso = FALSE, quantile_type = "standard", simple_match = FALSE,
+        lambda_quantile = "2p/n", interplt = FALSE, delta = 0.4999,
+        taus = seq(0.05, 0.95, by = 0.05), num_core = num_cores
+      ),
+      error = function(e) {
+        if (grepl("contrasts can be applied only to factors with 2 or more levels", e$message, fixed = TRUE)) {
+          stop(
+            sprintf(
+              paste(
+                "ConQuR failed because a factor dropped to <2 levels after filtering.",
+                "Batch counts before failure: %s."
+              ),
+              paste(sprintf("%s=%d", names(batch_counts), as.integer(batch_counts)), collapse = ", ")
+            )
+          )
+        }
+        stop(e)
+      }
     )
   )
   write_tss_clr("ConQuR", res_pos, "positive", "normalized_conqur.csv")
