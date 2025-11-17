@@ -215,10 +215,12 @@ if (only_baseline) {
   print(base_row)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$Silhouette, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Silhouette Score (baseline)",
       x = "Method", y = "Score"
@@ -243,10 +245,12 @@ if (only_baseline) {
   print(sil_tbl, n = nrow(sil_tbl))
   
   plot_df <- sil_tbl %>% mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$Silhouette, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
   p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Silhouette Score",
       x = "Method", y = "Score"

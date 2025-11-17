@@ -327,7 +327,7 @@ p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
     expand = expansion(mult = c(0, 0))
   ) +
   labs(x = "Methods", y = "Explained variance (%)",
-       title = "Principal Variance Component Analysis: Variance Partition.") +
+       title = "Principal Variance Component Analysis: Variance Partition") +
   theme_bw() +
   theme(
     legend.position    = "right",

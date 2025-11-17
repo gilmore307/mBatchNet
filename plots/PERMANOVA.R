@@ -168,12 +168,14 @@ for (idx in seq_len(nrow(geometry_specs))) {
   results_by_geom[[geom_key]] <- geom_tbl
 
   plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
+  y_max <- max(plot_df$`R²`, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
   p <- ggplot(plot_df, aes(x = Method, y = `R²`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", `R²`)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
-      title = sprintf("PERMANOVA R\u00B2 (Batch, %s)", geom_label),
+      title = "PERMANOVA R\u00B2",
       x = "Method", y = "Score"
     ) +
     theme_bw() +

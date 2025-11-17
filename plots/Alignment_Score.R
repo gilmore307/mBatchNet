@@ -186,11 +186,13 @@ if (only_baseline) {
   
   # single-bar plot in original order
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$`Alignment Score`, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
 
   p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score (baseline)",
          x = "Method", y = "Score") +
     theme_bw() +
@@ -218,11 +220,13 @@ if (only_baseline) {
   # Plot bars in original method order (DO NOT reorder by AS)
   plot_df <- as_tbl %>%
     mutate(Method = factor(Method, levels = method_levels))
+  y_max <- max(plot_df$`Alignment Score`, na.rm = TRUE)
+  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
 
   p_as <- ggplot(plot_df, aes(x = Method, y = `Alignment Score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
     geom_text(aes(label = sprintf("%.3f", `Alignment Score`)), vjust = -0.4, size = 3.2) +
-    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.02))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(title = "Alignment Score",
          x = "Method", y = "Score") +
     theme_bw() +

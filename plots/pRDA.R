@@ -320,7 +320,7 @@ if (length(file_list_clr)) {
   
   plot_prda_with_table(
     parts_df_aitch, file_list_clr,
-    title_prefix  = "Partial Redundant Analysis: Variance Partition.",
+    title_prefix  = "Partial Redundant Analysis: Variance Partition",
     outfile_prefix = "pRDA_aitchison"
   )
 }
