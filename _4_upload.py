@@ -24,6 +24,8 @@ from _2_utils import (
 
 
 EXAMPLE_DIR = BASE_DIR / "assets" / "example"
+PREVIEW_MAX_ROWS = 5
+PREVIEW_MAX_COLS = 50
 
 
 def _scan_example_sets() -> List[Tuple[str, Path, Path]]:
@@ -216,6 +218,49 @@ def upload_layout(active_path: str):
                                                             placeholder="Select an example dataset",
                                                             clearable=False,
                                                             style={"maxWidth": "420px"},
+                                                        ),
+                                                        dbc.Row(
+                                                            [
+                                                                dbc.Col(
+                                                                    [
+                                                                        dbc.Label(
+                                                                            "Preview rows",
+                                                                            html_for="example-preview-rows",
+                                                                            className="fw-semibold",
+                                                                        ),
+                                                                        dbc.Input(
+                                                                            id="example-preview-rows",
+                                                                            type="number",
+                                                                            value=PREVIEW_MAX_ROWS,
+                                                                            min=1,
+                                                                            step=1,
+                                                                            style={"maxWidth": "200px"},
+                                                                        ),
+                                                                    ],
+                                                                    md=6,
+                                                                    className="mt-2",
+                                                                ),
+                                                                dbc.Col(
+                                                                    [
+                                                                        dbc.Label(
+                                                                            "Preview columns",
+                                                                            html_for="example-preview-cols",
+                                                                            className="fw-semibold",
+                                                                        ),
+                                                                        dbc.Input(
+                                                                            id="example-preview-cols",
+                                                                            type="number",
+                                                                            value=PREVIEW_MAX_COLS,
+                                                                            min=1,
+                                                                            step=1,
+                                                                            style={"maxWidth": "200px"},
+                                                                        ),
+                                                                    ],
+                                                                    md=6,
+                                                                    className="mt-2",
+                                                                ),
+                                                            ],
+                                                            className="g-3",
                                                         ),
                                                         html.Div(id="example-preview", className="mt-3"),
                                                         dbc.Button(
@@ -885,10 +930,12 @@ def register_upload_callbacks(app):
     @app.callback(
         Output("example-preview", "children"),
         Input("example-select", "value"),
+        Input("example-preview-rows", "value"),
+        Input("example-preview-cols", "value"),
         State("page-url", "pathname"),
         prevent_initial_call=False,
     )
-    def preview_example(selected_key: str, pathname: str):
+    def preview_example(selected_key: str, preview_rows: Optional[int], preview_cols: Optional[int], pathname: str):
         # Only render on Upload page
         if (pathname or "/").split("?", 1)[0] != "/upload":
             raise dash.exceptions.PreventUpdate
@@ -900,29 +947,47 @@ def register_upload_callbacks(app):
         raw_p, meta_p = pair
         import csv as _csv
 
+        def _clamp_positive(val: Optional[int], default: int) -> int:
+            try:
+                iv = int(val)
+                if iv > 0:
+                    return iv
+            except Exception:
+                pass
+            return default
+
+        row_limit = _clamp_positive(preview_rows, PREVIEW_MAX_ROWS)
+        col_limit = _clamp_positive(preview_cols, PREVIEW_MAX_COLS)
+
         def _table_for(path: Path, title: str):
             try:
                 rows_preview: List[List[str]] = []
                 row_count = 0
+                total_col_count = 0
                 header: Optional[List[str]] = None
                 with path.open("r", encoding="utf-8", newline="") as fh:
                     reader = _csv.reader(fh)
                     for i, row in enumerate(reader):
                         if title == "Metadata" and i == 0:
                             header = row
+                            total_col_count = len(header)
+                            header = header[:col_limit]
                             continue
                         row_count += 1
-                        if len(rows_preview) < 5:
-                            rows_preview.append(row)
+                        if total_col_count == 0:
+                            total_col_count = len(row)
+                        if len(rows_preview) < row_limit:
+                            rows_preview.append(row[:col_limit])
                 if title == "Metadata" and header is None:
                     return html.Div(f"{title}: empty file", className="text-muted")
-                col_count = (
-                    len(header) if title == "Metadata" else (len(rows_preview[0]) if rows_preview else 0)
+                col_count = total_col_count if total_col_count else (
+                    len(rows_preview[0]) if rows_preview else 0
                 )
                 if title == "Metadata":
                     column_names = header or []
                 else:
-                    column_names = [f"Column {i+1}" for i in range(len(rows_preview[0]))] if rows_preview else []
+                    display_cols = min(col_count, col_limit)
+                    column_names = [f"Column {i+1}" for i in range(display_cols)] if rows_preview else []
                 if not column_names:
                     return html.Div(f"{title}: no preview rows", className="text-muted")
 
@@ -970,8 +1035,9 @@ def register_upload_callbacks(app):
                 )
                 size = path.stat().st_size if path.exists() else 0
                 meta = f"{row_count} rows × {col_count} cols"
+                preview_scope = f"showing first {min(row_count, row_limit)} rows and first {min(col_count, col_limit)} cols"
                 return dbc.Card([
-                    dbc.CardHeader(html.Strong(f"{title} — {meta} ({human_size(size)})")),
+                    dbc.CardHeader(html.Strong(f"{title} — {meta} ({human_size(size)}) — {preview_scope}")),
                     dbc.CardBody(
                         html.Div(
                             grid,
