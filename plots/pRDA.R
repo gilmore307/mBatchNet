@@ -55,7 +55,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -224,7 +224,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
       axis.text.x        = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "bold")
+      plot.title         = element_text(hjust = 0.5, face = "plain")
     )
   
   # Values table
@@ -290,7 +290,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
     heights = grid::unit.c(grid::unit(1, "null"), spacer_height, sum(tbl_grob$heights))
   )
 
-  hist_dims <- apply_fig_overrides(7.6, 5.4, 600)
+  hist_dims <- apply_fig_overrides(10, 5, 300)
   table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
   table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
   final_width  <- max(hist_dims$width, table_width_in)

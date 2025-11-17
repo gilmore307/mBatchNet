@@ -98,7 +98,7 @@ if (length(args) > 1) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -310,7 +310,7 @@ if (only_baseline) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(2800 / 600, 1800 / 600, 600)
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "ebm.png"), p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
@@ -342,7 +342,7 @@ if (only_baseline) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(2800 / 600, 1800 / 600, 600)
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "ebm.png"), p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "ebm.tif"), p_ebm,

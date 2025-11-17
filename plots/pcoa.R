@@ -131,7 +131,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 600,
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
                                panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
@@ -491,8 +491,8 @@ names(plots_clr) <- names(file_list_clr)
 n_panels_clr <- length(plots_clr)
 panel_cols_clr <- 1L
 panel_rows_clr <- 1L
-base_fig_width_in  <- 2800 / 600
-base_fig_height_in <- 1800 / 600
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
 base_col_width_in  <- base_fig_width_in / 3
 base_row_height_in <- base_fig_height_in
 if (n_panels_clr == 1L) {
@@ -518,7 +518,7 @@ if (n_panels_clr == 1L) {
   w_clr <- base_col_width_in * panel_cols_clr
   h_clr <- base_row_height_in * panel_rows_clr
 }
-fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 600, panel_cols_clr, panel_rows_clr)
+fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
 ggsave(file.path(output_folder, "pcoa_aitchison.png"),
        plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
 ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
@@ -593,7 +593,7 @@ if (n_panels_tss == 1L) {
   w_tss <- base_col_width_in * panel_cols_tss
   h_tss <- base_row_height_in * panel_rows_tss
 }
-fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 600, panel_cols_tss, panel_rows_tss)
+fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
 ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
        plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
 ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),

@@ -58,7 +58,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 600,
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
                                panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
@@ -346,8 +346,8 @@ for (nm in names(mat_list_ait)) {
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
 panel_rows_ait <- 1L
-base_fig_width_in  <- 2800 / 600
-base_fig_height_in <- 1800 / 600
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
 base_col_width_in  <- base_fig_width_in / 3
 base_row_height_in <- base_fig_height_in
 if (n_panels_ait == 1L) {
@@ -363,7 +363,7 @@ if (n_panels_ait == 1L) {
   w_ait <- base_col_width_in * panel_cols_ait
   h_ait <- base_row_height_in * panel_rows_ait
 }
-fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 600, panel_cols_ait, panel_rows_ait)
+fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
@@ -418,7 +418,7 @@ if (n_panels_bc == 1L) {
   w_bc <- base_col_width_in * panel_cols_bc
   h_bc <- base_row_height_in * panel_rows_bc
 }
-fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 600, panel_cols_bc, panel_rows_bc)
+fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),

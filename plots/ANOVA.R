@@ -67,7 +67,7 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 600) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -293,7 +293,7 @@ p_clr <- make_boxplot(
   expression("Feature-wise ANOVA " * R^2 )
 )
 if (!is.null(p_clr)) {
-  fig_dims_clr <- apply_fig_overrides(4400 / 600, 1200 / 600, 600)
+  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
   ggsave(file.path(output_folder, "anova_aitchison.png"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
   ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,

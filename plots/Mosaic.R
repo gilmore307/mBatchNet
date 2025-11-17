@@ -212,5 +212,5 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch_id', '.outcome'))
-ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = 12, height = 8, dpi = 600)
-ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 600, compression = "lzw")
+ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = 12, height = 8, dpi = 300)
+ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
