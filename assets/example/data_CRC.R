@@ -2,10 +2,10 @@
 # Outputs:
 #   CRC:
 #     - raw_crc_cmgd.csv        (samples x OTUs, numeric, NO headers)
-#     - metadata_crc_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, CRC=1)
+#     - metadata_crc_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, CRC=1, + covariates)
 #   IBD:
 #     - raw_ibd_cmgd.csv        (samples x OTUs, numeric, NO headers)
-#     - metadata_ibd_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, IBD=1)
+#     - metadata_ibd_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, IBD=1, + covariates)
 
 quiet_install_bioc <- function(pkgs) {
   if (!requireNamespace("BiocManager", quietly = TRUE))
@@ -96,6 +96,94 @@ recode_batches <- function(batch_chr) {
   unname(mp[batch_chr])
 }
 
+# Covariate filtering based on your rules
+filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
+  if (!ncol(covars)) return(covars)
+  
+  keep <- rep(TRUE, ncol(covars))
+  names(keep) <- colnames(covars)
+  
+  for (j in seq_along(covars)) {
+    v  <- covars[[j]]
+    nm <- colnames(covars)[j]
+    
+    drop_reason <- NULL
+    
+    is_text <- is.character(v) || is.factor(v)
+    if (is_text) {
+      v_chr <- trimws(as.character(v))
+    } else {
+      v_chr <- NULL
+    }
+    
+    # 定义 missing（NA 或空字符）
+    if (is_text) {
+      missing <- is.na(v_chr) | v_chr == ""
+    } else {
+      missing <- is.na(v)
+    }
+    
+    # 1) 只要出现 NA 或空值，就删除整列
+    if (any(missing)) {
+      drop_reason <- sprintf("has %d NA/empty values", sum(missing))
+    } else {
+      # 去掉缺失后的有效值
+      if (is_text) {
+        v_use <- v_chr
+      } else {
+        v_use <- v
+      }
+      # 此时已经没有 NA/空了
+      nunique <- length(unique(v_use))
+      
+      # 2) 只有 0–1 个非缺失 unique 值
+      if (nunique <= 1) {
+        drop_reason <- "only 0–1 unique value"
+      }
+      
+      # 3) 与 batch_id 一一对应（每个 batch 只有一个取值）
+      if (is.null(drop_reason) && !is.null(batch_id) && length(batch_id) == length(v)) {
+        b  <- batch_id
+        ok <- !is.na(b)   # v 没有 missing，直接用
+        if (any(ok)) {
+          b_use <- b[ok]
+          x_use <- if (is_text) v_chr[ok] else v[ok]
+          per_batch_unique <- tapply(x_use, b_use, function(z) length(unique(z)))
+          if (all(per_batch_unique <= 1)) {
+            drop_reason <- "determined by batch_id (one value per batch)"
+          }
+        }
+      }
+      
+      # 4) 与 phenotype 一一对应（每个 phenotype 只有一个取值）
+      if (is.null(drop_reason) && !is.null(phenotype) && length(phenotype) == length(v)) {
+        p  <- phenotype
+        ok <- !is.na(p)
+        if (any(ok)) {
+          p_use <- p[ok]
+          x_use <- if (is_text) v_chr[ok] else v[ok]
+          per_pheno_unique <- tapply(x_use, p_use, function(z) length(unique(z)))
+          if (all(per_pheno_unique <= 1)) {
+            drop_reason <- "determined by phenotype (one value per phenotype level)"
+          }
+        }
+      }
+      
+      # 5) 文本型离散变量且 unique > 2
+      if (is.null(drop_reason) && is_text && nunique > 2) {
+        drop_reason <- sprintf("categorical text with %d unique values (>2)", nunique)
+      }
+    }
+    
+    if (!is.null(drop_reason)) {
+      keep[j] <- FALSE
+      message(sprintf("[%s] Dropping covariate '%s': %s", dataset_label, nm, drop_reason))
+    }
+  }
+  
+  covars[, keep, drop = FALSE]
+}
+
 # Write matrix (samples x OTUs) WITHOUT headers, and metadata with required columns
 write_outputs <- function(M_samples_x_otus, metadata_df, prefix) {
   stopifnot(nrow(M_samples_x_otus) == nrow(metadata_df))
@@ -110,7 +198,8 @@ message("==== CRC ====")
 smd <- curatedMetagenomicData::sampleMetadata
 
 crc_studies <- unique(na.omit(smd$study_name[smd$study_condition == "CRC"]))
-crc_meta <- smd[smd$study_name %in% crc_studies & smd$study_condition %in% c("control","CRC"), ]
+crc_meta <- smd[smd$study_name %in% crc_studies &
+                  smd$study_condition %in% c("control","CRC"), ]
 rownames(crc_meta) <- crc_meta$sample_id
 
 crc_mat <- NULL
@@ -123,11 +212,13 @@ for (st in unique(crc_meta$study_name)) {
     message(sprintf("[CRC] %s -> no matrix", st))
   }
 }
-if (is.null(crc_mat) || is.null(dim(crc_mat))) stop("CRC: merged matrix is empty; no products found.")
+if (is.null(crc_mat) || is.null(dim(crc_mat)))
+  stop("CRC: merged matrix is empty; no products found.")
 
 # Intersect with selected samples only here
 keep_cols <- intersect(colnames(crc_mat), rownames(crc_meta))
-if (!length(keep_cols)) stop("CRC: no overlapping sample_ids between merged matrix and crc_meta.")
+if (!length(keep_cols))
+  stop("CRC: no overlapping sample_ids between merged matrix and crc_meta.")
 crc_mat  <- as.matrix(crc_mat[, keep_cols, drop = FALSE])
 crc_meta <- crc_meta[keep_cols, , drop = FALSE]
 
@@ -153,13 +244,31 @@ crc_meta$study_name <- sub("ThomasAM_2018b", "ThomasAM_2018", crc_meta$study_nam
 crc_mat <- crc_mat[, rownames(crc_meta), drop = FALSE]
 
 # Build outputs
-crc_M <- t(crc_mat); storage.mode(crc_M) <- "double"         # samples x OTUs, numeric
-crc_batch_id <- recode_batches(crc_meta$study_name)          # batches from (possibly merged) study_name
-crc_pheno    <- ifelse(crc_meta$study_condition == "CRC", 1L, 0L)
+crc_M <- t(crc_mat)
+storage.mode(crc_M) <- "double"           # samples x OTUs, numeric
+
+crc_meta_df  <- as.data.frame(crc_meta)
+crc_batch_id <- recode_batches(crc_meta_df$study_name)          # batches from (possibly merged) study_name
+crc_pheno    <- ifelse(crc_meta_df$study_condition == "CRC", 1L, 0L)
+
+message("[CRC] batch_id source column   : 'study_name'")
+message("[CRC] phenotype source column : 'study_condition' (CRC=1, control=0)")
+
+# Covariates: remove columns used for ID / batch / phenotype
+crc_covars_raw <- crc_meta_df[, setdiff(colnames(crc_meta_df),
+                                        c("sample_id", "study_name", "study_condition")),
+                              drop = FALSE]
+
+# Apply covariate filters
+crc_covars <- filter_covariates(crc_covars_raw,
+                                batch_id   = crc_batch_id,
+                                phenotype  = crc_pheno,
+                                dataset_label = "CRC")
 
 crc_metadata <- data.frame(
   batch_id  = crc_batch_id,
   phenotype = crc_pheno,
+  crc_covars,
   stringsAsFactors = FALSE
 )
 
@@ -185,11 +294,13 @@ for (st in unique(ibd_meta$study_name)) {
     message(sprintf("[IBD] %s -> no matrix", st))
   }
 }
-if (is.null(ibd_mat) || is.null(dim(ibd_mat))) stop("IBD: merged matrix is empty; no products found.")
+if (is.null(ibd_mat) || is.null(dim(ibd_mat)))
+  stop("IBD: merged matrix is empty; no products found.")
 
 # Intersect with selected samples only here
 keep_cols <- intersect(colnames(ibd_mat), rownames(ibd_meta))
-if (!length(keep_cols)) stop("IBD: no overlapping sample_ids between merged matrix and ibd_meta.")
+if (!length(keep_cols))
+  stop("IBD: no overlapping sample_ids between merged matrix and ibd_meta.")
 ibd_mat  <- as.matrix(ibd_mat[, keep_cols, drop = FALSE])
 ibd_meta <- ibd_meta[keep_cols, , drop = FALSE]
 
@@ -214,13 +325,31 @@ ibd_meta$study_name <- gsub("LifeLinesDeep_2016", "VilaAV_2018", ibd_meta$study_
 ibd_mat <- ibd_mat[, rownames(ibd_meta), drop = FALSE]
 
 # Build outputs
-ibd_M <- t(ibd_mat); storage.mode(ibd_M) <- "double"         # samples x OTUs
-ibd_batch_id <- recode_batches(ibd_meta$study_name)
-ibd_pheno    <- ifelse(ibd_meta$study_condition == "IBD", 1L, 0L)
+ibd_M <- t(ibd_mat)
+storage.mode(ibd_M) <- "double"           # samples x OTUs
+
+ibd_meta_df  <- as.data.frame(ibd_meta)
+ibd_batch_id <- recode_batches(ibd_meta_df$study_name)
+ibd_pheno    <- ifelse(ibd_meta_df$study_condition == "IBD", 1L, 0L)
+
+message("[IBD] batch_id source column   : 'study_name'")
+message("[IBD] phenotype source column : 'study_condition' (IBD=1, control=0)")
+
+# Covariates: remove columns used for ID / batch / phenotype
+ibd_covars_raw <- ibd_meta_df[, setdiff(colnames(ibd_meta_df),
+                                        c("sample_id", "study_name", "study_condition")),
+                              drop = FALSE]
+
+# Apply covariate filters
+ibd_covars <- filter_covariates(ibd_covars_raw,
+                                batch_id   = ibd_batch_id,
+                                phenotype  = ibd_pheno,
+                                dataset_label = "IBD")
 
 ibd_metadata <- data.frame(
   batch_id  = ibd_batch_id,
   phenotype = ibd_pheno,
+  ibd_covars,
   stringsAsFactors = FALSE
 )
 
@@ -228,3 +357,4 @@ write_outputs(ibd_M, ibd_metadata, prefix = "ibd_cmgd")
 message("Wrote: raw_ibd_cmgd.csv, metadata_ibd_cmgd.csv")
 
 cat("Done.\n")
+
