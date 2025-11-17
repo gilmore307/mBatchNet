@@ -6,6 +6,21 @@ run_method("ConQuR", {
   suppressPackageStartupMessages({ library(ConQuR); library(doParallel) })
   X_cnt <- get_input_for("ConQuR", base_M, base_form)
   covariates <- metadata[, colnames(covar), drop = FALSE]
+
+  lib_sizes <- rowSums(X_cnt)
+  keep_lib <- !is.na(lib_sizes) & lib_sizes > 0
+  if (!all(keep_lib)) {
+    warn_step(
+      "ConQuR",
+      sprintf(
+        "Dropped %d sample(s) with zero/NA library size before ConQuR.",
+        sum(!keep_lib)
+      )
+    )
+    metadata <- metadata[keep_lib, , drop = FALSE]
+    X_cnt <- X_cnt[keep_lib, , drop = FALSE]
+    covariates <- covariates[keep_lib, , drop = FALSE]
+  }
   complete_rows <- !is.na(metadata$batch_id)
   if (ncol(covariates)) {
     complete_rows <- complete_rows & stats::complete.cases(covariates)
@@ -69,6 +84,15 @@ run_method("ConQuR", {
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
   batch_id <- droplevels(as.factor(metadata$batch_id))
   batch_counts <- table(batch_id)
+
+  if (any(batch_counts < 1) || length(batch_counts) < 2) {
+    stop(
+      sprintf(
+        "ConQuR requires at least two batch levels with samples after filtering (counts: %s).",
+        paste(sprintf("%s=%d", names(batch_counts), as.integer(batch_counts)), collapse = ", ")
+      )
+    )
+  }
 
   res_pos <- suppressWarnings(
     tryCatch(
