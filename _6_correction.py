@@ -54,6 +54,9 @@ def _parse_italic_text(text: str) -> object:
     return parts
 
 
+_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
+
+
 def correction_layout(active_path: str):
     return html.Div(
         [
@@ -117,11 +120,11 @@ def register_correction_callbacks(app):
         header = html.Thead(
             html.Tr(
                 [
-                    html.Th("Methods"),
-                    html.Th("Avg Time (s)"),
-                    html.Th("Status"),
-                    html.Th("Run Correction", className="text-center"),
-                    html.Th("Delete", className="text-center"),
+                    html.Th("Methods", style=_COLUMN_WIDTH),
+                    html.Th("Avg Time (s)", style=_COLUMN_WIDTH),
+                    html.Th("Status", style=_COLUMN_WIDTH),
+                    html.Th("Run Correction", className="text-center", style=_COLUMN_WIDTH),
+                    html.Th("Delete", className="text-center", style=_COLUMN_WIDTH),
                     html.Th("Citation"),
                 ]
             )
@@ -154,13 +157,14 @@ def register_correction_callbacks(app):
                     className="be-cell-loading",
                 ),
                 className="text-center",
+                style=_COLUMN_WIDTH,
             )
             run_button = dbc.Button(
                 "Run Correction",
                 id={"type": "method-run-button", "code": code},
                 color=button_color(run_disabled),
                 size="sm",
-                style={"width": "250px"},
+                style={"width": "200px"},
                 disabled=run_disabled,
                 n_clicks=0,
             )
@@ -172,13 +176,14 @@ def register_correction_callbacks(app):
                     className="be-cell-loading",
                 ),
                 className="text-center be-run-cell",
+                style=_COLUMN_WIDTH,
             )
             delete_button = dbc.Button(
                 "Delete",
                 id={"type": "method-delete-button", "code": code},
                 color=button_color(delete_disabled),
                 size="sm",
-                style={"width": "250px"},
+                style={"width": "200px"},
                 disabled=delete_disabled,
                 n_clicks=0,
             )
@@ -190,6 +195,7 @@ def register_correction_callbacks(app):
                     className="be-cell-loading",
                 ),
                 className="text-center be-delete-cell",
+                style=_COLUMN_WIDTH,
             )
             metadata = METHOD_REFERENCE_BY_CODE.get(code, {})
             package_url = (metadata.get("package") or "").strip()
@@ -221,8 +227,8 @@ def register_correction_callbacks(app):
             citation_cell = html.Td(citation_content)
             row = html.Tr(
                 [
-                    html.Td(method_display),
-                    html.Td(avg_display),
+                    html.Td(method_display, style=_COLUMN_WIDTH),
+                    html.Td(avg_display, style=_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
                     delete_cell,
