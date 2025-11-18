@@ -158,6 +158,59 @@ write_binary_metadata <- function(output_dir) {
   invisible(NULL)
 }
 
+# Convert all metadata columns (except identifiers/batch) to numeric encodings,
+# writing a parallel metadata_numeric.csv for correction methods while keeping
+# the original metadata.csv (with text labels) for plotting.
+encode_to_numeric <- function(x) {
+  if (is.numeric(x)) return(list(values = as.numeric(x), mapping = NULL))
+  if (is.logical(x)) return(list(values = as.integer(x), mapping = data.frame(label = c(FALSE, TRUE), numeric = 0:1)))
+
+  vals <- trimws(as.character(x))
+  levels <- unique(vals[!is.na(vals)])
+  if (!length(levels)) {
+    return(list(values = rep(NA_real_, length(x)), mapping = NULL))
+  }
+
+  codes <- match(vals, levels) - 1L
+  list(
+    values  = as.numeric(codes),
+    mapping = data.frame(label = levels, numeric = seq_along(levels) - 1L, stringsAsFactors = FALSE)
+  )
+}
+
+write_numeric_metadata <- function(output_dir) {
+  meta_path <- file.path(output_dir, "metadata.csv")
+  if (!file.exists(meta_path)) return(invisible(NULL))
+
+  t0 <- start_step("Convert metadata to numeric (metadata_numeric.csv)")
+  meta <- tryCatch(utils::read.csv(meta_path, check.names = FALSE), error = function(e) NULL)
+  if (is.null(meta)) {
+    warn_step("metadata_numeric.csv", "Failed to read metadata.csv; skipping numeric copy.")
+    return(invisible(NULL))
+  }
+
+  keep_cols <- c("sample_id", "batch_id")
+  num_meta <- meta
+  col_maps <- list()
+
+  for (nm in colnames(num_meta)) {
+    if (nm %in% keep_cols) next
+    enc <- encode_to_numeric(num_meta[[nm]])
+    num_meta[[nm]] <- enc$values
+    if (!is.null(enc$mapping)) col_maps[[nm]] <- enc$mapping
+  }
+
+  utils::write.csv(num_meta, file.path(output_dir, "metadata_numeric.csv"), row.names = FALSE)
+
+  # Save an optional mapping helper for debugging/reference
+  if (length(col_maps)) {
+    jsonlite::write_json(col_maps, file.path(output_dir, "metadata_numeric_mappings.json"), pretty = TRUE, auto_unbox = TRUE)
+  }
+
+  ok_step("Convert metadata to numeric (metadata_numeric.csv)", t0)
+  invisible(NULL)
+}
+
 # --- If called as a script from Upload step, fix duplicates in-place ---
 try({
   meta_path <- file.path(output_folder, "metadata.csv")
@@ -401,6 +454,10 @@ if (isTRUE(run_main)) {
   # Prepare binary phenotype metadata for downstream correction while
   # preserving the original labels for plotting.
   write_binary_metadata(output_folder)
+
+  # Create a numeric-only copy of metadata (except batch/sample_id) for
+  # correction methods that require numeric covariates.
+  write_numeric_metadata(output_folder)
 
   # Prefer header-less numeric matrix; fall back to headered if needed
   read_matrix_guess <- function(p) {
