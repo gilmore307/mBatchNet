@@ -194,17 +194,50 @@ get_input_for <- function(method, base_M, base_form) {
 # ---------------------------
 custom_matrix_path    <- file.path(output_folder, "raw.csv")
 custom_metadata_path  <- file.path(output_folder, "metadata.csv")
+custom_metadata_binary_path <- file.path(output_folder, "metadata_binary.csv")
+phenotype_map_path    <- file.path(output_folder, "phenotype_mapping.csv")
 default_matrix_path   <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path <- file.path("assets", "example", "metadata_1.csv")
 
 if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   say("✅ Using uploaded user files")
   uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
-  metadata     <- read.csv(custom_metadata_path, check.names = FALSE)
+  if (file.exists(custom_metadata_binary_path)) {
+    metadata <- read.csv(custom_metadata_binary_path, check.names = FALSE)
+  } else {
+    metadata <- read.csv(custom_metadata_path, check.names = FALSE)
+  }
 } else {
   say("⚠️ No uploaded files found — using default assets")
   uploaded_mat <- read.csv(default_matrix_path, header = FALSE, check.names = FALSE)
   metadata     <- read.csv(default_metadata_path, check.names = FALSE)
+}
+
+phenotype_mapping <- NULL
+if (file.exists(phenotype_map_path)) {
+  phenotype_mapping <- tryCatch(read.csv(phenotype_map_path, check.names = FALSE), error = function(e) NULL)
+}
+
+conv_pheno <- convert_phenotype_to_binary(metadata)
+if (isTRUE(conv_pheno$changed)) {
+  metadata <- conv_pheno$metadata
+  if (!is.null(conv_pheno$mapping)) phenotype_mapping <- conv_pheno$mapping
+  say("ℹ️ Converted phenotype to binary for correction use")
+} else if (!is.null(conv_pheno$reason)) {
+  say("ℹ️ Phenotype left unchanged: ", conv_pheno$reason)
+}
+
+if (!is.na(CONTROL_LABEL)) {
+  if (!is.null(phenotype_mapping) && "label" %in% colnames(phenotype_mapping)) {
+    mapped <- phenotype_mapping$binary[match(CONTROL_LABEL, phenotype_mapping$label)]
+    if (length(mapped) && is.finite(mapped[1])) {
+      CONTROL_LABEL <- mapped[1]
+    }
+  }
+  if (is.character(CONTROL_LABEL)) {
+    num_label <- suppressWarnings(as.numeric(CONTROL_LABEL))
+    if (is.finite(num_label)) CONTROL_LABEL <- num_label
+  }
 }
 
 check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)

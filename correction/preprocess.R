@@ -63,6 +63,75 @@ make_unique_sample_ids <- function(metadata, id_col = "sample_id", sep = "_") {
   metadata
 }
 
+# Convert a text phenotype column with two unique levels into binary 0/1 values.
+# Returns a list with the updated metadata, a mapping (label -> binary), and a
+# boolean indicating whether conversion occurred. If conversion is not possible,
+# `changed` is FALSE and `metadata` is returned unchanged.
+convert_phenotype_to_binary <- function(metadata) {
+  if (!is.data.frame(metadata)) return(list(metadata = metadata, mapping = NULL, changed = FALSE))
+  if (!("phenotype" %in% colnames(metadata))) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "'phenotype' missing"))
+  }
+
+  pheno <- metadata$phenotype
+  # If already numeric (or logical), leave as-is
+  if (is.numeric(pheno) || is.logical(pheno)) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "phenotype already numeric"))
+  }
+
+  ph_chr <- trimws(as.character(pheno))
+  uniq <- unique(ph_chr[!is.na(ph_chr) & nzchar(ph_chr)])
+  if (length(uniq) != 2) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "phenotype needs exactly 2 unique text levels"))
+  }
+
+  # Deterministic mapping: first sorted level -> 0, second -> 1
+  uniq <- sort(uniq)
+  ph_bin <- ifelse(ph_chr == uniq[1], 0L, 1L)
+  metadata$phenotype <- as.integer(ph_bin)
+
+  mapping <- data.frame(
+    label = uniq,
+    binary = c(0L, 1L),
+    stringsAsFactors = FALSE
+  )
+
+  list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted text phenotype to binary")
+}
+
+# Write a binary-phenotype metadata copy (metadata_binary.csv) and mapping file
+# when possible, keeping the original metadata.csv intact for plots.
+write_binary_metadata <- function(output_dir) {
+  meta_path <- file.path(output_dir, "metadata.csv")
+  if (!file.exists(meta_path)) return(invisible(NULL))
+
+  t0 <- start_step("Prepare binary phenotype metadata")
+  meta <- tryCatch(utils::read.csv(meta_path, check.names = FALSE), error = function(e) NULL)
+  if (is.null(meta)) {
+    warn_step("metadata.csv", "Failed to read; skipping binary phenotype copy.")
+    return(invisible(NULL))
+  }
+
+  res <- convert_phenotype_to_binary(meta)
+  if (!isTRUE(res$changed)) {
+    if (!is.null(res$reason)) {
+      warn_step("metadata.csv", res$reason)
+    } else {
+      warn_step("metadata.csv", "Unable to convert phenotype to binary.")
+    }
+    ok_step("Prepare binary phenotype metadata", t0)
+    return(invisible(NULL))
+  }
+
+  out_path <- file.path(output_dir, "metadata_binary.csv")
+  utils::write.csv(res$metadata, out_path, row.names = FALSE)
+  map_path <- file.path(output_dir, "phenotype_mapping.csv")
+  utils::write.csv(res$mapping, map_path, row.names = FALSE)
+
+  ok_step("Prepare binary phenotype metadata", t0)
+  invisible(NULL)
+}
+
 # --- If called as a script from Upload step, fix duplicates in-place ---
 try({
   meta_path <- file.path(output_folder, "metadata.csv")
@@ -302,6 +371,10 @@ if (isTRUE(run_main)) {
   say("▶ Converting to TSS & CLR")
   say("Output folder: ", normalizePath(output_folder, winslash = "/"))
   say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
+
+  # Prepare binary phenotype metadata for downstream correction while
+  # preserving the original labels for plotting.
+  write_binary_metadata(output_folder)
 
   # Prefer header-less numeric matrix; fall back to headered if needed
   read_matrix_guess <- function(p) {
