@@ -68,7 +68,12 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   list(width = w, height = h, dpi = dpi)
 }
 
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
@@ -308,7 +313,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
 # --------- Compute & plot: A) Aitchison (CLR + RDA) ---------
 if (length(file_list_clr)) {
   batch_col <- "batch_id"; treat_col <- "phenotype"
-  if (!("phenotype" %in% names(metadata))) stop("metadata.csv has no 'phenotype'.")
+if (!("phenotype" %in% names(metadata))) stop("metadata file has no 'phenotype'.")
   if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs >= 2 levels.")
   
   parts_df_aitch <- lapply(names(file_list_clr), function(nm) {

@@ -29,8 +29,13 @@ try({
   }
 }, silent = TRUE)
 
-# ==== Read metadata (metadata.csv) ====
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+# ==== Read metadata (prefer metadata_origin.csv for text labels) ====
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
@@ -54,7 +59,7 @@ if (is.null(PHENO_COL) || !(PHENO_COL %in% names(metadata))) {
 
 # Check if the phenotype/label column exists
 if (is.null(PHENO_COL) || !PHENO_COL %in% names(metadata))
-  stop("Label column not found in metadata.csv; cannot build mosaic plot.")
+  stop("Label column not found in metadata; cannot build mosaic plot.")
 
 # Prepare .outcome as a two-class factor, keeping the user's original labels
 vals <- as.character(metadata[[PHENO_COL]])

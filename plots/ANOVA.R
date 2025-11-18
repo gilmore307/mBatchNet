@@ -82,7 +82,12 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
 }
 
 # ----------------- Read metadata -----------------
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
@@ -104,7 +109,7 @@ if (!(label_col %in% names(metadata))) {
   } else if ("phenotype" %in% names(metadata)) {
     label_col <- "phenotype"
   } else {
-    stop("metadata.csv lacks a label column for ANOVA plots.")
+    stop("metadata file lacks a label column for ANOVA plots.")
   }
 }
 
@@ -233,9 +238,9 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = la
 }
 
 # ----------------- Build per-feature R^2 across all methods -----------------
-if (!(label_col %in% names(metadata))) stop("metadata.csv lacks the label column.")
+if (!(label_col %in% names(metadata))) stop("metadata file lacks the label column.")
 if (dplyr::n_distinct(metadata[[label_col]]) < 2) stop("Label column needs at least 2 levels.")
-if (!("batch_id" %in% names(metadata))) stop("metadata.csv lacks 'batch_id'.")
+if (!("batch_id" %in% names(metadata))) stop("metadata file lacks 'batch_id'.")
 if (dplyr::n_distinct(metadata$batch_id)   < 2) stop("'batch_id' needs at least 2 levels.")
 
 # CLR set

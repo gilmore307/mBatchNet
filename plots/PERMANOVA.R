@@ -53,8 +53,13 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
 }
 
 # --------- Load metadata ---------
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
-if (!("batch_id" %in% names(metadata))) stop("metadata.csv must contain 'batch_id'.")
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
+if (!("batch_id" %in% names(metadata))) stop("metadata file must contain 'batch_id'.")
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }

@@ -430,7 +430,7 @@ def register_upload_callbacks(app):
                     if raw_src.exists():
                         shutil.copy2(raw_src, session_dir / "raw.csv")
                     if meta_src.exists():
-                        shutil.copy2(meta_src, session_dir / "metadata.csv")
+                        shutil.copy2(meta_src, session_dir / "metadata_origin.csv")
                     # Build file info
                     if (session_dir / "raw.csv").exists():
                         size = (session_dir / "raw.csv").stat().st_size
@@ -438,11 +438,13 @@ def register_upload_callbacks(app):
                             dbc.Badge("Loaded", color="info", className="me-2"),
                             html.Span(f"Source: {raw_src.relative_to(BASE_DIR)} | Saved as: raw.csv | {human_size(size)}"),
                         )
-                    if (session_dir / "metadata.csv").exists():
-                        size = (session_dir / "metadata.csv").stat().st_size
+                    if (session_dir / "metadata_origin.csv").exists():
+                        size = (session_dir / "metadata_origin.csv").stat().st_size
                         metadata_info = (
                             dbc.Badge("Loaded", color="info", className="me-2"),
-                            html.Span(f"Source: {meta_src.relative_to(BASE_DIR)} | Saved as: metadata.csv | {human_size(size)}"),
+                            html.Span(
+                                f"Source: {meta_src.relative_to(BASE_DIR)} | Saved as: metadata_origin.csv | {human_size(size)}"
+                            ),
                         )
                     example_status = html.Span("Example files loaded.")
                     example_loaded_out = True
@@ -459,15 +461,15 @@ def register_upload_callbacks(app):
             saved_items.append(f"Matrix saved as raw.csv (source: {matrix_name})")
 
         if metadata_contents and trig == "upload-metadata":
-            save_uploaded_file(metadata_contents, session_dir, "metadata.csv")
-            size = (session_dir / "metadata.csv").stat().st_size
+            save_uploaded_file(metadata_contents, session_dir, "metadata_origin.csv")
+            size = (session_dir / "metadata_origin.csv").stat().st_size
             metadata_info = (
                 dbc.Badge("Uploaded", color="success", className="me-2"),
-                html.Span(f"Source: {metadata_name} | Saved as: metadata.csv | {human_size(size)}"),
+                html.Span(f"Source: {metadata_name} | Saved as: metadata_origin.csv | {human_size(size)}"),
             )
-            saved_items.append(f"Metadata saved as metadata.csv (source: {metadata_name})")
+            saved_items.append(f"Metadata saved as metadata_origin.csv (source: {metadata_name})")
 
-        upload_complete = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+        upload_complete = (session_dir / "raw.csv").exists() and (session_dir / "metadata_origin.csv").exists()
         return upload_complete, matrix_info, metadata_info, example_status, example_loaded_out
 
     @app.callback(
@@ -499,7 +501,7 @@ def register_upload_callbacks(app):
             return html.Div()
 
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata.csv"
+        meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return html.Div("Metadata file not found; preprocess the data first.", className="text-danger")
 
@@ -510,7 +512,7 @@ def register_upload_callbacks(app):
                 reader = csv.DictReader(fh)
                 rows = list(reader)
         except Exception:
-            return html.Div("Failed to read metadata.csv for study settings.", className="text-danger")
+            return html.Div("Failed to read metadata_origin.csv for study settings.", className="text-danger")
         if not rows:
             return html.Div("Metadata file is empty; unable to configure study settings.", className="text-danger")
 
@@ -670,7 +672,7 @@ def register_upload_callbacks(app):
         if not session_id:
             return dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata.csv"
+        meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return dash.no_update, dash.no_update
 
@@ -710,7 +712,7 @@ def register_upload_callbacks(app):
             ], className="mt-2")
 
             info = html.Div([
-                html.H6("Columns in metadata.csv:"),
+                html.H6("Columns in metadata_origin.csv:"),
                 chips,
             ])
             return info, mapping_display
@@ -755,7 +757,7 @@ def register_upload_callbacks(app):
             ], className="mt-2")
 
             info = html.Div([
-                html.H6("Columns in metadata.csv:"),
+                html.H6("Columns in metadata_origin.csv:"),
                 chips,
             ])
             return info, mapping_ui
@@ -785,7 +787,7 @@ def register_upload_callbacks(app):
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata.csv"
+        meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
@@ -849,7 +851,7 @@ def register_upload_callbacks(app):
         if not session_id:
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata.csv"
+        meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 

@@ -63,12 +63,12 @@ make_unique_sample_ids <- function(metadata, id_col = "sample_id", sep = "_") {
   metadata
 }
 
+TARGET_BINARY_COL <- "target_binary"
+
 # Convert a text or numeric label column into target_binary (0/1).
 # Returns a list with the updated metadata, a mapping (label -> binary), and a
 # boolean indicating whether conversion occurred. If conversion is not possible,
 # `changed` is FALSE and `metadata` is returned unchanged.
-TARGET_BINARY_COL <- "target_binary"
-
 resolve_label_column <- function(metadata, output_dir) {
   cfg_path <- file.path(output_dir, "session_config.json")
   label_col <- NULL
@@ -123,44 +123,6 @@ convert_target_to_binary <- function(metadata, label_col) {
   list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
 }
 
-# Write the target_binary column into metadata.csv and emit a mapping file
-# when possible, keeping the original label column intact for plots.
-write_binary_metadata <- function(output_dir) {
-  meta_path <- file.path(output_dir, "metadata.csv")
-  if (!file.exists(meta_path)) return(invisible(NULL))
-
-  t0 <- start_step("Prepare binary target metadata")
-  meta <- tryCatch(utils::read.csv(meta_path, check.names = FALSE), error = function(e) NULL)
-  if (is.null(meta)) {
-    warn_step("metadata.csv", "Failed to read; skipping binary target copy.")
-    return(invisible(NULL))
-  }
-
-  label_col <- resolve_label_column(meta, output_dir)
-  res <- convert_target_to_binary(meta, label_col)
-  if (!isTRUE(res$changed)) {
-    if (!is.null(res$reason)) {
-      warn_step("metadata.csv", res$reason)
-    } else {
-      warn_step("metadata.csv", "Unable to convert target to binary.")
-    }
-    ok_step("Prepare binary target metadata", t0)
-    return(invisible(NULL))
-  }
-
-  # Persist target_binary onto the main metadata.csv so downstream steps can
-  # read a single file while keeping the original label column intact for plots.
-  utils::write.csv(res$metadata, meta_path, row.names = FALSE)
-  map_path <- file.path(output_dir, "target_binary_mapping.csv")
-  utils::write.csv(res$mapping, map_path, row.names = FALSE)
-
-  ok_step("Prepare binary target metadata", t0)
-  invisible(NULL)
-}
-
-# Convert all metadata columns (except identifiers/batch) to numeric encodings,
-# writing a parallel metadata_numeric.csv for correction methods while keeping
-# the original metadata.csv (with text labels) for plotting.
 encode_to_numeric <- function(x) {
   if (is.numeric(x)) return(list(values = as.numeric(x), mapping = NULL))
   if (is.logical(x)) return(list(values = as.integer(x), mapping = data.frame(label = c(FALSE, TRUE), numeric = 0:1)))
@@ -178,36 +140,63 @@ encode_to_numeric <- function(x) {
   )
 }
 
-write_numeric_metadata <- function(output_dir) {
-  meta_path <- file.path(output_dir, "metadata.csv")
-  if (!file.exists(meta_path)) return(invisible(NULL))
+prepare_metadata_outputs <- function(output_dir) {
+  origin_path <- file.path(output_dir, "metadata_origin.csv")
+  corr_path   <- file.path(output_dir, "metadata.csv")
 
-  t0 <- start_step("Convert metadata to numeric (metadata_numeric.csv)")
-  meta <- tryCatch(utils::read.csv(meta_path, check.names = FALSE), error = function(e) NULL)
+  src_path <- if (file.exists(origin_path)) origin_path else corr_path
+  if (!file.exists(src_path)) return(invisible(NULL))
+
+  t0 <- start_step("Prepare metadata for correction")
+  meta <- tryCatch(utils::read.csv(src_path, check.names = FALSE), error = function(e) NULL)
   if (is.null(meta)) {
-    warn_step("metadata_numeric.csv", "Failed to read metadata.csv; skipping numeric copy.")
+    warn_step("metadata", "Failed to read metadata; skipping metadata prep.")
     return(invisible(NULL))
   }
 
-  keep_cols <- c("sample_id", "batch_id")
+  # Ensure sample_id
+  if (!("sample_id" %in% colnames(meta))) {
+    meta$sample_id <- sprintf("S%03d", seq_len(nrow(meta)))
+  }
+  meta <- make_unique_sample_ids(meta, id_col = "sample_id", sep = "_")
+
+  label_col <- resolve_label_column(meta, output_dir)
+  bin_res <- convert_target_to_binary(meta, label_col)
+  if (!is.null(bin_res$metadata)) meta <- bin_res$metadata
+
+  # Textual copy kept for plotting
+  meta_text <- meta
+
+  # Numeric encoding for correction
+  keep_cols <- c("sample_id", "batch_id", TARGET_BINARY_COL)
   num_meta <- meta
   col_maps <- list()
-
   for (nm in colnames(num_meta)) {
-    if (nm %in% keep_cols) next
+    if (nm %in% keep_cols) {
+      if (nm == TARGET_BINARY_COL) {
+        num_meta[[nm]] <- suppressWarnings(as.numeric(num_meta[[nm]]))
+      }
+      next
+    }
     enc <- encode_to_numeric(num_meta[[nm]])
     num_meta[[nm]] <- enc$values
     if (!is.null(enc$mapping)) col_maps[[nm]] <- enc$mapping
   }
 
-  utils::write.csv(num_meta, file.path(output_dir, "metadata_numeric.csv"), row.names = FALSE)
+  utils::write.csv(meta_text, origin_path, row.names = FALSE)
+  utils::write.csv(num_meta, corr_path, row.names = FALSE)
 
-  # Save an optional mapping helper for debugging/reference
-  if (length(col_maps)) {
-    jsonlite::write_json(col_maps, file.path(output_dir, "metadata_numeric_mappings.json"), pretty = TRUE, auto_unbox = TRUE)
+  mapping_payload <- list(
+    label_column = label_col,
+    target_binary = if (!is.null(bin_res$mapping)) list(label_column = label_col, mapping = bin_res$mapping) else NULL,
+    encodings = if (length(col_maps)) col_maps else NULL
+  )
+  map_path <- file.path(output_dir, "metadata_mappings.json")
+  if (length(Filter(Negate(is.null), mapping_payload)) > 0) {
+    jsonlite::write_json(mapping_payload, map_path, pretty = TRUE, auto_unbox = TRUE)
   }
 
-  ok_step("Convert metadata to numeric (metadata_numeric.csv)", t0)
+  ok_step("Prepare metadata for correction", t0)
   invisible(NULL)
 }
 
@@ -451,13 +440,9 @@ if (isTRUE(run_main)) {
   say("Output folder: ", normalizePath(output_folder, winslash = "/"))
   say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
 
-  # Prepare binary phenotype metadata for downstream correction while
-  # preserving the original labels for plotting.
-  write_binary_metadata(output_folder)
-
-  # Create a numeric-only copy of metadata (except batch/sample_id) for
-  # correction methods that require numeric covariates.
-  write_numeric_metadata(output_folder)
+  # Prepare metadata: keep a text copy for plotting and write numeric encodings
+  # (including target_binary) into metadata.csv for correction.
+  prepare_metadata_outputs(output_folder)
 
   # Prefer header-less numeric matrix; fall back to headered if needed
   read_matrix_guess <- function(p) {

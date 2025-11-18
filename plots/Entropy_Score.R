@@ -112,16 +112,21 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
 }
 
 # --------- Load metadata ---------
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!(LABEL_COL %in% names(metadata))) {
-  stop(sprintf("metadata.csv must contain a '%s' column.", LABEL_COL))
+  stop(sprintf("metadata must contain a '%s' column.", LABEL_COL))
 }
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 if (!(LABEL_COL %in% names(metadata))) {
-  stop(sprintf("metadata.csv must contain a '%s' column.", LABEL_COL))
+  stop(sprintf("metadata must contain a '%s' column.", LABEL_COL))
 }
 
 # --------- Collect CLR files ---------

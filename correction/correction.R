@@ -251,9 +251,9 @@ get_input_for <- function(method, base_M, base_form) {
 # Load data (matrix + metadata)
 # ---------------------------
 custom_matrix_path      <- file.path(output_folder, "raw.csv")
-custom_metadata_path    <- file.path(output_folder, "metadata_numeric.csv")
-fallback_metadata_path  <- file.path(output_folder, "metadata.csv")
-target_map_path         <- file.path(output_folder, "target_binary_mapping.csv")
+custom_metadata_path    <- file.path(output_folder, "metadata.csv")
+fallback_metadata_path  <- file.path(output_folder, "metadata_origin.csv")
+mapping_path            <- file.path(output_folder, "metadata_mappings.json")
 default_matrix_path     <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path   <- file.path("assets", "example", "metadata_1.csv")
 
@@ -262,7 +262,7 @@ if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
   metadata <- read.csv(custom_metadata_path, check.names = FALSE)
 } else if (file.exists(custom_matrix_path) && file.exists(fallback_metadata_path)) {
-  say("✅ Using uploaded matrix with fallback metadata.csv")
+  say("✅ Using uploaded matrix with fallback metadata_origin.csv")
   uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
   metadata <- read.csv(fallback_metadata_path, check.names = FALSE)
 } else {
@@ -272,18 +272,24 @@ if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
 }
 
 target_mapping <- NULL
-if (file.exists(target_map_path)) {
-  target_mapping <- tryCatch(read.csv(target_map_path, check.names = FALSE), error = function(e) NULL)
+map_config <- NULL
+if (file.exists(mapping_path) && .can_json) {
+  map_config <- tryCatch(jsonlite::fromJSON(mapping_path), error = function(e) NULL)
+  if (!is.null(map_config$target_binary$mapping)) {
+    target_mapping <- map_config$target_binary$mapping
+  }
 }
 
-label_col <- resolve_label_column(metadata, output_folder)
-conv_target <- convert_target_to_binary(metadata, label_col)
-if (isTRUE(conv_target$changed)) {
-  metadata <- conv_target$metadata
-  if (!is.null(conv_target$mapping)) target_mapping <- conv_target$mapping
-  say("ℹ️ Converted target to binary for correction use")
-} else if (!is.null(conv_target$reason)) {
-  say("ℹ️ Target left unchanged: ", conv_target$reason)
+label_col <- if (!is.null(map_config$label_column)) map_config$label_column else resolve_label_column(metadata, output_folder)
+if (!(TARGET_BINARY_COL %in% colnames(metadata))) {
+  conv_target <- convert_target_to_binary(metadata, label_col)
+  if (isTRUE(conv_target$changed)) {
+    metadata <- conv_target$metadata
+    if (!is.null(conv_target$mapping)) target_mapping <- conv_target$mapping
+    say("ℹ️ Converted target to binary for correction use")
+  } else if (!is.null(conv_target$reason)) {
+    say("ℹ️ Target left unchanged: ", conv_target$reason)
+  }
 }
 
 if (!is.na(CONTROL_LABEL)) {
