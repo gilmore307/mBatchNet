@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(uwot)
   library(cluster)   # silhouette
+  library(jsonlite)
 })
 
 # ---- Config ----
@@ -95,6 +96,14 @@ if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) LABEL_COL_NAME <- cfg$label_column
+  }
+}, silent = TRUE)
 
 # Try a sensible fallback label if 'phenotype' is missing
 if (!(LABEL_COL_NAME %in% names(metadata))) {

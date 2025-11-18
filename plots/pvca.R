@@ -8,6 +8,7 @@ suppressPackageStartupMessages({
   library(gridExtra)  # tableGrob + arrangeGrob
   library(grid)       # rectGrob, segmentsGrob
   library(gtable)     # add borders/lines to table grob
+  library(jsonlite)
 
 # Map method codes to short labels for figures
 method_short_label <- function(x) {
@@ -42,7 +43,7 @@ pvca_zero <- function() {
 # 2) Eigen-decompose; choose PCs: min 3, max 10, reaching cumvar_threshold.
 # 3) For each selected PC: LMM random effects (batch, treat, interaction).
 # 4) Standardize per-PC variances, weight by PC eigenvalue share, renormalize.
-compute_pvca <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype",
+compute_pvca <- function(df, meta, batch_col = "batch_id", treat_col = label_col,
                          cumvar_threshold = 0.60, scale_features = TRUE,  # kept for API compatibility
                          na_action = stats::na.omit, quiet = TRUE) {
   
@@ -258,6 +259,26 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata %>% dplyr::mutate(sample_id = as.character(sample_id))
 
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("group","condition","status","class","label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else if ("phenotype" %in% names(metadata)) {
+    label_col <- "phenotype"
+  } else {
+    stop("metadata.csv lacks a label column for PVCA.")
+  }
+}
+
 if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
   metadata$batch_id <- metadata$batch_id
 }
@@ -281,7 +302,7 @@ pvca_list <- lapply(names(file_list), function(nm) {
   df <- readr::read_csv(file_list[[nm]], show_col_types = FALSE)
   out <- compute_pvca(df, metadata,
                       batch_col = "batch_id",
-                      treat_col = "phenotype",
+                      treat_col = label_col,
                       cumvar_threshold = 0.60,
                       scale_features = TRUE,
                       quiet = TRUE)

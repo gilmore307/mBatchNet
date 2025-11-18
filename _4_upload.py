@@ -85,8 +85,9 @@ def _render_mosaic_card(session_dir: Path) -> html.Div:
     )
 
 
-def _persist_study_settings(session_dir: Path, control_label: str, reference_batch: str) -> Tuple[bool, Optional[str]]:
-    """Write the selected study settings into session_config.json."""
+def _update_session_config(session_dir: Path, **entries: object) -> Tuple[bool, Optional[str]]:
+    """Merge provided entries into session_config.json."""
+
     cfg_path = session_dir / "session_config.json"
     config: Dict[str, object] = {}
     if cfg_path.exists():
@@ -94,8 +95,10 @@ def _persist_study_settings(session_dir: Path, control_label: str, reference_bat
             config = json.loads(cfg_path.read_text(encoding="utf-8"))
         except Exception:
             config = {}
-    config["control_label"] = None if control_label is None else str(control_label)
-    config["reference_batch"] = None if reference_batch is None else str(reference_batch)
+
+    for key, value in entries.items():
+        config[key] = value
+
     try:
         cfg_path.write_text(
             json.dumps(config, indent=2, ensure_ascii=False),
@@ -104,6 +107,37 @@ def _persist_study_settings(session_dir: Path, control_label: str, reference_bat
         return True, None
     except Exception as exc:
         return False, str(exc)
+
+
+def _persist_study_settings(session_dir: Path, control_label: str, reference_batch: str) -> Tuple[bool, Optional[str]]:
+    """Write the selected study settings into session_config.json."""
+
+    return _update_session_config(
+        session_dir,
+        control_label=None if control_label is None else str(control_label),
+        reference_batch=None if reference_batch is None else str(reference_batch),
+    )
+
+
+def _resolve_label_column(session_dir: Path, header: Optional[List[str]] = None) -> Optional[str]:
+    """Determine which metadata column carries the user-provided labels (text)."""
+
+    cfg_path = session_dir / "session_config.json"
+    label_col: Optional[str] = None
+    if cfg_path.exists():
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            label_col = cfg.get("label_column")
+        except Exception:
+            label_col = None
+
+    if header:
+        if label_col in header:
+            return label_col
+        for col in header:
+            if col.lower() == "phenotype":
+                return col
+    return label_col
 
 
 def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
@@ -480,6 +514,8 @@ def register_upload_callbacks(app):
         if not rows:
             return html.Div("Metadata file is empty; unable to configure study settings.", className="text-danger")
 
+        label_col = _resolve_label_column(session_dir, reader.fieldnames or [])
+
         def _collect(column: str) -> List[str]:
             vals = {
                 str(row.get(column)).strip()
@@ -488,10 +524,10 @@ def register_upload_callbacks(app):
             }
             return sorted(v for v in vals if v)
 
-        phenotypes = _collect("phenotype")
+        phenotypes = _collect(label_col) if label_col else []
         batches = _collect("batch_id")
         if not phenotypes or not batches:
-            return html.Div("Metadata must contain non-empty phenotype and batch_id columns.", className="text-danger")
+            return html.Div("Metadata must contain non-empty target labels and batch_id columns.", className="text-danger")
 
         saved_control = None
         saved_reference = None
@@ -668,7 +704,7 @@ def register_upload_callbacks(app):
                     html.Div("Using the following mapping for example data:"),
                     html.Ul([
                         html.Li([html.Code("batch_id"), " column -> batch_id"]),
-                        html.Li([html.Code("phenotype"), " column -> phenotype"]),
+                        html.Li([html.Code("phenotype"), " column -> target_binary (binary copy written for correction)"]),
                     ], className="mb-0"),
                 ]),
             ], className="mt-2")
@@ -696,12 +732,12 @@ def register_upload_callbacks(app):
                             ),
                         ], md=6),
                         dbc.Col([
-                            dbc.Label("Phenotype column"),
+                            dbc.Label("Target (binary) column"),
                             dcc.Dropdown(
-                                id="map-phenotype",
+                                id="map-target-binary",
                                 options=opts,
                                 value=None,
-                                placeholder="Select phenotype column",
+                                placeholder="Select column to convert to target_binary (e.g., positive/negative)",
                                 clearable=True,
                             ),
                         ], md=6),
@@ -732,7 +768,7 @@ def register_upload_callbacks(app):
         Output("runlog-interval", "disabled", allow_duplicate=True),
         Input("apply-mapping", "n_clicks"),
         State("map-batch-id", "value"),
-        State("map-phenotype", "value"),
+        State("map-target-binary", "value"),
         State("session-id", "data"),
         State("page-url", "pathname"),
         prevent_initial_call=True,
@@ -765,8 +801,6 @@ def register_upload_callbacks(app):
             for name in orig_fieldnames:
                 if name == batch_col:
                     new_fieldnames.append("batch_id")
-                elif name == pheno_col:
-                    new_fieldnames.append("phenotype")
                 else:
                     new_fieldnames.append(name)
             # Write back with new headers
@@ -778,6 +812,11 @@ def register_upload_callbacks(app):
                     for old, new in zip(orig_fieldnames, new_fieldnames):
                         out_row[new] = row.get(old)
                     writer.writerow(out_row)
+            _update_session_config(
+                session_dir,
+                label_column=pheno_col,
+                target_binary_column="target_binary",
+            )
         except Exception:
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
@@ -814,7 +853,7 @@ def register_upload_callbacks(app):
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-        # Ensure standard header names if needed (batch_id, phenotype)
+        # Ensure standard header names if needed (batch_id and chosen label column)
         try:
             import csv
             with meta_path.open("r", encoding="utf-8", newline="") as fh:
@@ -827,8 +866,12 @@ def register_upload_callbacks(app):
             new_fieldnames = list(orig_fieldnames)
             if "batch_id" not in lower:
                 need_write = True
+            # Preserve the detected label column name for plotting later
+            label_col = None
             if "phenotype" not in lower:
                 need_write = True
+            else:
+                label_col = orig_fieldnames[lower.index("phenotype")]
             if need_write:
                 # Map exact matches ignoring case
                 def pick(name, target):
@@ -855,6 +898,15 @@ def register_upload_callbacks(app):
                         for old, new in zip(orig_fieldnames, new_fieldnames):
                             out_row[new] = row.get(old)
                         writer.writerow(out_row)
+                label_col = label_col or (orig_fieldnames[pi] if pi is not None else None)
+            if label_col is None and "phenotype" in new_fieldnames:
+                label_col = "phenotype"
+            if label_col:
+                _update_session_config(
+                    session_dir,
+                    label_column=label_col,
+                    target_binary_column="target_binary",
+                )
         except Exception:
             pass
 
@@ -898,7 +950,7 @@ def register_upload_callbacks(app):
         Output("apply-mapping", "disabled"),
         Output("apply-mapping", "color"),
         Input("map-batch-id", "value"),
-        Input("map-phenotype", "value"),
+        Input("map-target-binary", "value"),
         prevent_initial_call=True,
     )
     def toggle_apply_mapping(batch_val, pheno_val):

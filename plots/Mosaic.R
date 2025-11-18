@@ -5,6 +5,7 @@ library(readr)
 library(tidyr)      # for pivot_wider()
 library(gridExtra)
 library(grid)       # for unit()
+library(jsonlite)
 
 # ==== Args / config (for input and output folder) ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -14,8 +15,7 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
-# Your metadata outcome column:
-PHENO_COL <- "phenotype"
+PHENO_COL <- NULL
 
 # Optional study settings from session_config.json (in output_folder)
 CONTROL_LABEL <- NA_character_
@@ -36,9 +36,25 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata %>% mutate(sample_id = as.character(sample_id))
 
-# Check if the phenotype column exists
-if (!PHENO_COL %in% names(metadata))
-  stop(sprintf("Phenotype column '%s' not found in metadata.csv", PHENO_COL))
+# Resolve the label column: prefer session config, fallback to phenotype
+if (is.null(PHENO_COL)) {
+  try({
+    cfg_path <- file.path(output_folder, "session_config.json")
+    if (file.exists(cfg_path)) {
+      cfg <- jsonlite::fromJSON(cfg_path)
+      if (!is.null(cfg$label_column)) PHENO_COL <<- cfg$label_column
+    }
+  }, silent = TRUE)
+}
+if (is.null(PHENO_COL) || !(PHENO_COL %in% names(metadata))) {
+  if ("phenotype" %in% names(metadata)) {
+    PHENO_COL <- "phenotype"
+  }
+}
+
+# Check if the phenotype/label column exists
+if (is.null(PHENO_COL) || !PHENO_COL %in% names(metadata))
+  stop("Label column not found in metadata.csv; cannot build mosaic plot.")
 
 # Prepare .outcome as a two-class factor
 vals <- unique(metadata[[PHENO_COL]])

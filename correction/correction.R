@@ -50,8 +50,66 @@ if (.can_json && file.exists(summary_file)) {
       if (!is.null(prev$started) && nzchar(as.character(prev$started))) {
         .session_summary$started <- prev$started
       }
+  }
+}, silent = TRUE)
+}
+
+# ---------------------------
+# Target/label helpers
+# ---------------------------
+TARGET_BINARY_COL <- "target_binary"
+
+resolve_label_column <- function(metadata) {
+  cfg_path <- file.path(output_folder, "session_config.json")
+  label_col <- NULL
+  try({
+    if (.can_json && file.exists(cfg_path)) {
+      cfg <- jsonlite::fromJSON(cfg_path)
+      if (!is.null(cfg$label_column)) label_col <- cfg$label_column
     }
   }, silent = TRUE)
+  if (!is.null(label_col) && label_col %in% colnames(metadata)) return(label_col)
+  if ("phenotype" %in% colnames(metadata)) return("phenotype")
+  NULL
+}
+
+convert_target_to_binary <- function(metadata, label_col) {
+  if (!is.data.frame(metadata)) return(list(metadata = metadata, mapping = NULL, changed = FALSE))
+  if (is.null(label_col) || !(label_col %in% colnames(metadata))) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column missing"))
+  }
+
+  vals <- metadata[[label_col]]
+  if (is.numeric(vals) || is.logical(vals)) {
+    uniq <- sort(unique(vals))
+    uniq <- uniq[is.finite(uniq)]
+    uniq <- uniq[!is.na(uniq)]
+    if (length(uniq) == 2) {
+      mapping <- data.frame(label = uniq, binary = c(0L, 1L), stringsAsFactors = FALSE)
+      bin <- as.integer(factor(vals, levels = uniq)) - 1L
+      metadata[[TARGET_BINARY_COL]] <- bin
+      return(list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "numeric labels coerced to 0/1"))
+    }
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "numeric labels need exactly 2 unique values"))
+  }
+
+  vals_chr <- trimws(as.character(vals))
+  uniq <- unique(vals_chr[!is.na(vals_chr) & nzchar(vals_chr)])
+  if (length(uniq) != 2) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column needs exactly 2 unique text levels"))
+  }
+
+  uniq <- sort(uniq)
+  bin <- ifelse(vals_chr == uniq[1], 0L, 1L)
+  metadata[[TARGET_BINARY_COL]] <- as.integer(bin)
+
+  mapping <- data.frame(
+    label = uniq,
+    binary = c(0L, 1L),
+    stringsAsFactors = FALSE
+  )
+
+  list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
 }
 
 record_methods <- c(
@@ -195,7 +253,7 @@ get_input_for <- function(method, base_M, base_form) {
 custom_matrix_path    <- file.path(output_folder, "raw.csv")
 custom_metadata_path  <- file.path(output_folder, "metadata.csv")
 custom_metadata_binary_path <- file.path(output_folder, "metadata_binary.csv")
-phenotype_map_path    <- file.path(output_folder, "phenotype_mapping.csv")
+target_map_path       <- file.path(output_folder, "target_binary_mapping.csv")
 default_matrix_path   <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path <- file.path("assets", "example", "metadata_1.csv")
 
@@ -213,23 +271,24 @@ if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   metadata     <- read.csv(default_metadata_path, check.names = FALSE)
 }
 
-phenotype_mapping <- NULL
-if (file.exists(phenotype_map_path)) {
-  phenotype_mapping <- tryCatch(read.csv(phenotype_map_path, check.names = FALSE), error = function(e) NULL)
+target_mapping <- NULL
+if (file.exists(target_map_path)) {
+  target_mapping <- tryCatch(read.csv(target_map_path, check.names = FALSE), error = function(e) NULL)
 }
 
-conv_pheno <- convert_phenotype_to_binary(metadata)
-if (isTRUE(conv_pheno$changed)) {
-  metadata <- conv_pheno$metadata
-  if (!is.null(conv_pheno$mapping)) phenotype_mapping <- conv_pheno$mapping
-  say("ℹ️ Converted phenotype to binary for correction use")
-} else if (!is.null(conv_pheno$reason)) {
-  say("ℹ️ Phenotype left unchanged: ", conv_pheno$reason)
+label_col <- resolve_label_column(metadata)
+conv_target <- convert_target_to_binary(metadata, label_col)
+if (isTRUE(conv_target$changed)) {
+  metadata <- conv_target$metadata
+  if (!is.null(conv_target$mapping)) target_mapping <- conv_target$mapping
+  say("ℹ️ Converted target to binary for correction use")
+} else if (!is.null(conv_target$reason)) {
+  say("ℹ️ Target left unchanged: ", conv_target$reason)
 }
 
 if (!is.na(CONTROL_LABEL)) {
-  if (!is.null(phenotype_mapping) && "label" %in% colnames(phenotype_mapping)) {
-    mapped <- phenotype_mapping$binary[match(CONTROL_LABEL, phenotype_mapping$label)]
+  if (!is.null(target_mapping) && "label" %in% colnames(target_mapping)) {
+    mapped <- target_mapping$binary[match(CONTROL_LABEL, target_mapping$label)]
     if (length(mapped) && is.finite(mapped[1])) {
       CONTROL_LABEL <- mapped[1]
     }
@@ -265,7 +324,7 @@ try({
 metadata$batch_id <- factor(metadata$batch_id, levels = unique(metadata$batch_id))
 batch_id <- metadata$batch_id
 
-covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id","phenotype")), drop = FALSE]
+covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id", TARGET_BINARY_COL)), drop = FALSE]
 covar <- as.data.frame(lapply(covar, function(col) {
   if (is.numeric(col))      col[is.na(col)] <- mean(col, na.rm = TRUE)
   else if (is.factor(col))  { if (anyNA(col)) col[is.na(col)] <- levels(col)[1] }
