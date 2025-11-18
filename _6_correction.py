@@ -120,12 +120,12 @@ def register_correction_callbacks(app):
         header = html.Thead(
             html.Tr(
                 [
-                    html.Th("Methods", style=_COLUMN_WIDTH),
-                    html.Th("Avg Time (s)", style=_COLUMN_WIDTH),
-                    html.Th("Status", style=_COLUMN_WIDTH),
+                    html.Th("Methods", className="text-center", style=_COLUMN_WIDTH),
+                    html.Th("Avg Time (s)", className="text-center", style=_COLUMN_WIDTH),
+                    html.Th("Status", className="text-center", style=_COLUMN_WIDTH),
                     html.Th("Run Correction", className="text-center", style=_COLUMN_WIDTH),
                     html.Th("Delete", className="text-center", style=_COLUMN_WIDTH),
-                    html.Th("Citation"),
+                    html.Th("Citation", className="text-center"),
                 ]
             )
         )
@@ -227,8 +227,8 @@ def register_correction_callbacks(app):
             citation_cell = html.Td(citation_content)
             row = html.Tr(
                 [
-                    html.Td(method_display, style=_COLUMN_WIDTH),
-                    html.Td(avg_display, style=_COLUMN_WIDTH),
+                    html.Td(method_display, className="text-center", style=_COLUMN_WIDTH),
+                    html.Td(avg_display, className="text-center", style=_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
                     delete_cell,
