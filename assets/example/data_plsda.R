@@ -2,7 +2,7 @@
 # Outputs:
 #   1) raw_plada.csv            -> samples x OTUs, numeric only, NO row/col names
 #   2) metadata_PLSDAbatch.csv  -> CSV with headers:
-#        batch_id (Batch 1..), phenotype (0/1),
+#        batch (Batch 1..), phenotype (0/1),
 #        and filtered covariates (see rules in filter_covariates)
 
 quiet_install_cran <- function(pkgs) {
@@ -50,10 +50,10 @@ recode_batches <- function(batch_chr) {
 # Covariate filtering:
 #   - drop column if any NA / empty string
 #   - drop if ≤1 unique value
-#   - drop if determined by batch_id (one value per batch)
+#   - drop if determined by batch (one value per batch)
 #   - drop if determined by phenotype (one value per phenotype level)
 #   - drop if character/factor and unique values > 2
-filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
+filter_covariates <- function(covars, batch, phenotype, dataset_label = "") {
   if (!ncol(covars)) return(covars)
   
   keep <- rep(TRUE, ncol(covars))
@@ -96,16 +96,16 @@ filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
         drop_reason <- "only 0–1 unique value"
       }
       
-      # 3) determined by batch_id (one value per batch)
-      if (is.null(drop_reason) && !is.null(batch_id) && length(batch_id) == length(v)) {
-        b  <- batch_id
+      # 3) determined by batch (one value per batch)
+      if (is.null(drop_reason) && !is.null(batch) && length(batch) == length(v)) {
+        b  <- batch
         ok <- !is.na(b)
         if (any(ok)) {
           b_use <- b[ok]
           x_use <- if (is_text) v_chr[ok] else v[ok]
           per_batch_unique <- tapply(x_use, b_use, function(z) length(unique(z)))
           if (all(per_batch_unique <= 1)) {
-            drop_reason <- "determined by batch_id (one value per batch)"
+            drop_reason <- "determined by batch (one value per batch)"
           }
         }
       }
@@ -192,9 +192,9 @@ if (is.factor(ad.trt)) {
 
 # --- Batch: recode sequencing_run_date -> Batch 1.. ---
 orig_batch_vec <- as.character(ad.batch)
-batch_id_vec   <- recode_batches(orig_batch_vec)
+batch_vec   <- recode_batches(orig_batch_vec)
 
-message("[PLSDAbatch] batch_id source column   : 'sequencing_run_date' (re-coded to 'Batch 1..')")
+message("[PLSDAbatch] batch source column   : 'sequencing_run_date' (re-coded to 'Batch 1..')")
 
 # --- Covariates: all metadata columns minus ID / batch / phenotype ---
 id_like_cols <- intersect(c("sample", "sample_id", "SampleID", "Sample_ID"), colnames(ad.metadata))
@@ -210,7 +210,7 @@ covar_raw <- ad.metadata[
 
 covar_filtered <- filter_covariates(
   covars    = covar_raw,
-  batch_id  = batch_id_vec,
+  batch  = batch_vec,
   phenotype = phenotype01,
   dataset_label = "PLSDAbatch"
 )
@@ -225,9 +225,9 @@ if (sample_in_rows) {
 }
 storage.mode(M) <- "double"
 
-# --- Build metadata (batch_id + phenotype + covariates) and align to matrix rows ---
+# --- Build metadata (batch + phenotype + covariates) and align to matrix rows ---
 metadata <- data.frame(
-  batch_id  = batch_id_vec,
+  batch  = batch_vec,
   phenotype = phenotype01,
   covar_filtered,
   stringsAsFactors = FALSE
@@ -252,5 +252,5 @@ write.csv(metadata, file = metadata_path, row.names = FALSE, quote = TRUE)
 
 cat("Done.\n",
     " - ", matrix_path,   " (samples x OTUs, no headers)\n",
-    " - ", metadata_path, " (batch_id=Batch 1.., phenotype=0/1, filtered covariates)\n",
+    " - ", metadata_path, " (batch=Batch 1.., phenotype=0/1, filtered covariates)\n",
     sep = "")

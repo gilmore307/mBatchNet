@@ -2,10 +2,10 @@
 # Outputs:
 #   CRC:
 #     - raw_crc_cmgd.csv        (samples x OTUs, numeric, NO headers)
-#     - metadata_crc_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, CRC=1, + covariates)
+#     - metadata_crc_cmgd.csv   (batch=Batch 1.., phenotype: control=0, CRC=1, + covariates)
 #   IBD:
 #     - raw_ibd_cmgd.csv        (samples x OTUs, numeric, NO headers)
-#     - metadata_ibd_cmgd.csv   (batch_id=Batch 1.., phenotype: control=0, IBD=1, + covariates)
+#     - metadata_ibd_cmgd.csv   (batch=Batch 1.., phenotype: control=0, IBD=1, + covariates)
 
 quiet_install_bioc <- function(pkgs) {
   if (!requireNamespace("BiocManager", quietly = TRUE))
@@ -97,7 +97,7 @@ recode_batches <- function(batch_chr) {
 }
 
 # Covariate filtering based on your rules
-filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
+filter_covariates <- function(covars, batch, phenotype, dataset_label = "") {
   if (!ncol(covars)) return(covars)
   
   keep <- rep(TRUE, ncol(covars))
@@ -141,16 +141,16 @@ filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
         drop_reason <- "only 0–1 unique value"
       }
       
-      # 3) 与 batch_id 一一对应（每个 batch 只有一个取值）
-      if (is.null(drop_reason) && !is.null(batch_id) && length(batch_id) == length(v)) {
-        b  <- batch_id
+      # 3) 与 batch 一一对应（每个 batch 只有一个取值）
+      if (is.null(drop_reason) && !is.null(batch) && length(batch) == length(v)) {
+        b  <- batch
         ok <- !is.na(b)   # v 没有 missing，直接用
         if (any(ok)) {
           b_use <- b[ok]
           x_use <- if (is_text) v_chr[ok] else v[ok]
           per_batch_unique <- tapply(x_use, b_use, function(z) length(unique(z)))
           if (all(per_batch_unique <= 1)) {
-            drop_reason <- "determined by batch_id (one value per batch)"
+            drop_reason <- "determined by batch (one value per batch)"
           }
         }
       }
@@ -248,10 +248,10 @@ crc_M <- t(crc_mat)
 storage.mode(crc_M) <- "double"           # samples x OTUs, numeric
 
 crc_meta_df  <- as.data.frame(crc_meta)
-crc_batch_id <- recode_batches(crc_meta_df$study_name)          # batches from (possibly merged) study_name
+crc_batch <- recode_batches(crc_meta_df$study_name)          # batches from (possibly merged) study_name
 crc_pheno    <- ifelse(crc_meta_df$study_condition == "CRC", 1L, 0L)
 
-message("[CRC] batch_id source column   : 'study_name'")
+message("[CRC] batch source column   : 'study_name'")
 message("[CRC] phenotype source column : 'study_condition' (CRC=1, control=0)")
 
 # Covariates: remove columns used for ID / batch / phenotype
@@ -261,12 +261,12 @@ crc_covars_raw <- crc_meta_df[, setdiff(colnames(crc_meta_df),
 
 # Apply covariate filters
 crc_covars <- filter_covariates(crc_covars_raw,
-                                batch_id   = crc_batch_id,
+                                batch   = crc_batch,
                                 phenotype  = crc_pheno,
                                 dataset_label = "CRC")
 
 crc_metadata <- data.frame(
-  batch_id  = crc_batch_id,
+  batch  = crc_batch,
   phenotype = crc_pheno,
   crc_covars,
   stringsAsFactors = FALSE
@@ -329,10 +329,10 @@ ibd_M <- t(ibd_mat)
 storage.mode(ibd_M) <- "double"           # samples x OTUs
 
 ibd_meta_df  <- as.data.frame(ibd_meta)
-ibd_batch_id <- recode_batches(ibd_meta_df$study_name)
+ibd_batch <- recode_batches(ibd_meta_df$study_name)
 ibd_pheno    <- ifelse(ibd_meta_df$study_condition == "IBD", 1L, 0L)
 
-message("[IBD] batch_id source column   : 'study_name'")
+message("[IBD] batch source column   : 'study_name'")
 message("[IBD] phenotype source column : 'study_condition' (IBD=1, control=0)")
 
 # Covariates: remove columns used for ID / batch / phenotype
@@ -342,12 +342,12 @@ ibd_covars_raw <- ibd_meta_df[, setdiff(colnames(ibd_meta_df),
 
 # Apply covariate filters
 ibd_covars <- filter_covariates(ibd_covars_raw,
-                                batch_id   = ibd_batch_id,
+                                batch   = ibd_batch,
                                 phenotype  = ibd_pheno,
                                 dataset_label = "IBD")
 
 ibd_metadata <- data.frame(
-  batch_id  = ibd_batch_id,
+  batch  = ibd_batch,
   phenotype = ibd_pheno,
   ibd_covars,
   stringsAsFactors = FALSE

@@ -79,8 +79,8 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 
-if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
-  metadata$batch_id <- metadata$batch_id
+if (!("batch" %in% names(metadata)) && ("batch" %in% names(metadata))) {
+  metadata$batch <- metadata$batch
 }
 
 # ---- Find normalized files ----
@@ -136,7 +136,7 @@ safe_adjR2 <- function(fit) {
 }
 
 # --------- Core calculators (return named numeric: Treatment, Intersection, Batch, Residuals) ---------
-compute_prda_parts_aitch <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype") {
+compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = "phenotype") {
   # ensure sample_id present & align
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
@@ -312,7 +312,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
 
 # --------- Compute & plot: A) Aitchison (CLR + RDA) ---------
 if (length(file_list_clr)) {
-  batch_col <- "batch_id"; treat_col <- "phenotype"
+  batch_col <- "batch"; treat_col <- "phenotype"
 if (!("phenotype" %in% names(metadata))) stop("metadata file has no 'phenotype'.")
   if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs >= 2 levels.")
   

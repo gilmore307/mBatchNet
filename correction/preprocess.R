@@ -168,7 +168,7 @@ prepare_metadata_outputs <- function(output_dir) {
   meta_text <- meta
 
   # Numeric encoding for correction
-  keep_cols <- c("sample_id", "batch_id", TARGET_BINARY_COL)
+  keep_cols <- c("sample_id", "batch", TARGET_BINARY_COL)
   num_meta <- meta
   col_maps <- list()
   for (nm in colnames(num_meta)) {

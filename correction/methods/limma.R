@@ -7,7 +7,7 @@ run_method("limma", {
   X_log <- get_input_for("limma", base_M, base_form)
   adj_t <- removeBatchEffect(
     t(X_log),
-    batch = factor(batch_id),
+    batch = factor(batch),
     covariates = if (ncol(covar) > 0) as.matrix(covar) else NULL
   )
   adj <- t(adj_t)

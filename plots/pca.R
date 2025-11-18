@@ -31,7 +31,7 @@ method_short_label <- function(x) {
   sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
 }
 
-guess_shape_var <- function(meta, batch_col = "batch_id") {
+guess_shape_var <- function(meta, batch_col = "batch") {
   cand <- c("group","phenotype","condition","status","case_control","class","disease","label")
   hit <- cand[cand %in% names(meta)]
   if (length(hit)) return(hit[1])
@@ -198,7 +198,7 @@ file_list <- setNames(clr_paths, method_short_label(method_names))
 
 # ==== build plot.df + metric.df like mbecPCA would ====
 # ensures consistent factor levels across panels so legend can be shared
-compute_pca_frames <- function(df, metadata, model.vars = c("batch_id","group"), n_pcs = 5) {
+compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_pcs = 5) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata; can't align samples.")
@@ -377,7 +377,7 @@ CB
 }
 
 # ==== choose covariates (auto-detect shape var) ====
-batch_var  <- "batch_id"
+batch_var  <- "batch"
 model_vars <- c(batch_var)
 message(sprintf("Using color=%s (shape: none)", batch_var))
 
@@ -452,7 +452,7 @@ ggsave(file.path(output_folder, "pca.tif"),
 # PCA assessment summaries
 # =========================
 
-compute_centroids_pca <- function(scores, batch_var = "batch_id") {
+compute_centroids_pca <- function(scores, batch_var = "batch") {
   scores %>%
     dplyr::group_by(!!rlang::sym(batch_var)) %>%
     dplyr::summarise(PC1 = mean(PC1), PC2 = mean(PC2), .groups = "drop")
@@ -462,7 +462,7 @@ compute_centroid_distances <- function(centroids) {
   as.numeric(mean(dist(centroids[, c("PC1","PC2")], method = "euclidean")))
 }
 
-prepare_batch_scores <- function(plot_df, metadata, axes = c("PC1", "PC2"), batch_var = "batch_id") {
+prepare_batch_scores <- function(plot_df, metadata, axes = c("PC1", "PC2"), batch_var = "batch") {
   if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
   if (!batch_var %in% names(metadata)) return(NULL)
   idx <- match(plot_df$sample_id, metadata$sample_id)
@@ -551,7 +551,7 @@ compute_knn_mixing <- function(coords, groups, k = 10L) {
   mean(mixing[valid_rows])
 }
 
-summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch_id") {
+summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch") {
   prep <- prepare_batch_scores(fr$plot.df, metadata, axes = c("PC1", "PC2"), batch_var = batch_var)
   if (is.null(prep)) return(NULL)
   coords <- prep$coords

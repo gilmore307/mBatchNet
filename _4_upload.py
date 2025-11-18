@@ -27,6 +27,16 @@ EXAMPLE_DIR = BASE_DIR / "assets" / "example"
 PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
 
+# Mapping presets for example datasets (case-insensitive keys)
+EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, str]] = {
+    "bladderbatch": {"batch": "batch", "target": "cancer"},
+    "conqur": {"batch": "batch", "target": "sex"},
+    "ibd_cmgd": {"batch": "batch", "target": "study_condition"},
+    "crc_cmgd": {"batch": "batch", "target": "study_condition"},
+    "metadict": {"batch": "batch", "target": "Y"},
+    "plsdabatch": {"batch": "batch", "target": "initial_phenol_concentration.regroup"},
+}
+
 
 def _scan_example_sets() -> List[Tuple[str, Path, Path]]:
     """Find example pairs in assets/example as (key, raw_path, meta_path).
@@ -60,6 +70,22 @@ def _example_pair_for(key: str) -> Optional[Tuple[Path, Path]]:
         if k == key:
             return raw_p, meta_p
     return None
+
+
+def _read_session_config(session_dir: Path) -> Dict[str, object]:
+    cfg_path = session_dir / "session_config.json"
+    if not cfg_path.exists():
+        return {}
+    try:
+        return json.loads(cfg_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _example_mapping_for(key: Optional[str]) -> Optional[Dict[str, str]]:
+    if not key:
+        return None
+    return EXAMPLE_COLUMN_MAP.get(key.lower())
 
 
 def _render_mosaic_card(session_dir: Path) -> html.Div:
@@ -414,6 +440,7 @@ def register_upload_callbacks(app):
             # Copy selected example files into the session directory
             try:
                 pair = None
+                selected_key = example_key
                 if example_key:
                     res = _example_pair_for(example_key)
                     if res:
@@ -421,7 +448,7 @@ def register_upload_callbacks(app):
                 if pair is None:
                     pairs = _scan_example_sets()
                     if pairs:
-                        _key, raw_src, meta_src = pairs[0]
+                        selected_key, raw_src, meta_src = pairs[0]
                         pair = (raw_src, meta_src)
                 if pair is None:
                     example_status = html.Span("No example datasets found in assets/example.", className="text-danger")
@@ -431,6 +458,8 @@ def register_upload_callbacks(app):
                         shutil.copy2(raw_src, session_dir / "raw.csv")
                     if meta_src.exists():
                         shutil.copy2(meta_src, session_dir / "metadata_origin.csv")
+                    if selected_key:
+                        _update_session_config(session_dir, example_key=selected_key)
                     # Build file info
                     if (session_dir / "raw.csv").exists():
                         size = (session_dir / "raw.csv").stat().st_size
@@ -527,9 +556,9 @@ def register_upload_callbacks(app):
             return sorted(v for v in vals if v)
 
         phenotypes = _collect(label_col) if label_col else []
-        batches = _collect("batch_id")
+        batches = _collect("batch")
         if not phenotypes or not batches:
-            return html.Div("Metadata must contain non-empty target labels and batch_id columns.", className="text-danger")
+            return html.Div("Metadata must contain non-empty target labels and batch columns.", className="text-danger")
 
         saved_control = None
         saved_reference = None
@@ -700,13 +729,18 @@ def register_upload_callbacks(app):
 
         if example_mode:
             # Show read-only mapping info; no dropdowns, no apply button
+            cfg = _read_session_config(session_dir)
+            example_key = cfg.get("example_key") if isinstance(cfg, dict) else None
+            preset = _example_mapping_for(example_key)
+            batch_label = preset.get("batch") if preset else "batch"
+            target_label = preset.get("target") if preset else "phenotype"
             mapping_display = dbc.Card([
                 dbc.CardHeader(html.Strong("Metadata mapping")),
                 dbc.CardBody([
                     html.Div("Using the following mapping for example data:"),
                     html.Ul([
-                        html.Li([html.Code("batch_id"), " column -> batch_id"]),
-                        html.Li([html.Code("phenotype"), " column -> target_binary (binary copy written for correction)"]),
+                        html.Li([html.Code(batch_label), " column -> batch"]),
+                        html.Li([html.Code(target_label), " column -> target_binary (binary copy written for correction)"]),
                     ], className="mb-0"),
                 ]),
             ], className="mt-2")
@@ -729,7 +763,7 @@ def register_upload_callbacks(app):
                                 id="map-batch-id",
                                 options=opts,
                                 value=None,
-                                placeholder="Select batch_id column",
+                                placeholder="Select batch column",
                                 clearable=True,
                             ),
                         ], md=6),
@@ -802,7 +836,7 @@ def register_upload_callbacks(app):
             new_fieldnames = []
             for name in orig_fieldnames:
                 if name == batch_col:
-                    new_fieldnames.append("batch_id")
+                    new_fieldnames.append("batch")
                 else:
                     new_fieldnames.append(name)
             # Write back with new headers
@@ -855,43 +889,45 @@ def register_upload_callbacks(app):
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-        # Ensure standard header names if needed (batch_id and chosen label column)
+        # Ensure standard header names if needed (batch and chosen label column)
         try:
             import csv
             with meta_path.open("r", encoding="utf-8", newline="") as fh:
                 reader = csv.DictReader(fh)
                 orig_fieldnames = reader.fieldnames or []
                 rows = list(reader)
-            # If already present, no rewrite; else try case-insensitive match
-            lower = [c.lower() for c in orig_fieldnames]
-            need_write = False
-            new_fieldnames = list(orig_fieldnames)
-            if "batch_id" not in lower:
-                need_write = True
-            # Preserve the detected label column name for plotting later
-            label_col = None
-            if "phenotype" not in lower:
-                need_write = True
-            else:
-                label_col = orig_fieldnames[lower.index("phenotype")]
-            if need_write:
-                # Map exact matches ignoring case
-                def pick(name, target):
-                    for i, c in enumerate(orig_fieldnames):
-                        if c.lower() == target:
-                            return i
-                    return None
-                bi = pick("batch_id", "batch_id")
-                pi = pick("phenotype", "phenotype")
-                # Build new headers where found
-                new_fieldnames = []
-                for i, name in enumerate(orig_fieldnames):
-                    if bi is not None and i == bi:
-                        new_fieldnames.append("batch_id")
-                    elif pi is not None and i == pi:
-                        new_fieldnames.append("phenotype")
-                    else:
-                        new_fieldnames.append(name)
+            # Use mapping preset (if any) to locate batch/target columns
+            cfg = _read_session_config(session_dir)
+            example_key = cfg.get("example_key") if isinstance(cfg, dict) else None
+            preset = _example_mapping_for(example_key) or {}
+
+            def find_col(name: str) -> Optional[str]:
+                for col in orig_fieldnames:
+                    if col.lower() == name.lower():
+                        return col
+                return None
+
+            batch_src = preset.get("batch", "batch")
+            target_src = preset.get("target")
+
+            batch_col = find_col(batch_src) or find_col("batch")
+            label_col = find_col(target_src) if target_src else None
+            if label_col is None:
+                label_col = find_col("phenotype")
+
+            replacements: Dict[str, str] = {}
+            if batch_col and batch_col != "batch":
+                replacements[batch_col] = "batch"
+            if label_col:
+                desired_label = target_src or label_col
+                if label_col.lower() == desired_label.lower() and label_col != desired_label:
+                    replacements[label_col] = desired_label
+                elif target_src and label_col.lower() != target_src.lower():
+                    replacements[label_col] = target_src
+
+            new_fieldnames = orig_fieldnames
+            if replacements:
+                new_fieldnames = [replacements.get(name, name) for name in orig_fieldnames]
                 with meta_path.open("w", encoding="utf-8", newline="") as fh:
                     writer = csv.DictWriter(fh, fieldnames=new_fieldnames)
                     writer.writeheader()
@@ -900,7 +936,13 @@ def register_upload_callbacks(app):
                         for old, new in zip(orig_fieldnames, new_fieldnames):
                             out_row[new] = row.get(old)
                         writer.writerow(out_row)
-                label_col = label_col or (orig_fieldnames[pi] if pi is not None else None)
+                if label_col:
+                    label_col = replacements.get(label_col, label_col)
+                if batch_col:
+                    batch_col = "batch"
+
+            if label_col is None and target_src and target_src in new_fieldnames:
+                label_col = target_src
             if label_col is None and "phenotype" in new_fieldnames:
                 label_col = "phenotype"
             if label_col:

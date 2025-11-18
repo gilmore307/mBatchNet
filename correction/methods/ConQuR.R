@@ -21,7 +21,7 @@ run_method("ConQuR", {
     X_cnt <- X_cnt[keep_lib, , drop = FALSE]
     covariates <- covariates[keep_lib, , drop = FALSE]
   }
-  complete_rows <- !is.na(metadata$batch_id)
+  complete_rows <- !is.na(metadata$batch)
   if (ncol(covariates)) {
     complete_rows <- complete_rows & stats::complete.cases(covariates)
   }
@@ -39,7 +39,7 @@ run_method("ConQuR", {
     covariates <- covariates[complete_rows, , drop = FALSE]
   }
 
-  batch_values <- unique(stats::na.omit(as.character(metadata$batch_id)))
+  batch_values <- unique(stats::na.omit(as.character(metadata$batch)))
   if (length(batch_values) < 2) {
     stop(
       sprintf(
@@ -82,8 +82,8 @@ run_method("ConQuR", {
     }
   }
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
-  batch_id <- droplevels(as.factor(metadata$batch_id))
-  batch_counts <- table(batch_id)
+  batch <- droplevels(as.factor(metadata$batch))
+  batch_counts <- table(batch)
 
   if (any(batch_counts < 1) || length(batch_counts) < 2) {
     stop(
@@ -98,7 +98,7 @@ run_method("ConQuR", {
     tryCatch(
       ConQuR(
         tax_tab = X_cnt,
-        batchid = batch_id,
+        batchid = batch,
         covariates = covariates,
         batch_ref = as.character(reference_batch),
         logistic_lasso = FALSE, quantile_type = "standard", simple_match = FALSE,

@@ -40,7 +40,7 @@ run_method("DEBIAS", {
   is_integerish <- is_num && all(abs(uniq_vals - round(uniq_vals)) < 1e-8)
   use_classifier <- (!is_num) || (is_integerish && length(uniq_vals) <= 10)
 
-  b0 <- as.integer(factor(batch_id)) - 1L
+  b0 <- as.integer(factor(batch)) - 1L
   if (any(is.na(b0))) fail_step("DEBIAS", "Invalid batch IDs.")
   X_with_batch <- cbind(b0, round(X_cnt))
 

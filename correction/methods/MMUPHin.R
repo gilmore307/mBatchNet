@@ -13,9 +13,9 @@ run_method("MMUPHin", {
 
   fit <- adjust_batch(
     feature_abd = feat_counts,
-    batch       = "batch_id",
+    batch       = "batch",
     covariates  = covariate_names,
-    data        = transform(metadata, batch_id=factor(batch_id)),
+    data        = transform(metadata, batch=factor(batch)),
     control     = list(verbose = FALSE, diagnostic_plot = NULL)
   )
   out_pos <- t(fit$feature_abd_adj)

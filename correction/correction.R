@@ -327,10 +327,10 @@ try({
   save_summary()
 }, silent = TRUE)
 
-metadata$batch_id <- factor(metadata$batch_id, levels = unique(metadata$batch_id))
-batch_id <- metadata$batch_id
+metadata$batch <- factor(metadata$batch, levels = unique(metadata$batch))
+batch <- metadata$batch
 
-covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id", TARGET_BINARY_COL)), drop = FALSE]
+covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch", TARGET_BINARY_COL)), drop = FALSE]
 covar <- as.data.frame(lapply(covar, function(col) {
   if (is.numeric(col))      col[is.na(col)] <- mean(col, na.rm = TRUE)
   else if (is.factor(col))  { if (anyNA(col)) col[is.na(col)] <- levels(col)[1] }
@@ -338,13 +338,13 @@ covar <- as.data.frame(lapply(covar, function(col) {
   col
 }))
 
-lvl <- levels(batch_id)
+lvl <- levels(batch)
 if (!is.na(REFERENCE_BATCH) && REFERENCE_BATCH %in% lvl) {
   reference_batch <- REFERENCE_BATCH
 } else {
   reference_batch <- lvl[1]
 }
-ref_idx <- which(batch_id == reference_batch)
+ref_idx <- which(batch == reference_batch)
 
 method_list <- character(0)
 CURRENT_METHOD_CODE <- NA_character_

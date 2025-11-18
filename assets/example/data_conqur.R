@@ -2,7 +2,7 @@
 # Outputs:
 #   1) raw_conqur.csv        -> samples x OTUs, numeric only, NO row/col names
 #   2) metadata_ConQuR.csv   -> CSV with headers:
-#        batch_id (Batch 1..), phenotype (0/1),
+#        batch (Batch 1..), phenotype (0/1),
 #        and covariates (excluding OTUs / batchid / sex-or-race used for phenotype)
 
 quiet_install_cran <- function(pkgs) {
@@ -84,7 +84,7 @@ if (is.null(phenotype_vec)) {
 batch_chr    <- as.character(batch_raw)
 batch_levels <- unique(batch_chr)   # order of first appearance
 batch_map    <- setNames(paste0("Batch ", seq_along(batch_levels)), batch_levels)
-batch_id     <- unname(batch_map[batch_chr])
+batch     <- unname(batch_map[batch_chr])
 
 # -------- Build expression matrix output --------
 # Matrix: ensure numeric; samples x OTUs; no headers
@@ -97,7 +97,7 @@ batch_col <- "batchid"
 
 drop_cols <- c(
   otu_cols,        # OTU count columns
-  batch_col,       # raw batch column (mapped to batch_id)
+  batch_col,       # raw batch column (mapped to batch)
   phenotype_source # the column used to build phenotype (sex or race)
 )
 
@@ -110,9 +110,9 @@ covars <- if (length(covar_cols)) {
   Sample_Data[, 0, drop = FALSE]
 }
 
-# -------- Metadata: batch_id + phenotype + covariates --------
+# -------- Metadata: batch + phenotype + covariates --------
 metadata <- data.frame(
-  batch_id  = batch_id,
+  batch  = batch,
   phenotype = phenotype_vec,
   covars,
   stringsAsFactors = FALSE
@@ -145,7 +145,7 @@ write.csv(
 cat(
   "Done.\n",
   " - ", matrix_path,   " (samples x OTUs, no headers)\n",
-  " - ", metadata_path, " (batch_id=Batch 1.., phenotype=0/1, + covariates w/o OTUs/batchid/sex-or-race)\n",
+  " - ", metadata_path, " (batch=Batch 1.., phenotype=0/1, + covariates w/o OTUs/batchid/sex-or-race)\n",
   sep = ""
 )
 

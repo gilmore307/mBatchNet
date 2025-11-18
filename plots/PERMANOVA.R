@@ -59,7 +59,7 @@ meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
   file.path(output_folder, "metadata.csv")
 }
 metadata <- read_csv(meta_path, show_col_types = FALSE)
-if (!("batch_id" %in% names(metadata))) stop("metadata file must contain 'batch_id'.")
+if (!("batch" %in% names(metadata))) stop("metadata file must contain 'batch'.")
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
@@ -102,7 +102,7 @@ clr_transform <- function(X, pseudocount = 1) {
   sweep(L, 1, rowMeans(L), "-")
 }
 permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
-                          batch_col = "batch_id", permutations = 999) {
+                          batch_col = "batch", permutations = 999) {
   geometry <- match.arg(tolower(geometry), c("aitchison", "bray-curtis"))
   if (!("sample_id" %in% names(df))) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id else stop("need sample_id")
@@ -157,7 +157,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
     cat("PERMANOVA (", geom_label, "): ", nm, "\n", sep = "")
     df <- read_csv(file_list[[nm]], show_col_types = FALSE)
     v <- permanova_one(df, metadata, geometry = geom_arg,
-                       batch_col = "batch_id", permutations = 999)
+                       batch_col = "batch", permutations = 999)
     geom_tbl <- bind_rows(
       geom_tbl,
       tibble(Method = nm,

@@ -10,7 +10,7 @@ run_method("PLSDAbatch", {
   res <- PLSDA_batch(
     X = X_clr,
     Y.trt = as.factor(metadata$target_binary),
-    Y.bat = as.factor(metadata$batch_id),
+    Y.bat = as.factor(metadata$batch),
     ncomp.trt = 1, ncomp.bat = 5
   )
   write_tss_clr("PLSDAbatch", res$X.nobatch, "clr", "normalized_plsda.csv")

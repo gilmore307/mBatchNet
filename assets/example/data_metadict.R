@@ -2,12 +2,12 @@
 # Outputs:
 #   1) raw_MetaDICT.csv      -> samples x OTUs, numeric only, NO row/col names
 #   2) metadata_MetaDICT.csv -> has headers; includes:
-#        - batch_id (Batch 1..)
+#        - batch (Batch 1..)
 #        - phenotype (0/1, from Y)
 #        - filtered covariates:
 #            * drop any column that has at least one NA or empty string
 #            * drop columns with ≤1 unique value
-#            * drop columns determined by batch_id (one value per batch)
+#            * drop columns determined by batch (one value per batch)
 #            * drop columns determined by phenotype (one value per phenotype level)
 #            * drop text/factor columns with >2 unique values
 
@@ -64,10 +64,10 @@ to_binary01 <- function(x) {
 # Covariate filtering:
 # - drop column if any NA / empty string
 # - drop if ≤1 unique value
-# - drop if determined by batch_id (one value per batch)
+# - drop if determined by batch (one value per batch)
 # - drop if determined by phenotype (one value per phenotype level)
 # - drop if character/factor and unique values > 2
-filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
+filter_covariates <- function(covars, batch, phenotype, dataset_label = "") {
   if (!ncol(covars)) return(covars)
   
   keep <- rep(TRUE, ncol(covars))
@@ -110,16 +110,16 @@ filter_covariates <- function(covars, batch_id, phenotype, dataset_label = "") {
         drop_reason <- "only 0–1 unique value"
       }
       
-      # 3) determined by batch_id (one value per batch)
-      if (is.null(drop_reason) && !is.null(batch_id) && length(batch_id) == length(v)) {
-        b  <- batch_id
+      # 3) determined by batch (one value per batch)
+      if (is.null(drop_reason) && !is.null(batch) && length(batch) == length(v)) {
+        b  <- batch
         ok <- !is.na(b)
         if (any(ok)) {
           b_use <- b[ok]
           x_use <- if (is_text) v_chr[ok] else v[ok]
           per_batch_unique <- tapply(x_use, b_use, function(z) length(unique(z)))
           if (all(per_batch_unique <= 1)) {
-            drop_reason <- "determined by batch_id (one value per batch)"
+            drop_reason <- "determined by batch (one value per batch)"
           }
         }
       }
@@ -176,13 +176,13 @@ if (!is.null(pheno_map)) {
   }
 }
 
-# ----------------- Build batch_id -----------------
+# ----------------- Build batch -----------------
 
 raw_batch  <- meta$batch
 batch_chr  <- as.character(raw_batch)
-batch_id   <- recode_batches(batch_chr)
+batch   <- recode_batches(batch_chr)
 
-message("[MetaDICT] batch_id source column : 'batch' (re-coded to 'Batch 1..')")
+message("[MetaDICT] batch source column : 'batch' (re-coded to 'Batch 1..')")
 
 # ----------------- Covariates -----------------
 
@@ -192,7 +192,7 @@ covar_raw <- meta[, setdiff(colnames(meta), c("batch", "Y")), drop = FALSE]
 # Filter covariates with strict rules
 covar_filtered <- filter_covariates(
   covars     = covar_raw,
-  batch_id   = batch_id,
+  batch   = batch,
   phenotype  = phenotype01,
   dataset_label = "MetaDICT"
 )
@@ -200,7 +200,7 @@ covar_filtered <- filter_covariates(
 # ----------------- Build metadata -----------------
 
 md <- data.frame(
-  batch_id  = batch_id,
+  batch  = batch,
   phenotype = phenotype01,
   covar_filtered,
   stringsAsFactors = FALSE
@@ -224,6 +224,6 @@ write.csv(md,  file = metadata_path, row.names = FALSE, quote = TRUE)
 
 cat("Done.\n",
     " - ", matrix_path,   " (samples x OTUs, no headers)\n",
-    " - ", metadata_path, " (batch_id=Batch 1.., phenotype=0/1, filtered covariates)\n",
+    " - ", metadata_path, " (batch=Batch 1.., phenotype=0/1, filtered covariates)\n",
     sep = "")
 
