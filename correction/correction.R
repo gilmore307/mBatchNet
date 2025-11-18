@@ -252,7 +252,6 @@ get_input_for <- function(method, base_M, base_form) {
 # ---------------------------
 custom_matrix_path    <- file.path(output_folder, "raw.csv")
 custom_metadata_path  <- file.path(output_folder, "metadata.csv")
-custom_metadata_binary_path <- file.path(output_folder, "metadata_binary.csv")
 target_map_path       <- file.path(output_folder, "target_binary_mapping.csv")
 default_matrix_path   <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path <- file.path("assets", "example", "metadata_1.csv")
@@ -260,11 +259,7 @@ default_metadata_path <- file.path("assets", "example", "metadata_1.csv")
 if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   say("✅ Using uploaded user files")
   uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
-  if (file.exists(custom_metadata_binary_path)) {
-    metadata <- read.csv(custom_metadata_binary_path, check.names = FALSE)
-  } else {
-    metadata <- read.csv(custom_metadata_path, check.names = FALSE)
-  }
+  metadata <- read.csv(custom_metadata_path, check.names = FALSE)
 } else {
   say("⚠️ No uploaded files found — using default assets")
   uploaded_mat <- read.csv(default_matrix_path, header = FALSE, check.names = FALSE)

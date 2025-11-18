@@ -123,8 +123,8 @@ convert_target_to_binary <- function(metadata, label_col) {
   list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
 }
 
-# Write a binary-target metadata copy (metadata_binary.csv) and mapping file
-# when possible, keeping the original metadata.csv intact for plots.
+# Write the target_binary column into metadata.csv and emit a mapping file
+# when possible, keeping the original label column intact for plots.
 write_binary_metadata <- function(output_dir) {
   meta_path <- file.path(output_dir, "metadata.csv")
   if (!file.exists(meta_path)) return(invisible(NULL))
@@ -148,9 +148,7 @@ write_binary_metadata <- function(output_dir) {
     return(invisible(NULL))
   }
 
-  out_path <- file.path(output_dir, "metadata_binary.csv")
-  utils::write.csv(res$metadata, out_path, row.names = FALSE)
-  # Also persist target_binary onto the main metadata.csv so downstream steps can
+  # Persist target_binary onto the main metadata.csv so downstream steps can
   # read a single file while keeping the original label column intact for plots.
   utils::write.csv(res$metadata, meta_path, row.names = FALSE)
   map_path <- file.path(output_dir, "target_binary_mapping.csv")
