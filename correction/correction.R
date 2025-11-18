@@ -114,7 +114,7 @@ convert_target_to_binary <- function(metadata, label_col) {
 
 record_methods <- c(
   "QN","BMC","limma","ConQuR","PLSDAbatch","ComBat","FSQN","MMUPHin",
-  "fastRUV-III-NB","MetaDICT","PN","FAbatch","ComBat-Seq","DEBIAS"
+  "fastRUV-III-NB","RUV-III-NB","MetaDICT","PN","FAbatch","ComBat-Seq","DEBIAS"
 )
 
 save_summary <- function(){
