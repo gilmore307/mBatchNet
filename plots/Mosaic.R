@@ -5,6 +5,7 @@ library(readr)
 library(tidyr)      # for pivot_wider()
 library(gridExtra)
 library(grid)       # for unit()
+library(jsonlite)
 
 # ==== Args / config (for input and output folder) ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -14,8 +15,7 @@ if (length(args) < 1) {
 output_folder <- args[1]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
-# Your metadata outcome column:
-PHENO_COL <- "phenotype"
+PHENO_COL <- NULL
 
 # Optional study settings from session_config.json (in output_folder)
 CONTROL_LABEL <- NA_character_
@@ -29,45 +29,52 @@ try({
   }
 }, silent = TRUE)
 
-# ==== Read metadata (metadata.csv) ====
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+# ==== Read metadata (prefer metadata_origin.csv for text labels) ====
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata %>% mutate(sample_id = as.character(sample_id))
 
-# Check if the phenotype column exists
-if (!PHENO_COL %in% names(metadata))
-  stop(sprintf("Phenotype column '%s' not found in metadata.csv", PHENO_COL))
-
-# Prepare .outcome as a two-class factor
-vals <- unique(metadata[[PHENO_COL]])
-if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(vals)) {
-  # Map user-specified control label to Negative; all others collapse into Positive
-  metadata <- metadata %>%
-    mutate(.outcome = factor(
-      ifelse(as.character(.data[[PHENO_COL]]) == CONTROL_LABEL, "Negative", "Positive"),
-      levels = c("Positive", "Negative")
-    ))
-} else if (length(vals) == 2) {
-  # Fallback: exactly two classes; use lexical order to determine Positive/Negative
-  if (is.numeric(metadata[[PHENO_COL]]) && all(sort(vals) %in% c(0, 1))) {
-    metadata <- metadata %>%
-      mutate(.outcome = factor(
-        ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
-        levels = c("Positive", "Negative")
-      ))
-  } else {
-    levs <- levels(factor(metadata[[PHENO_COL]]))
-    pos <- levs[2]
-    metadata <- metadata %>% mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
-  }
-} else if (is.numeric(metadata[[PHENO_COL]]) && all(sort(unique(metadata[[PHENO_COL]])) %in% c(0,1))) {
-  metadata <- metadata %>% mutate(.outcome = factor(ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
-                                                   levels = c("Positive","Negative")))
-} else {
-  stop(sprintf("Phenotype column '%s' must have exactly 2 classes unless a control label is specified.", PHENO_COL))
+# Resolve the label column: prefer session config, fallback to phenotype
+if (is.null(PHENO_COL)) {
+  try({
+    cfg_path <- file.path(output_folder, "session_config.json")
+    if (file.exists(cfg_path)) {
+      cfg <- jsonlite::fromJSON(cfg_path)
+      if (!is.null(cfg$label_column)) PHENO_COL <<- cfg$label_column
+    }
+  }, silent = TRUE)
 }
+if (is.null(PHENO_COL) || !(PHENO_COL %in% names(metadata))) {
+  if ("phenotype" %in% names(metadata)) {
+    PHENO_COL <- "phenotype"
+  }
+}
+
+# Check if the phenotype/label column exists
+if (is.null(PHENO_COL) || !PHENO_COL %in% names(metadata))
+  stop("Label column not found in metadata; cannot build mosaic plot.")
+
+# Prepare .outcome as a two-class factor, keeping the user's original labels
+vals <- as.character(metadata[[PHENO_COL]])
+if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% vals) {
+  outcome_levels <- c(CONTROL_LABEL, setdiff(unique(vals), CONTROL_LABEL))
+} else {
+  outcome_levels <- unique(vals)
+}
+
+if (length(outcome_levels) != 2) {
+  stop(sprintf("Label column '%s' must contain exactly 2 classes for the mosaic plot.", PHENO_COL))
+}
+
+metadata <- metadata %>% mutate(.outcome = factor(.data[[PHENO_COL]], levels = outcome_levels))
+OUTCOME_TITLE <- if (!is.null(PHENO_COL)) PHENO_COL else "Outcome"
 
 # ==== Collect files (e.g., normalized files) ====
 file_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
@@ -102,13 +109,15 @@ if (!"sample_id" %in% names(df_raw)) {
 }
 
 # Merge metadata and feature data
+batch_levels <- sort(unique(metadata$batch_id))
+
 df_merged <- df_raw %>%
   mutate(sample_id = as.character(sample_id)) %>%
   inner_join(metadata, by = "sample_id")
 
 # Ensure that batch_id and .outcome are factors for proper plotting
 df_merged <- df_merged %>%
-  mutate(batch_id = factor(batch_id),
+  mutate(batch_id = factor(batch_id, levels = batch_levels),
          .outcome = factor(.outcome))
 
 # ==== Prepare the mosaic data ====
@@ -133,7 +142,9 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
                 "#17BECF", "#9EDAE5")
   
   batchCols   <- mbecCols
-  outcomeCols <- c(Positive = "#222222", Negative = "#BBBBBB")  # distinct from batch pool
+  outcome_levels <- levels(study.summary$.outcome)
+  outcome_palette <- c("#222222", "#BBBBBB")
+  outcomeCols <- stats::setNames(outcome_palette[seq_along(outcome_levels)], outcome_levels)  # distinct from batch pool
   
   # Safety check: no overlap allowed
   if (length(intersect(toupper(batchCols), toupper(outcomeCols))) > 0) {
@@ -150,7 +161,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   ) +
     facet_grid(cols = vars(.outcome), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
-    guides(fill = guide_legend(title = "Batch", reverse = TRUE, keywidth = 1, keyheight = 1)) +
+    guides(fill = guide_legend(title = "Batch", keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = batchCols) +
     ylab("Proportion of all observations") +
     theme(axis.text.x = element_blank(),
@@ -175,7 +186,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   ) +
     facet_grid(cols = vars(batch_id), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
-    guides(fill = guide_legend(title = "Outcome", reverse = TRUE, keywidth = 1, keyheight = 1)) +
+    guides(fill = guide_legend(title = OUTCOME_TITLE, keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = outcomeCols, breaks = names(outcomeCols)) +
     ylab("Proportion of all observations") +
     theme(axis.text.x = element_blank(),

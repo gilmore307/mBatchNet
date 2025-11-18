@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(tidyr)
   library(forcats)
+  library(jsonlite)
 })
 
 # ----------------- Args / IO -----------------
@@ -81,11 +82,36 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
 }
 
 # ----------------- Read metadata -----------------
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("group","condition","status","class","label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else if ("phenotype" %in% names(metadata)) {
+    label_col <- "phenotype"
+  } else {
+    stop("metadata file lacks a label column for ANOVA plots.")
+  }
+}
 
 # ----------------- Find normalized files -----------------
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
@@ -155,7 +181,7 @@ anova_r2 <- function(y, g) {
 }
 
 # ----------------- Core: per-feature one-way ANOVA R^2 (Batch vs Treatment) -----------------
-compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "phenotype") {
+compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = label_col) {
   # align to metadata
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
@@ -212,16 +238,16 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = "p
 }
 
 # ----------------- Build per-feature R^2 across all methods -----------------
-if (!("phenotype" %in% names(metadata))) stop("metadata.csv lacks 'phenotype'.")
-if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs at least 2 levels.")
-if (!("batch_id" %in% names(metadata))) stop("metadata.csv lacks 'batch_id'.")
+if (!(label_col %in% names(metadata))) stop("metadata file lacks the label column.")
+if (dplyr::n_distinct(metadata[[label_col]]) < 2) stop("Label column needs at least 2 levels.")
+if (!("batch_id" %in% names(metadata))) stop("metadata file lacks 'batch_id'.")
 if (dplyr::n_distinct(metadata$batch_id)   < 2) stop("'batch_id' needs at least 2 levels.")
 
 # CLR set
 r2_long_clr <- lapply(names(file_list_clr), function(nm) {
   message("Per-feature ANOVA R^2 (CLR): ", nm)
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
-  out <- compute_anova_r2_BT(df, metadata, "batch_id", "phenotype")
+out <- compute_anova_r2_BT(df, metadata, "batch_id", label_col)
   out$Method <- nm
   out
 }) %>% bind_rows()

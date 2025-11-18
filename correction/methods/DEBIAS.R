@@ -30,10 +30,10 @@ run_method("DEBIAS", {
   )
   X_cnt[!is.finite(X_cnt)] <- 0
   X_cnt[X_cnt < 0] <- 0
-  if (!("phenotype" %in% colnames(metadata))) {
-    fail_step("DEBIAS", "'phenotype' column required in metadata.")
+  if (!("target_binary" %in% colnames(metadata))) {
+    fail_step("DEBIAS", "'target_binary' column required in metadata.")
   }
-  y_all <- metadata$phenotype
+  y_all <- metadata$target_binary
 
   is_num <- is.numeric(y_all)
   uniq_vals <- unique(y_all[!is.na(y_all)])

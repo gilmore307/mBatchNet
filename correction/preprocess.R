@@ -63,6 +63,143 @@ make_unique_sample_ids <- function(metadata, id_col = "sample_id", sep = "_") {
   metadata
 }
 
+TARGET_BINARY_COL <- "target_binary"
+
+# Convert a text or numeric label column into target_binary (0/1).
+# Returns a list with the updated metadata, a mapping (label -> binary), and a
+# boolean indicating whether conversion occurred. If conversion is not possible,
+# `changed` is FALSE and `metadata` is returned unchanged.
+resolve_label_column <- function(metadata, output_dir) {
+  cfg_path <- file.path(output_dir, "session_config.json")
+  label_col <- NULL
+  try({
+    if (file.exists(cfg_path)) {
+      cfg <- jsonlite::fromJSON(cfg_path)
+      if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+    }
+  }, silent = TRUE)
+  if (!is.null(label_col) && label_col %in% colnames(metadata)) return(label_col)
+  if ("phenotype" %in% colnames(metadata)) return("phenotype")
+  NULL
+}
+
+convert_target_to_binary <- function(metadata, label_col) {
+  if (!is.data.frame(metadata)) return(list(metadata = metadata, mapping = NULL, changed = FALSE))
+  if (is.null(label_col) || !(label_col %in% colnames(metadata))) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column missing"))
+  }
+
+  vals <- metadata[[label_col]]
+  # If already numeric/logical with two levels, coerce to 0/1 deterministically
+  if (is.numeric(vals) || is.logical(vals)) {
+    uniq <- sort(unique(vals))
+    uniq <- uniq[is.finite(uniq)]
+    uniq <- uniq[!is.na(uniq)]
+    if (length(uniq) == 2) {
+      mapping <- data.frame(label = uniq, binary = c(0L, 1L), stringsAsFactors = FALSE)
+      bin <- as.integer(factor(vals, levels = uniq)) - 1L
+      metadata[[TARGET_BINARY_COL]] <- bin
+      return(list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "numeric labels coerced to 0/1"))
+    }
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "numeric labels need exactly 2 unique values"))
+  }
+
+  vals_chr <- trimws(as.character(vals))
+  uniq <- unique(vals_chr[!is.na(vals_chr) & nzchar(vals_chr)])
+  if (length(uniq) != 2) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column needs exactly 2 unique text levels"))
+  }
+
+  uniq <- sort(uniq)
+  bin <- ifelse(vals_chr == uniq[1], 0L, 1L)
+  metadata[[TARGET_BINARY_COL]] <- as.integer(bin)
+
+  mapping <- data.frame(
+    label = uniq,
+    binary = c(0L, 1L),
+    stringsAsFactors = FALSE
+  )
+
+  list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
+}
+
+encode_to_numeric <- function(x) {
+  if (is.numeric(x)) return(list(values = as.numeric(x), mapping = NULL))
+  if (is.logical(x)) return(list(values = as.integer(x), mapping = data.frame(label = c(FALSE, TRUE), numeric = 0:1)))
+
+  vals <- trimws(as.character(x))
+  levels <- unique(vals[!is.na(vals)])
+  if (!length(levels)) {
+    return(list(values = rep(NA_real_, length(x)), mapping = NULL))
+  }
+
+  codes <- match(vals, levels) - 1L
+  list(
+    values  = as.numeric(codes),
+    mapping = data.frame(label = levels, numeric = seq_along(levels) - 1L, stringsAsFactors = FALSE)
+  )
+}
+
+prepare_metadata_outputs <- function(output_dir) {
+  origin_path <- file.path(output_dir, "metadata_origin.csv")
+  corr_path   <- file.path(output_dir, "metadata.csv")
+
+  src_path <- if (file.exists(origin_path)) origin_path else corr_path
+  if (!file.exists(src_path)) return(invisible(NULL))
+
+  t0 <- start_step("Prepare metadata for correction")
+  meta <- tryCatch(utils::read.csv(src_path, check.names = FALSE), error = function(e) NULL)
+  if (is.null(meta)) {
+    warn_step("metadata", "Failed to read metadata; skipping metadata prep.")
+    return(invisible(NULL))
+  }
+
+  # Ensure sample_id
+  if (!("sample_id" %in% colnames(meta))) {
+    meta$sample_id <- sprintf("S%03d", seq_len(nrow(meta)))
+  }
+  meta <- make_unique_sample_ids(meta, id_col = "sample_id", sep = "_")
+
+  label_col <- resolve_label_column(meta, output_dir)
+  bin_res <- convert_target_to_binary(meta, label_col)
+  if (!is.null(bin_res$metadata)) meta <- bin_res$metadata
+
+  # Textual copy kept for plotting
+  meta_text <- meta
+
+  # Numeric encoding for correction
+  keep_cols <- c("sample_id", "batch_id", TARGET_BINARY_COL)
+  num_meta <- meta
+  col_maps <- list()
+  for (nm in colnames(num_meta)) {
+    if (nm %in% keep_cols) {
+      if (nm == TARGET_BINARY_COL) {
+        num_meta[[nm]] <- suppressWarnings(as.numeric(num_meta[[nm]]))
+      }
+      next
+    }
+    enc <- encode_to_numeric(num_meta[[nm]])
+    num_meta[[nm]] <- enc$values
+    if (!is.null(enc$mapping)) col_maps[[nm]] <- enc$mapping
+  }
+
+  utils::write.csv(meta_text, origin_path, row.names = FALSE)
+  utils::write.csv(num_meta, corr_path, row.names = FALSE)
+
+  mapping_payload <- list(
+    label_column = label_col,
+    target_binary = if (!is.null(bin_res$mapping)) list(label_column = label_col, mapping = bin_res$mapping) else NULL,
+    encodings = if (length(col_maps)) col_maps else NULL
+  )
+  map_path <- file.path(output_dir, "metadata_mappings.json")
+  if (length(Filter(Negate(is.null), mapping_payload)) > 0) {
+    jsonlite::write_json(mapping_payload, map_path, pretty = TRUE, auto_unbox = TRUE)
+  }
+
+  ok_step("Prepare metadata for correction", t0)
+  invisible(NULL)
+}
+
 # --- If called as a script from Upload step, fix duplicates in-place ---
 try({
   meta_path <- file.path(output_folder, "metadata.csv")
@@ -302,6 +439,10 @@ if (isTRUE(run_main)) {
   say("▶ Converting to TSS & CLR")
   say("Output folder: ", normalizePath(output_folder, winslash = "/"))
   say("Input matrix : ", normalizePath(matrix_path,  winslash = "/"))
+
+  # Prepare metadata: keep a text copy for plotting and write numeric encodings
+  # (including target_binary) into metadata.csv for correction.
+  prepare_metadata_outputs(output_folder)
 
   # Prefer header-less numeric matrix; fall back to headered if needed
   read_matrix_guess <- function(p) {

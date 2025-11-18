@@ -4,7 +4,7 @@ prepare_method("ComBatSeq")
 
 run_method("ComBat-Seq", {
   require(sva)
-  if (!("phenotype" %in% colnames(metadata))) fail_step("ComBat-Seq", "'phenotype' is required.")
+  if (!("target_binary" %in% colnames(metadata))) fail_step("ComBat-Seq", "'target_binary' is required.")
   counts <- get_input_for("ComBatSeq", base_M, base_form)
   libsz <- rowSums(counts); keep <- libsz > 0
   if (any(!keep)) {
@@ -13,7 +13,7 @@ run_method("ComBat-Seq", {
     metadata <- metadata[keep, , drop = FALSE]
   }
   if (!all(rownames(counts) == rownames(metadata))) fail_step("ComBat-Seq", "Sample IDs mismatch after filtering.")
-  adj <- ComBat_seq(counts = t(counts), batch = metadata$batch_id, group = metadata$phenotype)
+  adj <- ComBat_seq(counts = t(counts), batch = metadata$batch_id, group = metadata$target_binary)
   out_counts <- t(adj)
   write_tss_clr("ComBat-Seq", out_counts, "counts", "normalized_combatseq.csv")
 })

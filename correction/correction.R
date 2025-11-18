@@ -50,8 +50,66 @@ if (.can_json && file.exists(summary_file)) {
       if (!is.null(prev$started) && nzchar(as.character(prev$started))) {
         .session_summary$started <- prev$started
       }
+  }
+}, silent = TRUE)
+}
+
+# ---------------------------
+# Target/label helpers
+# ---------------------------
+TARGET_BINARY_COL <- "target_binary"
+
+resolve_label_column <- function(metadata, output_dir = output_folder) {
+  cfg_path <- file.path(output_dir, "session_config.json")
+  label_col <- NULL
+  try({
+    if (.can_json && file.exists(cfg_path)) {
+      cfg <- jsonlite::fromJSON(cfg_path)
+      if (!is.null(cfg$label_column)) label_col <- cfg$label_column
     }
   }, silent = TRUE)
+  if (!is.null(label_col) && label_col %in% colnames(metadata)) return(label_col)
+  if ("phenotype" %in% colnames(metadata)) return("phenotype")
+  NULL
+}
+
+convert_target_to_binary <- function(metadata, label_col) {
+  if (!is.data.frame(metadata)) return(list(metadata = metadata, mapping = NULL, changed = FALSE))
+  if (is.null(label_col) || !(label_col %in% colnames(metadata))) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column missing"))
+  }
+
+  vals <- metadata[[label_col]]
+  if (is.numeric(vals) || is.logical(vals)) {
+    uniq <- sort(unique(vals))
+    uniq <- uniq[is.finite(uniq)]
+    uniq <- uniq[!is.na(uniq)]
+    if (length(uniq) == 2) {
+      mapping <- data.frame(label = uniq, binary = c(0L, 1L), stringsAsFactors = FALSE)
+      bin <- as.integer(factor(vals, levels = uniq)) - 1L
+      metadata[[TARGET_BINARY_COL]] <- bin
+      return(list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "numeric labels coerced to 0/1"))
+    }
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "numeric labels need exactly 2 unique values"))
+  }
+
+  vals_chr <- trimws(as.character(vals))
+  uniq <- unique(vals_chr[!is.na(vals_chr) & nzchar(vals_chr)])
+  if (length(uniq) != 2) {
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column needs exactly 2 unique text levels"))
+  }
+
+  uniq <- sort(uniq)
+  bin <- ifelse(vals_chr == uniq[1], 0L, 1L)
+  metadata[[TARGET_BINARY_COL]] <- as.integer(bin)
+
+  mapping <- data.frame(
+    label = uniq,
+    binary = c(0L, 1L),
+    stringsAsFactors = FALSE
+  )
+
+  list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
 }
 
 record_methods <- c(
@@ -192,19 +250,59 @@ get_input_for <- function(method, base_M, base_form) {
 # ---------------------------
 # Load data (matrix + metadata)
 # ---------------------------
-custom_matrix_path    <- file.path(output_folder, "raw.csv")
-custom_metadata_path  <- file.path(output_folder, "metadata.csv")
-default_matrix_path   <- file.path("assets", "example", "raw_1.csv")
-default_metadata_path <- file.path("assets", "example", "metadata_1.csv")
+custom_matrix_path      <- file.path(output_folder, "raw.csv")
+custom_metadata_path    <- file.path(output_folder, "metadata.csv")
+fallback_metadata_path  <- file.path(output_folder, "metadata_origin.csv")
+mapping_path            <- file.path(output_folder, "metadata_mappings.json")
+default_matrix_path     <- file.path("assets", "example", "raw_1.csv")
+default_metadata_path   <- file.path("assets", "example", "metadata_1.csv")
 
 if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   say("✅ Using uploaded user files")
   uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
-  metadata     <- read.csv(custom_metadata_path, check.names = FALSE)
+  metadata <- read.csv(custom_metadata_path, check.names = FALSE)
+} else if (file.exists(custom_matrix_path) && file.exists(fallback_metadata_path)) {
+  say("✅ Using uploaded matrix with fallback metadata_origin.csv")
+  uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
+  metadata <- read.csv(fallback_metadata_path, check.names = FALSE)
 } else {
   say("⚠️ No uploaded files found — using default assets")
   uploaded_mat <- read.csv(default_matrix_path, header = FALSE, check.names = FALSE)
   metadata     <- read.csv(default_metadata_path, check.names = FALSE)
+}
+
+target_mapping <- NULL
+map_config <- NULL
+if (file.exists(mapping_path) && .can_json) {
+  map_config <- tryCatch(jsonlite::fromJSON(mapping_path), error = function(e) NULL)
+  if (!is.null(map_config$target_binary$mapping)) {
+    target_mapping <- map_config$target_binary$mapping
+  }
+}
+
+label_col <- if (!is.null(map_config$label_column)) map_config$label_column else resolve_label_column(metadata, output_folder)
+if (!(TARGET_BINARY_COL %in% colnames(metadata))) {
+  conv_target <- convert_target_to_binary(metadata, label_col)
+  if (isTRUE(conv_target$changed)) {
+    metadata <- conv_target$metadata
+    if (!is.null(conv_target$mapping)) target_mapping <- conv_target$mapping
+    say("ℹ️ Converted target to binary for correction use")
+  } else if (!is.null(conv_target$reason)) {
+    say("ℹ️ Target left unchanged: ", conv_target$reason)
+  }
+}
+
+if (!is.na(CONTROL_LABEL)) {
+  if (!is.null(target_mapping) && "label" %in% colnames(target_mapping)) {
+    mapped <- target_mapping$binary[match(CONTROL_LABEL, target_mapping$label)]
+    if (length(mapped) && is.finite(mapped[1])) {
+      CONTROL_LABEL <- mapped[1]
+    }
+  }
+  if (is.character(CONTROL_LABEL)) {
+    num_label <- suppressWarnings(as.numeric(CONTROL_LABEL))
+    if (is.finite(num_label)) CONTROL_LABEL <- num_label
+  }
 }
 
 check_table(uploaded_mat, "uploaded_mat", allow_negative = TRUE)
@@ -232,7 +330,7 @@ try({
 metadata$batch_id <- factor(metadata$batch_id, levels = unique(metadata$batch_id))
 batch_id <- metadata$batch_id
 
-covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id","phenotype")), drop = FALSE]
+covar <- metadata[, !(colnames(metadata) %in% c("sample_id","batch_id", TARGET_BINARY_COL)), drop = FALSE]
 covar <- as.data.frame(lapply(covar, function(col) {
   if (is.numeric(col))      col[is.na(col)] <- mean(col, na.rm = TRUE)
   else if (is.factor(col))  { if (anyNA(col)) col[is.na(col)] <- levels(col)[1] }

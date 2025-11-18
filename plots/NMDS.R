@@ -22,6 +22,7 @@ method_short_label <- function(x) {
 
   library(rlang)
   library(vegan)       # distances + NMDS
+  library(jsonlite)
 })
 
 # ==== Helpers (robust ranges/padding) ====
@@ -139,11 +140,36 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
   list(width = w, height = h, dpi = dpi)
 }
 
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("group","condition","status","class","label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else if ("phenotype" %in% names(metadata)) {
+    label_col <- "phenotype"
+  } else {
+    stop("No label column available for NMDS plots.")
+  }
+}
 
 if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
   metadata$batch_id <- metadata$batch_id
@@ -176,7 +202,7 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
 }
 
 # ==== NMDS frames: Aitchison on CLR ====
-compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id","phenotype"), k = 2) {
+compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id", label_col), k = 2) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata.")
@@ -233,7 +259,7 @@ compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id","p
 }
 
 # ==== NMDS frames: Bray-Curtis on TSS ====
-compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id","phenotype"), k = 2) {
+compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id", label_col), k = 2) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata.")

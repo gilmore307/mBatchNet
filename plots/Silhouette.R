@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(uwot)
   library(cluster)   # silhouette
+  library(jsonlite)
 })
 
 # ---- Config ----
@@ -90,11 +91,24 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
 }
 
 # ---- Metadata ----
-metadata <- read_csv(file.path(output_folder, "metadata.csv"), show_col_types = FALSE)
+meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
+  file.path(output_folder, "metadata_origin.csv")
+} else {
+  file.path(output_folder, "metadata.csv")
+}
+metadata <- read_csv(meta_path, show_col_types = FALSE)
 if (!("sample_id" %in% names(metadata))) {
   metadata$sample_id <- sprintf("S%03d", seq_len(nrow(metadata)))
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
+
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) LABEL_COL_NAME <- cfg$label_column
+  }
+}, silent = TRUE)
 
 # Try a sensible fallback label if 'phenotype' is missing
 if (!(LABEL_COL_NAME %in% names(metadata))) {

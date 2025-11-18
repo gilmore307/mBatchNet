@@ -81,13 +81,13 @@ percentile_norm <- function(data, batch, trt, ctrl.grp = 0, n_control_thresh = 1
 }
 
 run_method("PN", {
-  if (!("phenotype" %in% colnames(metadata))) fail_step("PN", "'phenotype' is required.")
-  pheno_vals <- unique(metadata$phenotype)
-  if (length(pheno_vals) != 2) fail_step("PN", "'phenotype' must be binary.")
-  if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(metadata$phenotype)) {
-    trt <- ifelse(as.character(metadata$phenotype) == CONTROL_LABEL, 0, 1)
+  if (!("target_binary" %in% colnames(metadata))) fail_step("PN", "'target_binary' is required.")
+  pheno_vals <- unique(metadata$target_binary)
+  if (length(pheno_vals) != 2) fail_step("PN", "'target_binary' must have exactly 2 levels.")
+  if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(metadata$target_binary)) {
+    trt <- ifelse(as.character(metadata$target_binary) == CONTROL_LABEL, 0, 1)
   } else {
-    trt <- as.numeric(factor(metadata$phenotype, levels = sort(pheno_vals))) - 1
+    trt <- as.numeric(factor(metadata$target_binary, levels = sort(pheno_vals))) - 1
   }
   X_tss <- get_input_for("PN", base_M, base_form)
   if (all(X_tss == 0)) fail_step("PN", "All zero after TSS.")
