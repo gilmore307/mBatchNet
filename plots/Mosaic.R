@@ -69,6 +69,7 @@ if (length(outcome_levels) != 2) {
 }
 
 metadata <- metadata %>% mutate(.outcome = factor(.data[[PHENO_COL]], levels = outcome_levels))
+OUTCOME_TITLE <- if (!is.null(PHENO_COL)) PHENO_COL else "Outcome"
 
 # ==== Collect files (e.g., normalized files) ====
 file_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
@@ -180,7 +181,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   ) +
     facet_grid(cols = vars(batch_id), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
-    guides(fill = guide_legend(title = "Outcome", keywidth = 1, keyheight = 1)) +
+    guides(fill = guide_legend(title = OUTCOME_TITLE, keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = outcomeCols, breaks = names(outcomeCols)) +
     ylab("Proportion of all observations") +
     theme(axis.text.x = element_blank(),
