@@ -54,7 +54,8 @@ def _parse_italic_text(text: str) -> object:
     return parts
 
 
-_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
+_LABEL_COLUMN_WIDTH = {"width": "150px", "minWidth": "150px"}
+_ACTION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 
 
 def correction_layout(active_path: str):
@@ -120,12 +121,12 @@ def register_correction_callbacks(app):
         header = html.Thead(
             html.Tr(
                 [
-                    html.Th("Methods", style=_COLUMN_WIDTH),
-                    html.Th("Avg Time (s)", style=_COLUMN_WIDTH),
-                    html.Th("Status", style=_COLUMN_WIDTH),
-                    html.Th("Run Correction", className="text-center", style=_COLUMN_WIDTH),
-                    html.Th("Delete", className="text-center", style=_COLUMN_WIDTH),
-                    html.Th("Citation"),
+                    html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Avg Time (s)", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
+                    html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),
+                    html.Th("Citation", className="text-center"),
                 ]
             )
         )
@@ -157,7 +158,7 @@ def register_correction_callbacks(app):
                     className="be-cell-loading",
                 ),
                 className="text-center",
-                style=_COLUMN_WIDTH,
+                style=_LABEL_COLUMN_WIDTH,
             )
             run_button = dbc.Button(
                 "Run Correction",
@@ -170,13 +171,13 @@ def register_correction_callbacks(app):
             )
             run_cell = html.Td(
                 dcc.Loading(
-                    html.Div(run_button, className="d-grid gap-1"),
+                    html.Div(run_button, className="d-flex justify-content-center"),
                     type="default",
                     parent_className="be-cell-loading",
                     className="be-cell-loading",
                 ),
                 className="text-center be-run-cell",
-                style=_COLUMN_WIDTH,
+                style=_ACTION_COLUMN_WIDTH,
             )
             delete_button = dbc.Button(
                 "Delete",
@@ -189,13 +190,13 @@ def register_correction_callbacks(app):
             )
             delete_cell = html.Td(
                 dcc.Loading(
-                    html.Div(delete_button, className="d-grid gap-1"),
+                    html.Div(delete_button, className="d-flex justify-content-center"),
                     type="default",
                     parent_className="be-cell-loading",
                     className="be-cell-loading",
                 ),
                 className="text-center be-delete-cell",
-                style=_COLUMN_WIDTH,
+                style=_ACTION_COLUMN_WIDTH,
             )
             metadata = METHOD_REFERENCE_BY_CODE.get(code, {})
             package_url = (metadata.get("package") or "").strip()
@@ -227,8 +228,8 @@ def register_correction_callbacks(app):
             citation_cell = html.Td(citation_content)
             row = html.Tr(
                 [
-                    html.Td(method_display, style=_COLUMN_WIDTH),
-                    html.Td(avg_display, style=_COLUMN_WIDTH),
+                    html.Td(method_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Td(avg_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
                     delete_cell,
