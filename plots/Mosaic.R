@@ -136,7 +136,9 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
                 "#17BECF", "#9EDAE5")
   
   batchCols   <- mbecCols
-  outcomeCols <- c(Positive = "#222222", Negative = "#BBBBBB")  # distinct from batch pool
+  outcome_levels <- levels(study.summary$.outcome)
+  outcome_palette <- c("#222222", "#BBBBBB")
+  outcomeCols <- stats::setNames(outcome_palette[seq_along(outcome_levels)], outcome_levels)  # distinct from batch pool
   
   # Safety check: no overlap allowed
   if (length(intersect(toupper(batchCols), toupper(outcomeCols))) > 0) {
