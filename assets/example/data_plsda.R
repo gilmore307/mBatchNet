@@ -1,9 +1,10 @@
 # get_PLSDAbatch_data.R
 # Outputs:
-#   1) raw_plada.csv            -> samples x OTUs, numeric only, NO row/col names
-#   2) metadata_PLSDAbatch.csv  -> CSV with headers:
-#        batch (Batch 1..), phenotype (0/1),
-#        and filtered covariates (see rules in filter_covariates)
+#   1) raw_plada.csv           -> samples x OTUs, numeric only, NO row/col names
+#   2) metadata_PLSDAbatch.csv -> CSV with headers:
+#        - batch (Batch 1..)
+#        - initial_phenol_concentration.regroup (original phenotype values)
+#        - filtered covariates (see rules in filter_covariates)
 
 quiet_install_cran <- function(pkgs) {
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
@@ -25,20 +26,6 @@ suppressPackageStartupMessages({
 })
 
 # ---------- Helpers ----------
-
-# Strict binary phenotype (0/1): two unique values or logical
-to_binary01 <- function(x) {
-  if (is.logical(x)) return(as.integer(x))
-  if (is.numeric(x)) {
-    ux <- sort(unique(x))
-    if (length(ux) == 2L) return(match(x, ux) - 1L)
-  }
-  if (is.factor(x) || is.character(x)) {
-    f <- factor(x)
-    if (nlevels(f) == 2L) return(as.integer(f) - 1L)
-  }
-  stop("Phenotype must have exactly two unique values (or be logical).")
-}
 
 # Recode batches (character vector) to "Batch 1.."
 recode_batches <- function(batch_chr) {
@@ -174,27 +161,15 @@ ad.filter.res <- PLSDAbatch::PreFL(data = ad.count)
 ad.filter <- ad.filter.res$data.filter  # orientation preserved
 # If you prefer raw counts without prefilter, replace 'ad.filter' with 'ad.count' below.
 
-# --- Phenotype 0/1 ---
-phenotype01 <- to_binary01(ad.trt)
-
-message("[PLSDAbatch] phenotype source column : 'initial_phenol_concentration.regroup' (0/1 from factor)")
-# 可选：打印水平映射
-if (is.factor(ad.trt)) {
-  lev <- levels(ad.trt)
-  if (length(lev) == 2L) {
-    mapping <- setNames(0:1, lev)
-    message("[PLSDAbatch] phenotype mapping (level -> 0/1):")
-    for (nm in names(mapping)) {
-      message(sprintf("  %s -> %d", nm, mapping[[nm]]))
-    }
-  }
-}
+# --- Phenotype: original values and column name ---
+phenotype <- ad.trt
+message("[PLSDAbatch] phenotype source column : 'initial_phenol_concentration.regroup' (original values)")
 
 # --- Batch: recode sequencing_run_date -> Batch 1.. ---
 orig_batch_vec <- as.character(ad.batch)
-batch_vec   <- recode_batches(orig_batch_vec)
+batch_vec      <- recode_batches(orig_batch_vec)
 
-message("[PLSDAbatch] batch source column   : 'sequencing_run_date' (re-coded to 'Batch 1..')")
+message("[PLSDAbatch] batch source column    : 'sequencing_run_date' (re-coded to 'Batch 1..')")
 
 # --- Covariates: all metadata columns minus ID / batch / phenotype ---
 id_like_cols <- intersect(c("sample", "sample_id", "SampleID", "Sample_ID"), colnames(ad.metadata))
@@ -209,9 +184,9 @@ covar_raw <- ad.metadata[
 ]
 
 covar_filtered <- filter_covariates(
-  covars    = covar_raw,
-  batch  = batch_vec,
-  phenotype = phenotype01,
+  covars        = covar_raw,
+  batch         = batch_vec,
+  phenotype     = phenotype,
   dataset_label = "PLSDAbatch"
 )
 
@@ -225,10 +200,10 @@ if (sample_in_rows) {
 }
 storage.mode(M) <- "double"
 
-# --- Build metadata (batch + phenotype + covariates) and align to matrix rows ---
+# --- Build metadata (batch + original phenotype + covariates) and align to matrix rows ---
 metadata <- data.frame(
-  batch  = batch_vec,
-  phenotype = phenotype01,
+  batch = batch_vec,
+  initial_phenol_concentration.regroup = phenotype,
   covar_filtered,
   stringsAsFactors = FALSE
 )
@@ -241,7 +216,7 @@ metadata <- metadata[idx, , drop = FALSE]
 if (nrow(M) != nrow(metadata)) stop("Matrix rows and metadata rows disagree.")
 
 # --- Write files ---
-matrix_path   <- "raw_plada.csv"
+matrix_path   <- "raw_PLSDAbatch.csv"
 metadata_path <- "metadata_PLSDAbatch.csv"
 
 # Matrix: NO headers
@@ -252,5 +227,5 @@ write.csv(metadata, file = metadata_path, row.names = FALSE, quote = TRUE)
 
 cat("Done.\n",
     " - ", matrix_path,   " (samples x OTUs, no headers)\n",
-    " - ", metadata_path, " (batch=Batch 1.., phenotype=0/1, filtered covariates)\n",
+    " - ", metadata_path, " (batch=Batch 1.., initial_phenol_concentration.regroup (original phenotype), filtered covariates)\n",
     sep = "")

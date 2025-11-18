@@ -3,7 +3,7 @@
 #   1) raw_MetaDICT.csv      -> samples x OTUs, numeric only, NO row/col names
 #   2) metadata_MetaDICT.csv -> has headers; includes:
 #        - batch (Batch 1..)
-#        - phenotype (0/1, from Y)
+#        - Y (phenotype, original values, unchanged)
 #        - filtered covariates:
 #            * drop any column that has at least one NA or empty string
 #            * drop columns with ≤1 unique value
@@ -31,34 +31,6 @@ recode_batches <- function(batch_chr) {
   lv <- unique(batch_chr)
   mp <- setNames(paste0("Batch ", seq_along(lv)), lv)
   unname(mp[batch_chr])
-}
-
-# Coerce a vector to binary 0/1 safely
-to_binary01 <- function(x) {
-  # logical: FALSE->0, TRUE->1
-  if (is.logical(x)) return(as.integer(x))
-  
-  # numeric with exactly two unique values
-  if (is.numeric(x)) {
-    ux <- sort(unique(x))
-    if (length(ux) == 2L) {
-      m <- match(x, ux) - 1L        # smaller -> 0, larger -> 1
-      attr(m, "mapping") <- setNames(c(0, 1), ux)
-      return(m)
-    }
-  }
-  
-  # factor/character with exactly two levels
-  if (is.factor(x) || is.character(x)) {
-    f <- factor(x)                   # preserves level order if factor, alphabetical if character
-    if (nlevels(f) == 2L) {
-      out <- as.integer(f) - 1L      # first level -> 0, second -> 1
-      attr(out, "mapping") <- setNames(c(0, 1), levels(f))
-      return(out)
-    }
-  }
-  
-  stop("phenotype must have exactly two unique values (or be logical). Cannot safely coerce to 0/1.")
 }
 
 # Covariate filtering:
@@ -139,7 +111,7 @@ filter_covariates <- function(covars, batch, phenotype, dataset_label = "") {
       }
       
       # 5) text/factor with >2 levels
-      if (is_null(drop_reason <- drop_reason) && is_text && nunique > 2) {
+      if (is.null(drop_reason) && is_text && nunique > 2) {
         drop_reason <- sprintf("categorical text with %d unique values (>2)", nunique)
       }
     }
@@ -153,34 +125,22 @@ filter_covariates <- function(covars, batch, phenotype, dataset_label = "") {
   covars[, keep, drop = FALSE]
 }
 
-# 小 helper，避免 R CMD check 对 is_null 的 NOTE
-is_null <- function(x) is.null(x)
-
 # ----------------- Load vignette example -----------------
 
 data("exampleData", package = "MetaDICT")
 O    <- exampleData$O      # taxa x sample matrix
 meta <- exampleData$meta   # sample metadata (contains 'batch', 'Y', 'Y2', ...)
 
-# ----------------- Build phenotype -----------------
+# ----------------- Phenotype (original) -----------------
 
-raw_pheno    <- meta$Y  # using Y as the informative phenotype per the vignette
-phenotype01  <- to_binary01(raw_pheno)
-pheno_map    <- attr(phenotype01, "mapping")
+phenotype <- meta$Y  # use Y directly, original values and column name
+message("[MetaDICT] phenotype source column : 'Y' (original values, not recoded)")
 
-message("[MetaDICT] phenotype source column : 'Y' (mapped to 0/1)")
-if (!is.null(pheno_map)) {
-  message("[MetaDICT] phenotype mapping (original -> 0/1):")
-  for (nm in names(pheno_map)) {
-    message(sprintf("  %s -> %d", nm, pheno_map[[nm]]))
-  }
-}
+# ----------------- Batch -----------------
 
-# ----------------- Build batch -----------------
-
-raw_batch  <- meta$batch
-batch_chr  <- as.character(raw_batch)
-batch   <- recode_batches(batch_chr)
+raw_batch <- meta$batch
+batch_chr <- as.character(raw_batch)
+batch     <- recode_batches(batch_chr)
 
 message("[MetaDICT] batch source column : 'batch' (re-coded to 'Batch 1..')")
 
@@ -191,17 +151,17 @@ covar_raw <- meta[, setdiff(colnames(meta), c("batch", "Y")), drop = FALSE]
 
 # Filter covariates with strict rules
 covar_filtered <- filter_covariates(
-  covars     = covar_raw,
-  batch   = batch,
-  phenotype  = phenotype01,
+  covars        = covar_raw,
+  batch         = batch,
+  phenotype     = phenotype,
   dataset_label = "MetaDICT"
 )
 
 # ----------------- Build metadata -----------------
 
 md <- data.frame(
-  batch  = batch,
-  phenotype = phenotype01,
+  batch = batch,
+  Y     = phenotype,
   covar_filtered,
   stringsAsFactors = FALSE
 )
@@ -224,6 +184,5 @@ write.csv(md,  file = metadata_path, row.names = FALSE, quote = TRUE)
 
 cat("Done.\n",
     " - ", matrix_path,   " (samples x OTUs, no headers)\n",
-    " - ", metadata_path, " (batch=Batch 1.., phenotype=0/1, filtered covariates)\n",
+    " - ", metadata_path, " (batch=Batch 1.., Y (original phenotype), filtered covariates)\n",
     sep = "")
-
