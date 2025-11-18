@@ -59,8 +59,8 @@ if (.can_json && file.exists(summary_file)) {
 # ---------------------------
 TARGET_BINARY_COL <- "target_binary"
 
-resolve_label_column <- function(metadata) {
-  cfg_path <- file.path(output_folder, "session_config.json")
+resolve_label_column <- function(metadata, output_dir = output_folder) {
+  cfg_path <- file.path(output_dir, "session_config.json")
   label_col <- NULL
   try({
     if (.can_json && file.exists(cfg_path)) {
@@ -276,7 +276,7 @@ if (file.exists(target_map_path)) {
   target_mapping <- tryCatch(read.csv(target_map_path, check.names = FALSE), error = function(e) NULL)
 }
 
-label_col <- resolve_label_column(metadata)
+label_col <- resolve_label_column(metadata, output_folder)
 conv_target <- convert_target_to_binary(metadata, label_col)
 if (isTRUE(conv_target$changed)) {
   metadata <- conv_target$metadata
