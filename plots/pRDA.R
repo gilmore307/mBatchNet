@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(gridExtra)   # tableGrob + arrangeGrob
   library(grid)        # grobs
+  library(jsonlite)
 
 # Map method codes to short labels for figures
 method_short_label <- function(x) {
@@ -79,6 +80,27 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("group", "condition", "status", "class", "label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else if ("phenotype" %in% names(metadata)) {
+    label_col <- "phenotype"
+  } else {
+    stop("metadata file lacks a label column for pRDA plots.")
+  }
+}
+
 if (!("batch" %in% names(metadata)) && ("batch" %in% names(metadata))) {
   metadata$batch <- metadata$batch
 }
@@ -136,14 +158,19 @@ safe_adjR2 <- function(fit) {
 }
 
 # --------- Core calculators (return named numeric: Treatment, Intersection, Batch, Residuals) ---------
-compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = "phenotype") {
+compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = label_col) {
   # ensure sample_id present & align
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata; can't align samples.")
   }
   df  <- df %>% mutate(sample_id = as.character(sample_id))
-  dfx <- inner_join(df, meta, by = "sample_id") %>%
+  dfx <- inner_join(df, meta, by = "sample_id")
+
+  if (!(batch_col %in% names(dfx))) stop(sprintf("Batch column '%s' not in metadata/joined data.", batch_col))
+  if (!(treat_col %in% names(dfx))) stop(sprintf("Treatment column '%s' not in metadata/joined data.", treat_col))
+
+  dfx <- dfx %>%
     filter(!is.na(.data[[batch_col]]), !is.na(.data[[treat_col]]))
   
   # features
@@ -312,9 +339,11 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
 
 # --------- Compute & plot: A) Aitchison (CLR + RDA) ---------
 if (length(file_list_clr)) {
-  batch_col <- "batch"; treat_col <- "phenotype"
-if (!("phenotype" %in% names(metadata))) stop("metadata file has no 'phenotype'.")
-  if (dplyr::n_distinct(metadata$phenotype) < 2) stop("'phenotype' needs >= 2 levels.")
+  batch_col <- "batch"; treat_col <- label_col
+  if (!(batch_col %in% names(metadata))) stop("metadata file lacks 'batch'.")
+  if (dplyr::n_distinct(metadata[[batch_col]]) < 2) stop("'batch' needs >= 2 levels.")
+  if (!(treat_col %in% names(metadata))) stop("metadata file lacks the label column.")
+  if (dplyr::n_distinct(metadata[[treat_col]]) < 2) stop("Label column needs at least 2 levels.")
   
   parts_df_aitch <- lapply(names(file_list_clr), function(nm) {
     message("pRDA (Aitchison) for: ", nm)
