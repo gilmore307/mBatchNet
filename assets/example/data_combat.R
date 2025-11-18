@@ -2,7 +2,7 @@
 # Outputs:
 #   1) raw_combat.csv        -> samples x genes (numeric), NO row/col names
 #   2) metadata_ComBat.csv   -> CSV with headers:
-#        batch_id (Batch 1..), phenotype (0/1), and covariates (excluding batch/cancer/outcome)
+#        batch (Batch 1..), phenotype (0/1), and covariates (excluding batch/cancer/outcome)
 
 quiet_install_cran <- function(pkgs) {
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
@@ -86,7 +86,7 @@ if (!"batch" %in% colnames(pheno)) {
 batch_raw    <- as.character(pheno$batch)
 batch_levels <- unique(batch_raw)   # order of first appearance
 batch_map    <- setNames(paste0("Batch ", seq_along(batch_levels)), batch_levels)
-batch_id_vec <- unname(batch_map[batch_raw])
+batch_vec <- unname(batch_map[batch_raw])
 
 # --- Build expression matrix output ---
 # Matrix: samples x genes (transpose), numeric only, no headers
@@ -101,9 +101,9 @@ covars <- if (length(covar_cols)) {
   pheno[, 0, drop = FALSE]   # empty data.frame with correct row number
 }
 
-# --- Build metadata: batch_id + phenotype + covariates (no batch/cancer/outcome) ---
+# --- Build metadata: batch + phenotype + covariates (no batch/cancer/outcome) ---
 metadata <- data.frame(
-  batch_id  = batch_id_vec,
+  batch  = batch_vec,
   phenotype = phenotype_vec,
   covars,
   stringsAsFactors = FALSE
@@ -131,6 +131,6 @@ write.csv(
 cat(
   "Done.\n",
   " - raw_combat.csv (samples x genes, no headers)\n",
-  " - metadata_ComBat.csv (batch_id=Batch 1.., phenotype=0/1, + covariates w/o batch/cancer/outcome)\n",
+  " - metadata_ComBat.csv (batch=Batch 1.., phenotype=0/1, + covariates w/o batch/cancer/outcome)\n",
   sep = ""
 )

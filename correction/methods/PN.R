@@ -94,7 +94,7 @@ run_method("PN", {
 
   pn_pos <- percentile_norm(
     data = X_tss,
-    batch = metadata$batch_id,
+    batch = metadata$batch,
     trt = trt,
     ctrl.grp = 0,
     n_control_thresh = NA,

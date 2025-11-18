@@ -109,20 +109,20 @@ if (!"sample_id" %in% names(df_raw)) {
 }
 
 # Merge metadata and feature data
-batch_levels <- sort(unique(metadata$batch_id))
+batch_levels <- sort(unique(metadata$batch))
 
 df_merged <- df_raw %>%
   mutate(sample_id = as.character(sample_id)) %>%
   inner_join(metadata, by = "sample_id")
 
-# Ensure that batch_id and .outcome are factors for proper plotting
+# Ensure that batch and .outcome are factors for proper plotting
 df_merged <- df_merged %>%
-  mutate(batch_id = factor(batch_id, levels = batch_levels),
+  mutate(batch = factor(batch, levels = batch_levels),
          .outcome = factor(.outcome))
 
 # ==== Prepare the mosaic data ====
 mosaic_data <- df_merged %>%
-  group_by(batch_id, .outcome) %>%
+  group_by(batch, .outcome) %>%
   summarise(count = n(), .groups = "drop")
 
 # Calculate the total count to get proportions
@@ -157,7 +157,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   
   # ----- Facet 1: bars colored by batch (legend = Batch) -----
   plot.v2 <- ggplot(
-    study.summary, aes(x = batch_id, y = proportion, group = .outcome, fill = batch_id)
+    study.summary, aes(x = batch, y = proportion, group = .outcome, fill = batch)
   ) +
     facet_grid(cols = vars(.outcome), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
@@ -184,7 +184,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   plot.v1 <- ggplot(
     study.summary, aes(x = .outcome, y = proportion, fill = .outcome)
   ) +
-    facet_grid(cols = vars(batch_id), scales = "free", space = "free_x", drop = TRUE) +
+    facet_grid(cols = vars(batch), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
     guides(fill = guide_legend(title = OUTCOME_TITLE, keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = outcomeCols, breaks = names(outcomeCols)) +
@@ -222,6 +222,6 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 }
 
 # ==== Plot the Mosaic Plot ====
-plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch_id', '.outcome'))
+plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch', '.outcome'))
 ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = 12, height = 8, dpi = 300)
 ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")

@@ -38,7 +38,7 @@ KNN_POOLS     <- 50
 KNN_PER_LABEL <- 100
 
 # EBM labels column (batch mixing uses batches)
-LABEL_COL <- "batch_id"
+LABEL_COL <- "batch"
 
 # Baseline-only decision threshold removed; report metrics without recommendations
 

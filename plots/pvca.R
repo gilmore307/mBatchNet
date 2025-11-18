@@ -43,7 +43,7 @@ pvca_zero <- function() {
 # 2) Eigen-decompose; choose PCs: min 3, max 10, reaching cumvar_threshold.
 # 3) For each selected PC: LMM random effects (batch, treat, interaction).
 # 4) Standardize per-PC variances, weight by PC eigenvalue share, renormalize.
-compute_pvca <- function(df, meta, batch_col = "batch_id", treat_col = label_col,
+compute_pvca <- function(df, meta, batch_col = "batch", treat_col = label_col,
                          cumvar_threshold = 0.60, scale_features = TRUE,  # kept for API compatibility
                          na_action = stats::na.omit, quiet = TRUE) {
   
@@ -284,8 +284,8 @@ if (!(label_col %in% names(metadata))) {
   }
 }
 
-if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
-  metadata$batch_id <- metadata$batch_id
+if (!("batch" %in% names(metadata)) && ("batch" %in% names(metadata))) {
+  metadata$batch <- metadata$batch
 }
 
 # --------- Collect CLR files ---------
@@ -306,7 +306,7 @@ pvca_list <- lapply(names(file_list), function(nm) {
   message("Computing PVCA: ", nm)
   df <- readr::read_csv(file_list[[nm]], show_col_types = FALSE)
   out <- compute_pvca(df, metadata,
-                      batch_col = "batch_id",
+                      batch_col = "batch",
                       treat_col = label_col,
                       cumvar_threshold = 0.60,
                       scale_features = TRUE,

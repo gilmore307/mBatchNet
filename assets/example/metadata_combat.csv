@@ -1,4 +1,4 @@
-batch_id,phenotype,sample
+batch,phenotype,sample
 Batch 1,0,1
 Batch 2,0,2
 Batch 2,0,3

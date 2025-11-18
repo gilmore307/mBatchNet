@@ -181,7 +181,7 @@ anova_r2 <- function(y, g) {
 }
 
 # ----------------- Core: per-feature one-way ANOVA R^2 (Batch vs Treatment) -----------------
-compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = label_col) {
+compute_anova_r2_BT <- function(df, meta, batch_col = "batch", treat_col = label_col) {
   # align to metadata
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
@@ -193,7 +193,7 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = la
   message("df rows/cols: ", nrow(df), "/", ncol(df))
   message("after join rows: ", nrow(dfx))
   
-  if (!("batch_id" %in% names(dfx))) stop("Batch column 'batch_id' not in metadata/joined data.")
+  if (!("batch" %in% names(dfx))) stop("Batch column 'batch' not in metadata/joined data.")
   if (!("phenotype" %in% names(dfx))) stop("Treatment column 'phenotype' not in metadata/joined data.")
   
   feat_cols <- setdiff(names(df), "sample_id")
@@ -240,14 +240,14 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch_id", treat_col = la
 # ----------------- Build per-feature R^2 across all methods -----------------
 if (!(label_col %in% names(metadata))) stop("metadata file lacks the label column.")
 if (dplyr::n_distinct(metadata[[label_col]]) < 2) stop("Label column needs at least 2 levels.")
-if (!("batch_id" %in% names(metadata))) stop("metadata file lacks 'batch_id'.")
-if (dplyr::n_distinct(metadata$batch_id)   < 2) stop("'batch_id' needs at least 2 levels.")
+if (!("batch" %in% names(metadata))) stop("metadata file lacks 'batch'.")
+if (dplyr::n_distinct(metadata$batch)   < 2) stop("'batch' needs at least 2 levels.")
 
 # CLR set
 r2_long_clr <- lapply(names(file_list_clr), function(nm) {
   message("Per-feature ANOVA R^2 (CLR): ", nm)
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
-out <- compute_anova_r2_BT(df, metadata, "batch_id", label_col)
+out <- compute_anova_r2_BT(df, metadata, "batch", label_col)
   out$Method <- nm
   out
 }) %>% bind_rows()
@@ -260,7 +260,7 @@ tidy_long <- function(df, method_levels) {
   df %>%
     mutate(
       Effect = case_when(
-        tolower(Effect) %in% c("batch","batch_id") ~ "Batch",
+        tolower(Effect) %in% c("batch","batch") ~ "Batch",
         tolower(Effect) %in% c("treatment","phenotype","group","trt") ~ "Treatment",
         TRUE ~ Effect
       ),

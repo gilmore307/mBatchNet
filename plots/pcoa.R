@@ -189,9 +189,9 @@ if (!(label_col %in% names(metadata))) {
   }
 }
 
-# If batch_id column doesn't exist, create it with NA
-if (!("batch_id" %in% names(metadata))) {
-  metadata$batch_id <- NA  # or some default value
+# If batch column doesn't exist, create it with NA
+if (!("batch" %in% names(metadata))) {
+  metadata$batch <- NA  # or some default value
 }
 
 # ---- Find normalized files ----
@@ -222,7 +222,7 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
 has_dual_geometries <- length(file_list_clr) > 0 && length(file_list_tss) > 0
 
 # ==== PCoA frames (Aitchison on CLR) ====
-compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch_id", label_col),
+compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch", label_col),
                                       n_axes = 5) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
@@ -287,7 +287,7 @@ compute_pcoa_frames_aitch <- function(df, metadata, model.vars = c("batch_id", l
 }
 
 # ==== PCoA frames (Bray–Curtis on TSS) ====
-compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch_id", label_col),
+compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch", label_col),
                                      n_axes = 5) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
@@ -462,7 +462,7 @@ CB
 }
 
 # ==== Params ====
-batch_var  <- "batch_id"
+batch_var  <- "batch"
 model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 3
@@ -629,7 +629,7 @@ ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
 # Unified PCoA summaries (Aitchison + Bray combined)
 # =========================
 
-compute_centroids_pcoa <- function(scores, batch_var = "batch_id") {
+compute_centroids_pcoa <- function(scores, batch_var = "batch") {
   scores %>%
     dplyr::group_by(!!rlang::sym(batch_var)) %>%
     dplyr::summarise(PCo1 = mean(PCo1), PCo2 = mean(PCo2), .groups = "drop")
@@ -639,7 +639,7 @@ compute_centroid_distances <- function(centroids) {
   as.numeric(mean(dist(centroids[, c("PCo1", "PCo2")], method = "euclidean")))
 }
 
-prepare_batch_scores <- function(plot_df, metadata, axes = c("PCo1", "PCo2"), batch_var = "batch_id") {
+prepare_batch_scores <- function(plot_df, metadata, axes = c("PCo1", "PCo2"), batch_var = "batch") {
   if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
   if (!batch_var %in% names(metadata)) return(NULL)
   idx <- match(plot_df$sample_id, metadata$sample_id)
@@ -729,7 +729,7 @@ compute_knn_mixing <- function(coords, groups, k = 10L) {
 }
 
 summarise_pcoa_method <- function(fr, method_name, geometry_label, metadata,
-                                   axes = c("PCo1", "PCo2"), batch_var = "batch_id") {
+                                   axes = c("PCo1", "PCo2"), batch_var = "batch") {
   prep <- prepare_batch_scores(fr$plot.df, metadata, axes = axes, batch_var = batch_var)
   if (is.null(prep)) return(NULL)
   coords <- prep$coords

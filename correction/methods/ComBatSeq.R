@@ -13,7 +13,7 @@ run_method("ComBat-Seq", {
     metadata <- metadata[keep, , drop = FALSE]
   }
   if (!all(rownames(counts) == rownames(metadata))) fail_step("ComBat-Seq", "Sample IDs mismatch after filtering.")
-  adj <- ComBat_seq(counts = t(counts), batch = metadata$batch_id, group = metadata$target_binary)
+  adj <- ComBat_seq(counts = t(counts), batch = metadata$batch, group = metadata$target_binary)
   out_counts <- t(adj)
   write_tss_clr("ComBat-Seq", out_counts, "counts", "normalized_combatseq.csv")
 })

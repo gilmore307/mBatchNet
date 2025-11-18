@@ -14,7 +14,7 @@ run_method("FAbatch", {
     r
   }))
   y     <- factor(metadata$target_binary, levels = sort(pheno_vals))
-  batch <- factor(metadata$batch_id)
+  batch <- factor(metadata$batch)
   v  <- apply(X_log, 2, var)
   keep_var <- is.finite(v) & v > 1e-12
   if (!any(keep_var)) fail_step("FAbatch", "All features ~zero variance.")

@@ -164,7 +164,7 @@ for (nm in names(file_list)) {
   if (!nrow(merged)) { warning(sprintf("Skipping %s: no overlap with metadata.", nm)); next }
   # only use original data columns (exclude metadata)
   X <- safe_numeric_matrix(merged[, setdiff(names(df), "sample_id"), drop = FALSE])
-  b <- merged$batch_id
+  b <- merged$batch
   ascore <- tryCatch(
     compute_alignment_score(X, b, k = K_NEIGHBORS, var_prop = VAR_PROP_MIN, max_pcs = MAX_PCS),
     error = function(e) NA_real_

@@ -171,8 +171,8 @@ if (!(label_col %in% names(metadata))) {
   }
 }
 
-if (!("batch_id" %in% names(metadata)) && ("batch_id" %in% names(metadata))) {
-  metadata$batch_id <- metadata$batch_id
+if (!("batch" %in% names(metadata)) && ("batch" %in% names(metadata))) {
+  metadata$batch <- metadata$batch
 }
 
 # ---- Find normalized files ----
@@ -202,7 +202,7 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
 }
 
 # ==== NMDS frames: Aitchison on CLR ====
-compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id", label_col), k = 2) {
+compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch", label_col), k = 2) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata.")
@@ -259,7 +259,7 @@ compute_nmds_frames_aitch <- function(df, metadata, model.vars = c("batch_id", l
 }
 
 # ==== NMDS frames: Bray-Curtis on TSS ====
-compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch_id", label_col), k = 2) {
+compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch", label_col), k = 2) {
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(metadata)) df$sample_id <- metadata$sample_id
     else stop("Input lacks 'sample_id' and row count != metadata.")
@@ -361,7 +361,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
 }
 
 # ==== Params ====
-batch_var  <- "batch_id"
+batch_var  <- "batch"
 model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 3
@@ -510,7 +510,7 @@ ggsave(file.path(output_folder, "nmds_braycurtis.tif"),
 # NMDS assessment (with baseline-only option)
 # =========================
 
-prepare_batch_scores <- function(plot_df, metadata, axes = c("NMDS1", "NMDS2"), batch_var = "batch_id") {
+prepare_batch_scores <- function(plot_df, metadata, axes = c("NMDS1", "NMDS2"), batch_var = "batch") {
   if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
   if (!batch_var %in% names(metadata)) return(NULL)
   idx <- match(plot_df$sample_id, metadata$sample_id)
@@ -600,7 +600,7 @@ compute_knn_mixing <- function(coords, groups, k = 10L) {
 }
 
 summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
-                                   axes = c("NMDS1", "NMDS2"), batch_var = "batch_id") {
+                                   axes = c("NMDS1", "NMDS2"), batch_var = "batch") {
   prep <- prepare_batch_scores(fr$plot.df, metadata, axes = axes, batch_var = batch_var)
   if (is.null(prep)) return(NULL)
   coords <- prep$coords

@@ -14,9 +14,9 @@ run_method("MetaDICT", {
   rm(O_samp_feat)
   
   meta <- metadata[colnames(O), , drop = FALSE]
-  meta$batch <- droplevels(factor(meta$batch_id))
-  if (anyNA(meta$batch))   fail_step("MetaDICT", "batch_id contains NA after alignment.")
-  if (nlevels(meta$batch) < 2L) fail_step("MetaDICT", "batch_id has <2 levels after filtering.")
+  meta$batch <- droplevels(factor(meta$batch))
+  if (anyNA(meta$batch))   fail_step("MetaDICT", "batch contains NA after alignment.")
+  if (nlevels(meta$batch) < 2L) fail_step("MetaDICT", "batch has <2 levels after filtering.")
   
   storage.mode(O) <- "double"
   if (any(!is.finite(O))) fail_step("MetaDICT", "Non-finite values in input matrix (NA/Inf).")

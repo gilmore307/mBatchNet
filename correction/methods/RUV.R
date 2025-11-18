@@ -49,13 +49,13 @@ run_method("RUV-III-NB", {
     Y <- Y[, in_meta, drop = FALSE]
     samp_ids <- colnames(Y)
   }
-  if (!("batch_id" %in% colnames(metadata)))
-    fail_step("RUV", "metadata must contain 'batch_id' column.")
+  if (!("batch" %in% colnames(metadata)))
+    fail_step("RUV", "metadata must contain 'batch' column.")
 
-  batch_vec <- metadata[samp_ids, "batch_id"]
+  batch_vec <- metadata[samp_ids, "batch"]
   if (anyNA(batch_vec)) {
     bad <- samp_ids[is.na(batch_vec)]
-    message("Dropping samples with NA batch_id: ", paste(bad, collapse = ", "))
+    message("Dropping samples with NA batch: ", paste(bad, collapse = ", "))
     keep <- !is.na(batch_vec)
     Y <- Y[, keep, drop = FALSE]
     samp_ids <- colnames(Y)
@@ -76,7 +76,7 @@ run_method("RUV-III-NB", {
     message("Dropping zero-library samples: ", paste(colnames(Y)[drop], collapse = ", "))
     Y <- Y[, lib > 0L & is.finite(lib), drop = FALSE]
     samp_ids <- colnames(Y)
-    batch_factor <- droplevels(factor(metadata[samp_ids, "batch_id"]))
+    batch_factor <- droplevels(factor(metadata[samp_ids, "batch"]))
     if (nlevels(batch_factor) < 1L)
       fail_step("RUV", "No valid batch levels after zero-library drop.")
   }
@@ -91,7 +91,7 @@ run_method("RUV-III-NB", {
     M <- M[rs > 0L, , drop = FALSE]
     Y <- Y[, rownames(M), drop = FALSE]
     samp_ids <- colnames(Y)
-    batch_factor <- droplevels(factor(metadata[samp_ids, "batch_id"]))
+    batch_factor <- droplevels(factor(metadata[samp_ids, "batch"]))
   }
 
   ctl_names <- rownames(Y)

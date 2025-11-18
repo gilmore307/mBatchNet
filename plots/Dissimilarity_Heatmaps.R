@@ -121,7 +121,7 @@ if (!length(file_list_clr) && !length(file_list_tss)) {
   stop("No normalized files found (expected raw_clr.csv/raw_tss.csv and/or normalized_*_clr.csv / normalized_*_tss.csv) in ", output_folder)
 }
 
-batch_var <- "batch_id"
+batch_var <- "batch"
 has_dual_geometries <- length(file_list_clr) > 0 && length(file_list_tss) > 0
 
 # ==== Helpers ====
@@ -219,7 +219,7 @@ batch_distance_matrix <- function(D_sample, batch_factor, diag_mode = c("zero","
   Db
 }
 
-rmse_batch_matrix_aitchison <- function(df, metadata, batch_var = "batch_id", diag_mode = "zero") {
+rmse_batch_matrix_aitchison <- function(df, metadata, batch_var = "batch", diag_mode = "zero") {
   dfm <- align_samples_1to1(df, metadata)
   feat_cols <- setdiff(names(df), "sample_id")
   X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
@@ -235,7 +235,7 @@ rmse_batch_matrix_aitchison <- function(df, metadata, batch_var = "batch_id", di
   list(Db = Db, order = b_levels)
 }
 
-dissim_batch_matrix_bray <- function(df, metadata, batch_var = "batch_id", diag_mode = "zero") {
+dissim_batch_matrix_bray <- function(df, metadata, batch_var = "batch", diag_mode = "zero") {
   dfm <- align_samples_1to1(df, metadata)
   feat_cols <- setdiff(names(df), "sample_id")
   X <- dfm %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
