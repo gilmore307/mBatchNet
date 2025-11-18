@@ -56,34 +56,19 @@ if (is.null(PHENO_COL) || !(PHENO_COL %in% names(metadata))) {
 if (is.null(PHENO_COL) || !PHENO_COL %in% names(metadata))
   stop("Label column not found in metadata.csv; cannot build mosaic plot.")
 
-# Prepare .outcome as a two-class factor
-vals <- unique(metadata[[PHENO_COL]])
-if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% as.character(vals)) {
-  # Map user-specified control label to Negative; all others collapse into Positive
-  metadata <- metadata %>%
-    mutate(.outcome = factor(
-      ifelse(as.character(.data[[PHENO_COL]]) == CONTROL_LABEL, "Negative", "Positive"),
-      levels = c("Positive", "Negative")
-    ))
-} else if (length(vals) == 2) {
-  # Fallback: exactly two classes; use lexical order to determine Positive/Negative
-  if (is.numeric(metadata[[PHENO_COL]]) && all(sort(vals) %in% c(0, 1))) {
-    metadata <- metadata %>%
-      mutate(.outcome = factor(
-        ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
-        levels = c("Positive", "Negative")
-      ))
-  } else {
-    levs <- levels(factor(metadata[[PHENO_COL]]))
-    pos <- levs[2]
-    metadata <- metadata %>% mutate(.outcome = relevel(factor(.data[[PHENO_COL]]), ref = pos))
-  }
-} else if (is.numeric(metadata[[PHENO_COL]]) && all(sort(unique(metadata[[PHENO_COL]])) %in% c(0,1))) {
-  metadata <- metadata %>% mutate(.outcome = factor(ifelse(.data[[PHENO_COL]] == 1, "Positive", "Negative"),
-                                                   levels = c("Positive","Negative")))
+# Prepare .outcome as a two-class factor, keeping the user's original labels
+vals <- as.character(metadata[[PHENO_COL]])
+if (!is.na(CONTROL_LABEL) && CONTROL_LABEL %in% vals) {
+  outcome_levels <- c(CONTROL_LABEL, setdiff(unique(vals), CONTROL_LABEL))
 } else {
-  stop(sprintf("Phenotype column '%s' must have exactly 2 classes unless a control label is specified.", PHENO_COL))
+  outcome_levels <- unique(vals)
 }
+
+if (length(outcome_levels) != 2) {
+  stop(sprintf("Label column '%s' must contain exactly 2 classes for the mosaic plot.", PHENO_COL))
+}
+
+metadata <- metadata %>% mutate(.outcome = factor(.data[[PHENO_COL]], levels = outcome_levels))
 
 # ==== Collect files (e.g., normalized files) ====
 file_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
@@ -118,13 +103,15 @@ if (!"sample_id" %in% names(df_raw)) {
 }
 
 # Merge metadata and feature data
+batch_levels <- sort(unique(metadata$batch_id))
+
 df_merged <- df_raw %>%
   mutate(sample_id = as.character(sample_id)) %>%
   inner_join(metadata, by = "sample_id")
 
 # Ensure that batch_id and .outcome are factors for proper plotting
 df_merged <- df_merged %>%
-  mutate(batch_id = factor(batch_id),
+  mutate(batch_id = factor(batch_id, levels = batch_levels),
          .outcome = factor(.outcome))
 
 # ==== Prepare the mosaic data ====
@@ -166,7 +153,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   ) +
     facet_grid(cols = vars(.outcome), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
-    guides(fill = guide_legend(title = "Batch", reverse = TRUE, keywidth = 1, keyheight = 1)) +
+    guides(fill = guide_legend(title = "Batch", keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = batchCols) +
     ylab("Proportion of all observations") +
     theme(axis.text.x = element_blank(),
@@ -191,7 +178,7 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
   ) +
     facet_grid(cols = vars(batch_id), scales = "free", space = "free_x", drop = TRUE) +
     geom_bar(stat = "identity", width = 0.9) +
-    guides(fill = guide_legend(title = "Outcome", reverse = TRUE, keywidth = 1, keyheight = 1)) +
+    guides(fill = guide_legend(title = "Outcome", keywidth = 1, keyheight = 1)) +
     scale_fill_manual(values = outcomeCols, breaks = names(outcomeCols)) +
     ylab("Proportion of all observations") +
     theme(axis.text.x = element_blank(),
