@@ -545,58 +545,55 @@ mean_centroid_distance <- function(coords, groups) {
   as.numeric(mean(dist(centroid_mat, method = "euclidean")))
 }
 
-mean_within_radius <- function(coords, groups) {
-  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
-  if (ncol(coords) < 2) return(NA_real_)
+ellipse_shape_stats <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) {
+    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
+  }
+  if (ncol(coords) < 2) {
+    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
+  }
+
   groups <- droplevels(factor(groups))
   levs <- levels(groups)
-  total <- 0
-  count <- 0
+  areas <- c()
+  angles <- c()
+
   for (lev in levs) {
     idx <- which(groups == lev)
     if (!length(idx)) next
     sub <- coords[idx, , drop = FALSE]
     sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
-    if (!nrow(sub)) next
-    centroid <- colMeans(sub, na.rm = TRUE)
-    dists <- sqrt(rowSums((sub - matrix(centroid, nrow = nrow(sub), ncol = ncol(sub), byrow = TRUE))^2))
-    dists <- dists[is.finite(dists)]
-    total <- total + sum(dists)
-    count <- count + length(dists)
-  }
-  if (!count) return(NA_real_)
-  total / count
-}
+    if (nrow(sub) < 3) next
 
-compute_knn_mixing <- function(coords, groups, k = 10L) {
-  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
-  if (ncol(coords) < 2) return(NA_real_)
-  n <- nrow(coords)
-  if (n <= 1) return(NA_real_)
-  k <- min(as.integer(k), n - 1L)
-  if (k <= 0) return(NA_real_)
-  groups <- droplevels(factor(groups))
-  if (!nlevels(groups)) return(NA_real_)
-  dmat <- as.matrix(dist(coords, method = "euclidean", diag = TRUE, upper = TRUE))
-  diag(dmat) <- Inf
-  mixing <- numeric(n)
-  valid_rows <- rep(FALSE, n)
-  group_vals <- as.character(groups)
-  for (i in seq_len(n)) {
-    row <- dmat[i, ]
-    if (all(!is.finite(row))) next
-    ord <- order(row, na.last = NA)
-    ord <- ord[ord != i]
-    if (!length(ord)) next
-    take <- ord[seq_len(min(k, length(ord)))]
-    if (!length(take)) next
-    neigh <- group_vals[take]
-    if (!length(neigh)) next
-    mixing[i] <- mean(neigh != group_vals[i])
-    valid_rows[i] <- TRUE
+    covmat <- stats::cov(sub, use = "complete.obs")
+    eig <- eigen(covmat, symmetric = TRUE)
+    axis_lengths <- sqrt(pmax(eig$values, 0))
+    if (length(axis_lengths) >= 2) {
+      areas <- c(areas, pi * axis_lengths[1] * axis_lengths[2])
+    }
+
+    v1 <- eig$vectors[, 1]
+    angles <- c(angles, atan2(v1[2], v1[1]))
   }
-  if (!any(valid_rows)) return(NA_real_)
-  mean(mixing[valid_rows])
+
+  size_cv <- if (length(areas) >= 2 && mean(areas, na.rm = TRUE) > 0) {
+    stats::sd(areas, na.rm = TRUE) / mean(areas, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+
+  angle_disp <- if (length(angles) >= 2) {
+    ref <- angles[1]
+    diffs <- sapply(angles[-1], function(a) {
+      delta <- abs(atan2(sin(a - ref), cos(a - ref)))
+      min(delta, pi - delta)
+    })
+    mean(diffs)
+  } else {
+    NA_real_
+  }
+
+  list(size_cv = size_cv, angle_disp_deg = if (is.na(angle_disp)) NA_real_ else angle_disp * 180 / pi)
 }
 
 summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
@@ -605,17 +602,16 @@ summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
   if (is.null(prep)) return(NULL)
   coords <- prep$coords
   batch <- prep$batch
+  ell <- ellipse_shape_stats(coords, batch)
   tibble::tibble(
     Method = method_name,
     Geometry = geometry_label,
     NMDS_Stress = fr$stress,
     Shepard_R2 = if (is.null(fr$shepard_r2)) NA_real_ else fr$shepard_r2,
     Site_GoF_Median = if (is.null(fr$site_gof_median)) NA_real_ else fr$site_gof_median,
-    Batch_Distance_NMDS = mean_centroid_distance(coords, batch),
-    R_within_NMDS = mean_within_radius(coords, batch),
-    Mixing_k10_NMDS = compute_knn_mixing(coords, batch, k = 10L),
-    n_features_used_NMDS = if (is.null(fr$n_features_used)) NA_integer_ else fr$n_features_used,
-    n_features_total_NMDS = if (is.null(fr$n_features_total)) NA_integer_ else fr$n_features_total
+    Centroid_Distance_NMDS = mean_centroid_distance(coords, batch),
+    Ellipse_Size_CV_NMDS = ell$size_cv,
+    Ellipse_Angle_Dispersion_deg_NMDS = ell$angle_disp_deg
   )
 }
 
