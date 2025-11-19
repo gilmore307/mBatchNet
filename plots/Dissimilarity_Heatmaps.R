@@ -315,14 +315,7 @@ safe_anosim <- function(dist_obj, grouping) {
   unname(out$statistic)
 }
 
-safe_mantel <- function(dist_a, dist_b) {
-  if (is.null(dist_a) || is.null(dist_b)) return(NA_real_)
-  out <- tryCatch(vegan::mantel(dist_a, dist_b), error = function(e) NULL)
-  if (is.null(out)) return(NA_real_)
-  unname(out$statistic)
-}
-
-compute_R_norm <- function(between, within) {
+compute_normalized_inter_vs_intra <- function(between, within) {
   if (!is.finite(between) || !is.finite(within)) return(NA_real_)
   denom <- between + within
   if (!is.finite(denom) || denom == 0) return(NA_real_)
@@ -460,15 +453,6 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
 
-# ==== Cross-geometry Mantel correlations ====
-mantel_vals <- list()
-if (length(dist_list_ait) && length(dist_list_bc)) {
-  common_methods <- intersect(names(dist_list_ait), names(dist_list_bc))
-  for (m in common_methods) {
-    mantel_vals[[m]] <- safe_mantel(dist_list_ait[[m]], dist_list_bc[[m]])
-  }
-}
-
 # ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
 mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else numeric()
@@ -477,15 +461,12 @@ all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 output_name <- if (only_baseline) "dissimilarity_raw_assessment_pre.csv" else "dissimilarity_raw_assessment_post.csv"
 
-build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping, mantel_val = NA_real_) {
+build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
   tibble::tibble(
     Method = method,
     Geometry = geometry,
-    Inter_Batch_Dissimilarity = between,
-    Intra_Batch_Dissimilarity = within,
+    Normalized_Inter_vs_Intra = compute_normalized_inter_vs_intra(between, within),
     ANOSIM_R = safe_anosim(dist_obj, grouping),
-    R_norm = compute_R_norm(between, within),
-    Mantel_r = mantel_val
   )
 }
 
@@ -505,8 +486,7 @@ if (only_baseline) {
       between = between,
       within = within,
       dist_obj = comp_zero$dist,
-      grouping = comp_zero$grouping,
-      mantel_val = mantel_vals[["Before correction"]]
+      grouping = comp_zero$grouping
     )
   }
   
@@ -523,8 +503,7 @@ if (only_baseline) {
       between = between,
       within = within,
       dist_obj = comp_zero$dist,
-      grouping = comp_zero$grouping,
-      mantel_val = mantel_vals[["Before correction"]]
+      grouping = comp_zero$grouping
     )
   }
 
@@ -545,8 +524,7 @@ if (only_baseline) {
       between = mean_ait[[m]],
       within = within_means_ait[[m]],
       dist_obj = dist_list_ait[[m]],
-      grouping = grouping_ait[[m]],
-      mantel_val = mantel_vals[[m]]
+      grouping = grouping_ait[[m]]
     )
   }
   for (m in names(mean_bc)) {
@@ -556,8 +534,7 @@ if (only_baseline) {
       between = mean_bc[[m]],
       within = within_means_bc[[m]],
       dist_obj = dist_list_bc[[m]],
-      grouping = grouping_bc[[m]],
-      mantel_val = mantel_vals[[m]]
+      grouping = grouping_bc[[m]]
     )
   }
 
