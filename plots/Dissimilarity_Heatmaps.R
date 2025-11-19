@@ -232,7 +232,7 @@ rmse_batch_matrix_aitchison <- function(df, metadata, batch_var = "batch", diag_
   b_levels <- sort_levels_numeric(unique(dfm[[batch_var]]))
   bfac <- factor(as.character(dfm[[batch_var]]), levels = b_levels)
   Db <- batch_distance_matrix(D_rmse, bfac, diag_mode = diag_mode)
-  list(Db = Db, order = b_levels)
+  list(Db = Db, order = b_levels, dist = D_rmse, grouping = bfac)
 }
 
 dissim_batch_matrix_bray <- function(df, metadata, batch_var = "batch", diag_mode = "zero") {
@@ -244,7 +244,7 @@ dissim_batch_matrix_bray <- function(df, metadata, batch_var = "batch", diag_mod
   b_levels <- sort_levels_numeric(unique(dfm[[batch_var]]))
   bfac <- factor(as.character(dfm[[batch_var]]), levels = b_levels)
   Db <- batch_distance_matrix(D_bray, bfac, diag_mode = diag_mode)
-  list(Db = Db, order = b_levels)
+  list(Db = Db, order = b_levels, dist = D_bray, grouping = bfac)
 }
 
 upper_heatmap_panel <- function(Db, ord, title_label, fill_label,
@@ -306,6 +306,16 @@ upper_mean <- function(M) {
   mean(vals, na.rm = TRUE)
 }
 
+safe_anosim <- function(dist_obj, grouping) {
+  default <- c(ANOSIM_R = NA_real_)
+  if (is.null(dist_obj) || is.null(grouping)) return(default)
+  grouping <- droplevels(factor(grouping))
+  if (nlevels(grouping) < 2) return(default)
+  out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping), error = function(e) NULL)
+  if (is.null(out)) return(default)
+  c(ANOSIM_R = unname(out$statistic))
+}
+
 # ==== A) Aitchison RMSE heatmaps ====
 diag_mode <- "zero"
 label_digits <- 2
@@ -318,12 +328,16 @@ if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
 mat_list_ait <- list()
 ord_list_ait <- list()
 within_means_ait <- numeric()
+dist_list_ait <- list()
+grouping_ait <- list()
 for (nm in names(file_list_clr)) {
   cat("Computing Aitchison RMSE batch matrix:", nm, "\n")
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
   comp <- rmse_batch_matrix_aitchison(df, metadata, batch_var = batch_var, diag_mode = diag_mode)
   mat_list_ait[[nm]] <- comp$Db
   ord_list_ait[[nm]] <- comp$order
+  dist_list_ait[[nm]] <- comp$dist
+  grouping_ait[[nm]] <- comp$grouping
   comp_mean <- rmse_batch_matrix_aitchison(df, metadata, batch_var = batch_var, diag_mode = "mean")
   within_means_ait[[nm]] <- mean(diag(comp_mean$Db), na.rm = TRUE)
 }
@@ -378,12 +392,16 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
 mat_list_bc <- list()
 ord_list_bc <- list()
 within_means_bc <- numeric()
+dist_list_bc <- list()
+grouping_bc <- list()
 for (nm in names(file_list_tss)) {
   cat("Computing Bray-Curtis batch matrix:", nm, "\n")
   df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
   comp <- dissim_batch_matrix_bray(df, metadata, batch_var = batch_var, diag_mode = diag_mode)
   mat_list_bc[[nm]] <- comp$Db
   ord_list_bc[[nm]] <- comp$order
+  dist_list_bc[[nm]] <- comp$dist
+  grouping_bc[[nm]] <- comp$grouping
   comp_mean <- dissim_batch_matrix_bray(df, metadata, batch_var = batch_var, diag_mode = "mean")
   within_means_bc[[nm]] <- mean(diag(comp_mean$Db), na.rm = TRUE)
 }
@@ -437,9 +455,18 @@ all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 output_name <- if (only_baseline) "dissimilarity_raw_assessment_pre.csv" else "dissimilarity_raw_assessment_post.csv"
 
+build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
+  anosim_vals <- safe_anosim(dist_obj, grouping)
+  tibble::tibble(
+    Method = method,
+    Geometry = geometry,
+    ANOSIM_R = anosim_vals[["ANOSIM_R"]],
+  )
+}
+
 if (only_baseline) {
   assess_rows <- list()
-  
+
   # Aitchison baseline assessment
   if ("Before correction" %in% names(file_list_clr)) {
     df_raw_clr <- read_csv(file_list_clr[["Before correction"]], show_col_types = FALSE)
@@ -447,11 +474,13 @@ if (only_baseline) {
     comp_mean  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "mean")
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    assess_rows[["Ait"]] <- tibble::tibble(
-      Method = "Before correction",
-      Geometry = "Ait",
-      Inter_Batch_Dissimilarity = between,
-      Intra_Batch_Dissimilarity = within
+    assess_rows[["Ait"]] <- build_assessment_row(
+      method = "Before correction",
+      geometry = "Ait",
+      between = between,
+      within = within,
+      dist_obj = comp_zero$dist,
+      grouping = comp_zero$grouping
     )
   }
   
@@ -462,11 +491,13 @@ if (only_baseline) {
     comp_mean  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "mean")
     between    <- upper_mean(comp_zero$Db)
     within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    assess_rows[["BC"]] <- tibble::tibble(
-      Method = "Before correction",
-      Geometry = "BC",
-      Inter_Batch_Dissimilarity = between,
-      Intra_Batch_Dissimilarity = within
+    assess_rows[["BC"]] <- build_assessment_row(
+      method = "Before correction",
+      geometry = "BC",
+      between = between,
+      within = within,
+      dist_obj = comp_zero$dist,
+      grouping = comp_zero$grouping
     )
   }
 
@@ -479,22 +510,29 @@ if (only_baseline) {
 
 } else {
   # ---- Summaries for multiple methods (no ranking) ----
-    make_rows <- function(means_between, means_within, geometry_label) {
-      if (!length(means_between)) return(NULL)
-      tibble::tibble(
-        Method = names(means_between),
-        Geometry = geometry_label,
-        Inter_Batch_Dissimilarity = unname(means_between),
-        Intra_Batch_Dissimilarity = unname(means_within[names(means_between)])
-      )
-    }
-    
-    rows <- list(
-      make_rows(mean_ait, within_means_ait, "Ait"),
-      make_rows(mean_bc, within_means_bc, "BC")
+  rows <- list()
+  for (m in names(mean_ait)) {
+    rows[[length(rows) + 1L]] <- build_assessment_row(
+      method = m,
+      geometry = "Ait",
+      between = mean_ait[[m]],
+      within = within_means_ait[[m]],
+      dist_obj = dist_list_ait[[m]],
+      grouping = grouping_ait[[m]]
     )
+  }
+  for (m in names(mean_bc)) {
+    rows[[length(rows) + 1L]] <- build_assessment_row(
+      method = m,
+      geometry = "BC",
+      between = mean_bc[[m]],
+      within = within_means_bc[[m]],
+      dist_obj = dist_list_bc[[m]],
+      grouping = grouping_bc[[m]]
+    )
+  }
 
-    assessment_tbl <- dplyr::bind_rows(rows)
+  assessment_tbl <- dplyr::bind_rows(rows)
   assessment_tbl <- assessment_tbl %>%
     dplyr::arrange(Geometry, Method)
 
