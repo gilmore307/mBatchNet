@@ -19,7 +19,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Upload Files"),
             html.P(
-                "Upload a raw count/abundance table and a matching metadata table, or pick "one of the curated examples."
+                "Upload a raw count/abundance table and a matching metadata table, or pick one of the curated examples."
             ),
             html.Div(
                 [
@@ -27,7 +27,7 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Manual uploads accept CSV files. "
+                                "Manual uploads accept CSV files."
                             ),
                             html.Li(
                                 "The matrix must use features as rows, samples as columns, and omit row/column names. Use consistent feature order between the matrix and metadata to avoid mismatches."
@@ -75,7 +75,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Batch Effect Correction"),
             html.P(
-                "Select one or more correction strategies to run on the uploaded data. "
+                "Select one or more correction strategies to run on the uploaded data."
             ),
             html.Ul(
                 [
