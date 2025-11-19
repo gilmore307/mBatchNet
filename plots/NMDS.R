@@ -115,7 +115,8 @@ for (a in args[-1]) {
 }
 
 apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
-                               panel_cols = 1, panel_rows = 1) {
+                               panel_cols = 1, panel_rows = 1,
+                               max_total_pixels = 35e6) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
   w <- width_in
   h <- height_in
@@ -136,6 +137,22 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
     } else {
       h <- per_panel
     }
+  }
+  width_px <- w * dpi
+  height_px <- h * dpi
+  total_px <- width_px * height_px
+  if (is.finite(total_px) && total_px > max_total_pixels &&
+      is.finite(width_px) && is.finite(height_px) &&
+      width_px > 0 && height_px > 0) {
+    scale <- sqrt(max_total_pixels / total_px)
+    w <- w * scale
+    h <- h * scale
+    width_px <- w * dpi
+    height_px <- h * dpi
+    message(sprintf(
+      "Requested canvas %.0f×%.0f px exceeds limit %.0f; scaling by %.3f to %.0f×%.0f px",
+      width_px / scale, height_px / scale, max_total_pixels, scale, width_px, height_px
+    ))
   }
   list(width = w, height = h, dpi = dpi)
 }
