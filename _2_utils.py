@@ -192,8 +192,6 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
-        ("Shepard_R2", "up"),
-        ("Site_GoF_Median", "up"),
         ("Centroid_Distance_NMDS", "down"),
         ("Ellipse_Size_CV_NMDS", "down"),
         ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),

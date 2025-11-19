@@ -607,8 +607,6 @@ summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
     Method = method_name,
     Geometry = geometry_label,
     NMDS_Stress = fr$stress,
-    Shepard_R2 = if (is.null(fr$shepard_r2)) NA_real_ else fr$shepard_r2,
-    Site_GoF_Median = if (is.null(fr$site_gof_median)) NA_real_ else fr$site_gof_median,
     Centroid_Distance_NMDS = mean_centroid_distance(coords, batch),
     Ellipse_Size_CV_NMDS = ell$size_cv,
     Ellipse_Angle_Dispersion_deg_NMDS = ell$angle_disp_deg
