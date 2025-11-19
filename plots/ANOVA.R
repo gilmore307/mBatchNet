@@ -193,8 +193,8 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch", treat_col = label
   message("df rows/cols: ", nrow(df), "/", ncol(df))
   message("after join rows: ", nrow(dfx))
   
-  if (!("batch" %in% names(dfx))) stop("Batch column 'batch' not in metadata/joined data.")
-  if (!("phenotype" %in% names(dfx))) stop("Treatment column 'phenotype' not in metadata/joined data.")
+  if (!(batch_col %in% names(dfx))) stop(sprintf("Batch column '%s' not in metadata/joined data.", batch_col))
+  if (!(treat_col %in% names(dfx))) stop(sprintf("Treatment column '%s' not in metadata/joined data.", treat_col))
   
   feat_cols <- setdiff(names(df), "sample_id")
   X0 <- dfx %>% select(all_of(feat_cols))

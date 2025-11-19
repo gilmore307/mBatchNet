@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(patchwork)  # legend collecting & layout
   library(rlang)
+  library(jsonlite)
 })
 
 # ---- helpers ----
@@ -182,6 +183,37 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("target", "group", "condition", "status", "class", "label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else {
+    guessed <- guess_shape_var(metadata, batch_col = "batch")
+    if (!is.na(guessed) && guessed %in% names(metadata)) {
+      label_col <- guessed
+    } else if ("phenotype" %in% names(metadata)) {
+      label_col <- "phenotype"
+    } else {
+      stop("No label column available for PCA plots.")
+    }
+  }
+}
+
+if (!("batch" %in% names(metadata))) {
+  metadata$batch <- NA
+}
+
+target_var <- label_col
+
 # --------- Collect CLR files ---------
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
 
@@ -259,7 +291,7 @@ compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_
 }
 
 # ==== panel: scatter + marginal densities; legend kept (not collected here) ====
-mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
+mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch") {
   
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
@@ -292,7 +324,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
-    scale_color_manual(values = mbecCols, name = "Batch") +
+    scale_color_manual(values = mbecCols, name = palette_name) +
     guides(
       colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +
@@ -378,75 +410,93 @@ CB
 
 # ==== choose covariates (auto-detect shape var) ====
 batch_var  <- "batch"
-model_vars <- c(batch_var)
+model_vars_common <- unique(Filter(function(x) {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) return(FALSE)
+  nzchar(as.character(x))
+}, c(batch_var, target_var)))
+if (!length(model_vars_common)) model_vars_common <- c(batch_var)
 message(sprintf("Using color=%s (shape: none)", batch_var))
 
 # ==== build + save PCA panels for each matrix (single legend across ALL) ====
 pcs_to_plot <- c(1, 2)
 frames_cache <- list()   # <--- build this for assessment summaries
-plots <- list()
 
 for (nm in names(file_list)) {
   cat("Processing:", nm, "\n")
   df <- read_csv(file_list[[nm]], show_col_types = FALSE)
   
-  frames <- compute_pca_frames(df, metadata, model.vars = model_vars, n_pcs = max(pcs_to_plot))
+  frames <- compute_pca_frames(df, metadata, model.vars = model_vars_common, n_pcs = max(pcs_to_plot))
   frames_cache[[nm]] <- frames
-  
-  plt <- mbecPCAPlot(
-    plot.df   = frames$plot.df,
-    metric.df = frames$metric.df,
-    model.vars = frames$used.vars,
-    pca.axes  = pcs_to_plot,
-    label     = nm
-  )
-  
-  plots[[nm]] <- plt
+
 }
 
-# ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
-ncol_grid <- 3
-if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
-  ncol_grid <- max(1, opt_fig_ncol)
-}
-n_panels  <- length(plots)
-if (n_panels == 0L) stop("No PCA panels to plot.")
-
-panel_cols <- 1L
-panel_rows <- 1L
-base_fig_width_in  <- 2800 / 300
-base_fig_height_in <- 1800 / 300
-base_col_width_in  <- base_fig_width_in / 3
-base_row_height_in <- base_fig_height_in
-if (n_panels == 1L) {
-  combined <- plots[[1]] +
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin      = margin(8, 14, 8, 14)
+build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
+  plots <- lapply(names(frames_cache), function(nm) {
+    fr <- frames_cache[[nm]]
+    if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
+    if (!(color_var %in% names(fr$plot.df))) return(NULL)
+    label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
+    mbecPCAPlot(
+      plot.df   = fr$plot.df,
+      metric.df = fr$metric.df,
+      model.vars = c(color_var),
+      pca.axes  = pcs_to_plot,
+      label     = label_nm,
+      palette_name = palette_label
     )
-  w <- base_fig_width_in; h <- base_fig_height_in
-} else {
-  panel_cols <- min(ncol_grid, n_panels)
-  panel_rows <- ceiling(n_panels / ncol_grid)
-  combined <- wrap_plots(plots, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin      = margin(8, 14, 8, 14)
-    )
-  w <- base_col_width_in * panel_cols
-  h <- base_row_height_in * panel_rows
+  })
+  Filter(function(x) !is.null(x), plots)
 }
 
-fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-ggsave(file.path(output_folder, "pca.png"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
-ggsave(file.path(output_folder, "pca.tif"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+save_pca_plot_set <- function(plot_list, filename_stub) {
+  plot_list <- Filter(function(x) !is.null(x), plot_list)
+  if (!length(plot_list)) return(invisible(NULL))
+  ncol_grid <- 3
+  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+    ncol_grid <- max(1, opt_fig_ncol)
+  }
+  n_panels <- length(plot_list)
+  panel_cols <- 1L
+  panel_rows <- 1L
+  base_fig_width_in  <- 2800 / 300
+  base_fig_height_in <- 1800 / 300
+  base_col_width_in  <- base_fig_width_in / 3
+  base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    combined <- plot_list[[1]] +
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / ncol_grid)
+    combined <- wrap_plots(plot_list, ncol = ncol_grid) +
+      plot_layout(guides = "collect") &
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".png")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+}
+
+batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
+save_pca_plot_set(batch_plots, "pca_batch")
+target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
+save_pca_plot_set(target_plots, "pca_target")
 
 # =========================
 # PCA assessment summaries
@@ -497,58 +547,55 @@ mean_centroid_distance <- function(coords, groups) {
   as.numeric(mean(dist(centroid_mat, method = "euclidean")))
 }
 
-mean_within_radius <- function(coords, groups) {
-  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
-  if (ncol(coords) < 2) return(NA_real_)
+ellipse_shape_stats <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords)) {
+    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
+  }
+  if (ncol(coords) < 2) {
+    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
+  }
+
   groups <- droplevels(factor(groups))
   levs <- levels(groups)
-  total <- 0
-  count <- 0
+  areas <- c()
+  angles <- c()
+
   for (lev in levs) {
     idx <- which(groups == lev)
     if (!length(idx)) next
     sub <- coords[idx, , drop = FALSE]
     sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
-    if (!nrow(sub)) next
-    centroid <- colMeans(sub, na.rm = TRUE)
-    dists <- sqrt(rowSums((sub - matrix(centroid, nrow = nrow(sub), ncol = ncol(sub), byrow = TRUE))^2))
-    dists <- dists[is.finite(dists)]
-    total <- total + sum(dists)
-    count <- count + length(dists)
-  }
-  if (!count) return(NA_real_)
-  total / count
-}
+    if (nrow(sub) < 3) next
 
-compute_knn_mixing <- function(coords, groups, k = 10L) {
-  if (is.null(coords) || !length(coords) || !nrow(coords)) return(NA_real_)
-  if (ncol(coords) < 2) return(NA_real_)
-  n <- nrow(coords)
-  if (n <= 1) return(NA_real_)
-  k <- min(as.integer(k), n - 1L)
-  if (k <= 0) return(NA_real_)
-  groups <- droplevels(factor(groups))
-  if (!nlevels(groups)) return(NA_real_)
-  dmat <- as.matrix(dist(coords, method = "euclidean", diag = TRUE, upper = TRUE))
-  diag(dmat) <- Inf
-  mixing <- numeric(n)
-  valid_rows <- rep(FALSE, n)
-  group_vals <- as.character(groups)
-  for (i in seq_len(n)) {
-    row <- dmat[i, ]
-    if (all(!is.finite(row))) next
-    ord <- order(row, na.last = NA)
-    ord <- ord[ord != i]
-    if (!length(ord)) next
-    take <- ord[seq_len(min(k, length(ord)))]
-    if (!length(take)) next
-    neigh <- group_vals[take]
-    if (!length(neigh)) next
-    mixing[i] <- mean(neigh != group_vals[i])
-    valid_rows[i] <- TRUE
+    covmat <- stats::cov(sub, use = "complete.obs")
+    eig <- eigen(covmat, symmetric = TRUE)
+    axis_lengths <- sqrt(pmax(eig$values, 0))
+    if (length(axis_lengths) >= 2) {
+      areas <- c(areas, pi * axis_lengths[1] * axis_lengths[2])
+    }
+
+    v1 <- eig$vectors[, 1]
+    angles <- c(angles, atan2(v1[2], v1[1]))
   }
-  if (!any(valid_rows)) return(NA_real_)
-  mean(mixing[valid_rows])
+
+  size_cv <- if (length(areas) >= 2 && mean(areas, na.rm = TRUE) > 0) {
+    stats::sd(areas, na.rm = TRUE) / mean(areas, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+
+  angle_disp <- if (length(angles) >= 2) {
+    ref <- angles[1]
+    diffs <- sapply(angles[-1], function(a) {
+      delta <- abs(atan2(sin(a - ref), cos(a - ref)))
+      min(delta, pi - delta)
+    })
+    mean(diffs)
+  } else {
+    NA_real_
+  }
+
+  list(size_cv = size_cv, angle_disp_deg = if (is.na(angle_disp)) NA_real_ else angle_disp * 180 / pi)
 }
 
 summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch") {
@@ -556,17 +603,12 @@ summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch")
   if (is.null(prep)) return(NULL)
   coords <- prep$coords
   batch <- prep$batch
-  var_vals <- fr$metric.df$var.explained
-  top_two <- min(2L, length(var_vals))
-  var12 <- if (top_two) sum(var_vals[seq_len(top_two)], na.rm = TRUE) else NA_real_
+  ell <- ellipse_shape_stats(coords, batch)
   tibble::tibble(
     Method = method_name,
-    Var12_PCA = var12,
-    Batch_Distance_PCA = mean_centroid_distance(coords, batch),
-    R_within_PCA = mean_within_radius(coords, batch),
-    Mixing_k10_PCA = compute_knn_mixing(coords, batch, k = 10L),
-    n_features_used_PCA = if (is.null(fr$n_features_used)) NA_integer_ else fr$n_features_used,
-    n_features_total_PCA = if (is.null(fr$n_features_total)) NA_integer_ else fr$n_features_total
+    Centroid_Distance_PCA = mean_centroid_distance(coords, batch),
+    Ellipse_Size_CV_PCA = ell$size_cv,
+    Ellipse_Angle_Dispersion_deg_PCA = ell$angle_disp_deg
   )
 }
 only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
