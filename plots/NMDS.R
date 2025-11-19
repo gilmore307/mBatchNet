@@ -530,39 +530,100 @@ mean_centroid_distance <- function(coords, groups) {
   as.numeric(mean(dist(centroid_mat, method = "euclidean")))
 }
 
-ellipse_radius_variance <- function(coords, groups) {
+circle_overlap_ratio <- function(center_a, radius_a, center_b, radius_b) {
+  if (!is.finite(radius_a) || !is.finite(radius_b) || radius_a <= 0 || radius_b <= 0) {
+    return(NA_real_)
+  }
+  diff_vec <- center_a - center_b
+  if (any(!is.finite(diff_vec))) return(NA_real_)
+  d <- sqrt(sum(diff_vec^2))
+  if (!is.finite(d)) return(NA_real_)
+  if (d <= 1e-12 && abs(radius_a - radius_b) <= 1e-12) {
+    return(1)
+  }
+  if (d >= radius_a + radius_b) {
+    return(0)
+  }
+  if (d <= abs(radius_a - radius_b)) {
+    inter_area <- pi * min(radius_a, radius_b)^2
+  } else {
+    ang_a <- (d^2 + radius_a^2 - radius_b^2) / (2 * d * radius_a)
+    ang_b <- (d^2 + radius_b^2 - radius_a^2) / (2 * d * radius_b)
+    ang_a <- max(min(ang_a, 1), -1)
+    ang_b <- max(min(ang_b, 1), -1)
+    part1 <- radius_a^2 * acos(ang_a)
+    part2 <- radius_b^2 * acos(ang_b)
+    part3 <- 0.5 * sqrt(max(0, (-d + radius_a + radius_b) *
+                              (d + radius_a - radius_b) *
+                              (d - radius_a + radius_b) *
+                              (d + radius_a + radius_b)))
+    inter_area <- part1 + part2 - part3
+  }
+  union_area <- pi * radius_a^2 + pi * radius_b^2 - inter_area
+  if (!is.finite(inter_area) || !is.finite(union_area) || union_area <= 0) {
+    return(NA_real_)
+  }
+  inter_area / union_area
+}
+
+group_ellipse_params <- function(coords, groups, level = 0.95) {
+  groups <- droplevels(factor(groups))
+  levs <- levels(groups)
+  if (length(levs) < 2) return(list())
+  chi <- sqrt(qchisq(level, df = 2))
+  params <- lapply(levs, function(lev) {
+    idx <- which(groups == lev)
+    if (!length(idx)) return(NULL)
+    sub <- coords[idx, , drop = FALSE]
+    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
+    if (nrow(sub) < 3) return(NULL)
+    covmat <- tryCatch(stats::cov(sub, use = "complete.obs"), error = function(e) NULL)
+    if (is.null(covmat)) return(NULL)
+    eig <- tryCatch(eigen(covmat, symmetric = TRUE), error = function(e) NULL)
+    if (is.null(eig)) return(NULL)
+    axis_lengths <- sqrt(pmax(eig$values, 0))
+    if (length(axis_lengths) < 2) return(NULL)
+    radius <- sqrt(axis_lengths[1] * axis_lengths[2]) * chi
+    if (!is.finite(radius) || radius <= 0) return(NULL)
+    center <- colMeans(sub, na.rm = TRUE)
+    if (any(!is.finite(center))) return(NULL)
+    list(center = center, radius = radius)
+  })
+  params[!vapply(params, is.null, logical(1))]
+}
+
+ellipse_overlap_ratio <- function(coords, groups, level = 0.95) {
   if (is.null(coords) || !length(coords) || !nrow(coords) || ncol(coords) < 2) {
     return(NA_real_)
   }
-  groups <- droplevels(factor(groups))
-  levs <- levels(groups)
-  radii <- c()
-  for (lev in levs) {
-    idx <- which(groups == lev)
-    if (!length(idx)) next
-    sub <- coords[idx, , drop = FALSE]
-    sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
-    if (nrow(sub) < 3) next
-    covmat <- stats::cov(sub, use = "complete.obs")
-    eig <- eigen(covmat, symmetric = TRUE)
-    axis_lengths <- sqrt(pmax(eig$values, 0))
-    if (length(axis_lengths) >= 2) {
-      radii <- c(radii, sqrt(axis_lengths[1] * axis_lengths[2]))
-    }
+  params <- group_ellipse_params(coords, groups, level = level)
+  if (length(params) < 2) return(NA_real_)
+  if (length(params) == 2) {
+    ratios <- circle_overlap_ratio(params[[1]]$center, params[[1]]$radius,
+                                   params[[2]]$center, params[[2]]$radius)
+    return(if (is.finite(ratios)) ratios else NA_real_)
   }
-  if (length(radii) >= 2) stats::var(radii, na.rm = TRUE) else NA_real_
+  combos <- utils::combn(seq_along(params), 2, simplify = FALSE)
+  ratios <- vapply(combos, function(idx) {
+    p1 <- params[[idx[1]]]
+    p2 <- params[[idx[2]]]
+    circle_overlap_ratio(p1$center, p1$radius, p2$center, p2$radius)
+  }, numeric(1))
+  ratios <- ratios[is.finite(ratios)]
+  if (!length(ratios)) return(NA_real_)
+  mean(ratios)
 }
 
 compute_group_metrics <- function(plot_df, metadata, axes, group_var) {
   prep <- prepare_group_scores(plot_df, metadata, axes = axes, group_var = group_var)
   if (is.null(prep)) {
-    return(list(centroid = NA_real_, radius_var = NA_real_))
+    return(list(centroid = NA_real_, overlap = NA_real_))
   }
   coords <- prep$coords
   groups <- prep$groups
   list(
     centroid = mean_centroid_distance(coords, groups),
-    radius_var = ellipse_radius_variance(coords, groups)
+    overlap = ellipse_overlap_ratio(coords, groups)
   )
 }
 
@@ -582,8 +643,8 @@ summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
     NMDS_Stress = fr$stress,
     Centroid_Distance_Batch = batch_stats$centroid,
     Centroid_Distance_Target = target_stats$centroid,
-    Ellipse_Radius_Var_Batch = batch_stats$radius_var,
-    Ellipse_Radius_Var_Target = target_stats$radius_var,
+    Ellipse_Overlap_Batch = batch_stats$overlap,
+    Ellipse_Overlap_Target = target_stats$overlap,
     Target_vs_Batch_Centroid_Delta = target_vs_batch_dominance(target_stats$centroid, batch_stats$centroid)
   )
 }
