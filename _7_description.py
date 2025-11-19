@@ -185,6 +185,248 @@ HELP_MODAL_SECTIONS: List = [
                     ),
                 ]
             ),
+            html.Div(
+                [
+                    html.H5("Alignment score", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Quantifies how well batches mix in k-NN space after "
+                                "correction (higher = stronger batch mixing)."
+                            ),
+                            html.Li(
+                                "Figure: Bars show the alignment score for each method across the "
+                                "selected geometries so you can instantly spot which runs draw "
+                                "neighbours from multiple batches."
+                            ),
+                            html.Li(
+                                "Details: Lists the Alignment Score ↑ column so you can compare the "
+                                "exact numeric values that feed the ranking table."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PCA ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Visualises global variance structure to check whether "
+                                "batch dominates the first two PCs or if the target label remains "
+                                "separable."
+                            ),
+                            html.Li(
+                                "Figure: Each panel plots PC1 vs PC2 with ellipses around batch and "
+                                "target groups. Balanced overlap and short batch-to-batch centroid "
+                                "distances indicate effective correction."
+                            ),
+                            html.Li(
+                                "Details: Centroid Distance (Batch ↓ / Target ↑) captures between-"
+                                "group spacing, Ellipse Overlap (Batch ↑ / Target ↓) summarises "
+                                "cluster overlap, and Target vs Batch Centroid Delta ↑ highlights "
+                                "phenotype separation relative to batch."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PCoA ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Performs Principal Coordinates Analysis in CLR and TSS "
+                                "geometries to reveal geometry-specific batch structure."
+                            ),
+                            html.Li(
+                                "Figure: Use the Aitchison vs Bray-Curtis sub-tabs to see how "
+                                "batches overlap on each geometry; tighter batch ellipses and clear "
+                                "target separation imply successful corrections."
+                            ),
+                            html.Li(
+                                "Details: Shares the same Centroid Distance, Ellipse Overlap, and "
+                                "Target vs Batch Centroid Delta metrics as PCA so you can compare "
+                                "directions across geometries."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("NMDS ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Uses non-metric multidimensional scaling on CLR and TSS "
+                                "dissimilarities to examine nonlinear structure."
+                            ),
+                            html.Li(
+                                "Figure: Inspect NMDS1 vs NMDS2 scatterplots and ensure stress "
+                                "values remain below ~0.3 while batches overlap and targets stay "
+                                "separable."
+                            ),
+                            html.Li(
+                                "Details: NMDS Stress ↓ reports fit quality, while Centroid Distance, "
+                                "Ellipse Overlap, and Target vs Batch Centroid Delta mirror the "
+                                "PCA/PCoA diagnostics."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Dissimilarity heatmaps", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Compares pairwise distance matrices (CLR & TSS) to spot "
+                                "batches that remain isolated after correction."
+                            ),
+                            html.Li(
+                                "Figure: Heatmaps display within- vs between-batch distances. Cool "
+                                "tones along off-diagonals imply reduced cross-batch separation."
+                            ),
+                            html.Li(
+                                "Details: ANOSIM R ↓ indicates how batch labels explain the distance "
+                                "matrix—values near 0 mean little batch-driven structure."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PERMANOVA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Tests whether batch explains a significant portion of the "
+                                "distance matrix variance in each geometry."
+                            ),
+                            html.Li(
+                                "Figure: Box or bar plots show the pseudo-F distributions per method; "
+                                "smaller R² implies weaker batch association."
+                            ),
+                            html.Li(
+                                "Details: The R² ↓ column records the proportion of variance explained "
+                                "by batch so you can track how each method suppresses it."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Per-feature ANOVA (Median R²)", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Summarises how much of each feature's variance is explained "
+                                "by batch vs. treatment using per-feature ANOVA."
+                            ),
+                            html.Li(
+                                "Figure: Dual bars show the competing batch and treatment medians per "
+                                "method so you can aim for high treatment signal and low batch signal."
+                            ),
+                            html.Li(
+                                "Details: Median R² (Batch ↓) should shrink after correction, while "
+                                "Median R² (Treatment ↑) indicates preserved biological signal."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Partial RDA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Decomposes constrained variance into treatment, batch, and "
+                                "shared components to check whether correction prioritises the target "
+                                "label."
+                            ),
+                            html.Li(
+                                "Figure: Stacked bars show how much partial RDA variance is assigned "
+                                "to each component—seek taller treatment segments and shrunken batch "
+                                "segments."
+                            ),
+                            html.Li(
+                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ "
+                                "columns spell out the precise variance fractions per geometry."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PVCA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Applies Principal Variance Component Analysis to apportion "
+                                "variance across batch, treatment, and residual sources."
+                            ),
+                            html.Li(
+                                "Figure: Similar to partial RDA, stacked bars reveal whether batch "
+                                "variance shrinks relative to treatment across corrected matrices."
+                            ),
+                            html.Li(
+                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ mirror "
+                                "the PRDA table but derive from PVCA components."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Entropy batch mixing (EBM)", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Measures k-NN batch entropy within UMAP embeddings (higher "
+                                "entropy = better batch mixing)."
+                            ),
+                            html.Li(
+                                "Figure: Line or bar plots summarise the mean EBM value per method so "
+                                "you can prioritise corrections that fully intermingle batches."
+                            ),
+                            html.Li(
+                                "Details: The EBM ↑ column exposes the average entropy value across "
+                                "anchor pools that feeds the ranking score."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("UMAP silhouette", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Evaluates how well target-label clusters remain compact and "
+                                "separated after correction."
+                            ),
+                            html.Li(
+                                "Figure: Bars or ridgelines show the mean silhouette width derived "
+                                "from the UMAP embedding—higher values mean cleaner target clusters."
+                            ),
+                            html.Li(
+                                "Details: The Silhouette ↑ column reports the rescaled mean silhouette "
+                                "width so you can audit the precise values."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
         ],
         className="mb-0",
     ),
