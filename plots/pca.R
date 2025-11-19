@@ -192,14 +192,19 @@ try({
   }
 }, silent = TRUE)
 if (!(label_col %in% names(metadata))) {
-  fallback <- c("group","condition","status","class","label")
+  fallback <- c("target", "group", "condition", "status", "class", "label")
   cand <- fallback[fallback %in% names(metadata)]
   if (length(cand)) {
     label_col <- cand[1]
-  } else if ("phenotype" %in% names(metadata)) {
-    label_col <- "phenotype"
   } else {
-    stop("No label column available for PCA plots.")
+    guessed <- guess_shape_var(metadata, batch_col = "batch")
+    if (!is.na(guessed) && guessed %in% names(metadata)) {
+      label_col <- guessed
+    } else if ("phenotype" %in% names(metadata)) {
+      label_col <- "phenotype"
+    } else {
+      stop("No label column available for PCA plots.")
+    }
   }
 }
 
