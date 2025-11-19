@@ -888,7 +888,7 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["ebm"]
     elif s == "silhouette":
         bases = ["silhouette"]
-    elif s == "pca":
+    elif s == "pca" or s.startswith("pca_") or s.startswith("pca-"):
         bases = ["pca"]
     else:
         bases = [stem]
