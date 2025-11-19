@@ -186,20 +186,26 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "pca": (
-        ("Centroid_Distance_PCA", "down"),
-        ("Ellipse_Size_CV_PCA", "down"),
-        ("Ellipse_Angle_Dispersion_deg_PCA", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Radius_Var_Batch", "down"),
+        ("Ellipse_Radius_Var_Target", "flat"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "pcoa": (
-        ("Centroid_Distance_PCoA", "down"),
-        ("Ellipse_Size_CV_PCoA", "down"),
-        ("Ellipse_Angle_Dispersion_deg_PCoA", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Radius_Var_Batch", "down"),
+        ("Ellipse_Radius_Var_Target", "flat"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
-        ("Centroid_Distance_NMDS", "down"),
-        ("Ellipse_Size_CV_NMDS", "down"),
-        ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Radius_Var_Batch", "down"),
+        ("Ellipse_Radius_Var_Target", "flat"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "dissimilarity": (
         ("ANOSIM_R", "down"),

@@ -512,19 +512,19 @@ compute_centroid_distances <- function(centroids) {
   as.numeric(mean(dist(centroids[, c("PC1","PC2")], method = "euclidean")))
 }
 
-prepare_batch_scores <- function(plot_df, metadata, axes = c("PC1", "PC2"), batch_var = "batch") {
+prepare_group_scores <- function(plot_df, metadata, axes = c("PC1", "PC2"), group_var = "batch") {
   if (!all(c("sample_id", axes) %in% names(plot_df))) return(NULL)
-  if (!batch_var %in% names(metadata)) return(NULL)
+  if (!group_var %in% names(metadata)) return(NULL)
   idx <- match(plot_df$sample_id, metadata$sample_id)
-  batch <- metadata[[batch_var]][idx]
+  group_vals <- metadata[[group_var]][idx]
   coords <- as.matrix(plot_df[, axes, drop = FALSE])
   if (!nrow(coords) || ncol(coords) < 2) return(NULL)
-  valid <- apply(coords, 1, function(row) all(is.finite(row))) & !is.na(batch)
+  valid <- apply(coords, 1, function(row) all(is.finite(row))) & !is.na(group_vals)
   if (!any(valid)) return(NULL)
   coords <- coords[valid, , drop = FALSE]
-  batch <- droplevels(factor(batch[valid]))
-  if (!nrow(coords) || !nlevels(batch)) return(NULL)
-  list(coords = coords, batch = batch)
+  groups <- droplevels(factor(group_vals[valid]))
+  if (!nrow(coords) || !nlevels(groups)) return(NULL)
+  list(coords = coords, groups = groups)
 }
 
 mean_centroid_distance <- function(coords, groups) {
@@ -547,68 +547,57 @@ mean_centroid_distance <- function(coords, groups) {
   as.numeric(mean(dist(centroid_mat, method = "euclidean")))
 }
 
-ellipse_shape_stats <- function(coords, groups) {
-  if (is.null(coords) || !length(coords) || !nrow(coords)) {
-    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
+ellipse_radius_variance <- function(coords, groups) {
+  if (is.null(coords) || !length(coords) || !nrow(coords) || ncol(coords) < 2) {
+    return(NA_real_)
   }
-  if (ncol(coords) < 2) {
-    return(list(size_cv = NA_real_, angle_disp_deg = NA_real_))
-  }
-
   groups <- droplevels(factor(groups))
   levs <- levels(groups)
-  areas <- c()
-  angles <- c()
-
+  radii <- c()
   for (lev in levs) {
     idx <- which(groups == lev)
     if (!length(idx)) next
     sub <- coords[idx, , drop = FALSE]
     sub <- sub[rowSums(is.finite(sub)) == ncol(coords), , drop = FALSE]
     if (nrow(sub) < 3) next
-
     covmat <- stats::cov(sub, use = "complete.obs")
     eig <- eigen(covmat, symmetric = TRUE)
     axis_lengths <- sqrt(pmax(eig$values, 0))
     if (length(axis_lengths) >= 2) {
-      areas <- c(areas, pi * axis_lengths[1] * axis_lengths[2])
+      radii <- c(radii, sqrt(axis_lengths[1] * axis_lengths[2]))
     }
-
-    v1 <- eig$vectors[, 1]
-    angles <- c(angles, atan2(v1[2], v1[1]))
   }
-
-  size_cv <- if (length(areas) >= 2 && mean(areas, na.rm = TRUE) > 0) {
-    stats::sd(areas, na.rm = TRUE) / mean(areas, na.rm = TRUE)
-  } else {
-    NA_real_
-  }
-
-  angle_disp <- if (length(angles) >= 2) {
-    ref <- angles[1]
-    diffs <- sapply(angles[-1], function(a) {
-      delta <- abs(atan2(sin(a - ref), cos(a - ref)))
-      min(delta, pi - delta)
-    })
-    mean(diffs)
-  } else {
-    NA_real_
-  }
-
-  list(size_cv = size_cv, angle_disp_deg = if (is.na(angle_disp)) NA_real_ else angle_disp * 180 / pi)
+  if (length(radii) >= 2) stats::var(radii, na.rm = TRUE) else NA_real_
 }
 
-summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch") {
-  prep <- prepare_batch_scores(fr$plot.df, metadata, axes = c("PC1", "PC2"), batch_var = batch_var)
-  if (is.null(prep)) return(NULL)
+compute_group_metrics <- function(plot_df, metadata, axes, group_var) {
+  prep <- prepare_group_scores(plot_df, metadata, axes = axes, group_var = group_var)
+  if (is.null(prep)) {
+    return(list(centroid = NA_real_, radius_var = NA_real_))
+  }
   coords <- prep$coords
-  batch <- prep$batch
-  ell <- ellipse_shape_stats(coords, batch)
+  groups <- prep$groups
+  list(
+    centroid = mean_centroid_distance(coords, groups),
+    radius_var = ellipse_radius_variance(coords, groups)
+  )
+}
+
+target_vs_batch_dominance <- function(target_distance, batch_distance) {
+  if (!is.finite(target_distance) || !is.finite(batch_distance)) return(NA_real_)
+  target_distance - batch_distance
+}
+
+summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch", target_var = "target") {
+  batch_stats <- compute_group_metrics(fr$plot.df, metadata, axes = c("PC1", "PC2"), group_var = batch_var)
+  target_stats <- compute_group_metrics(fr$plot.df, metadata, axes = c("PC1", "PC2"), group_var = target_var)
   tibble::tibble(
     Method = method_name,
-    Centroid_Distance_PCA = mean_centroid_distance(coords, batch),
-    Ellipse_Size_CV_PCA = ell$size_cv,
-    Ellipse_Angle_Dispersion_deg_PCA = ell$angle_disp_deg
+    Centroid_Distance_Batch = batch_stats$centroid,
+    Centroid_Distance_Target = target_stats$centroid,
+    Ellipse_Radius_Var_Batch = batch_stats$radius_var,
+    Ellipse_Radius_Var_Target = target_stats$radius_var,
+    Target_vs_Batch_Centroid_Delta = target_vs_batch_dominance(target_stats$centroid, batch_stats$centroid)
   )
 }
 only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
@@ -619,7 +608,7 @@ if (only_baseline) {
   m <- "Before correction"
   fr <- frames_cache[[m]]
   stopifnot(!is.null(fr))
-  assess_df <- summarise_pca_method(fr, m, metadata, batch_var = batch_var)
+  assess_df <- summarise_pca_method(fr, m, metadata, batch_var = batch_var, target_var = target_var)
   if (is.null(assess_df)) assess_df <- tibble::tibble()
 
   print(assess_df, n = nrow(assess_df))
@@ -629,7 +618,7 @@ if (only_baseline) {
   # ---- Summarise multiple matrices without ranking ----
   rows <- lapply(names(frames_cache), function(m) {
     fr <- frames_cache[[m]]
-    summarise_pca_method(fr, m, metadata, batch_var = batch_var)
+    summarise_pca_method(fr, m, metadata, batch_var = batch_var, target_var = target_var)
   })
   rows <- rows[!vapply(rows, is.null, logical(1))]
   assessment_tbl <- if (length(rows)) {
