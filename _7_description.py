@@ -19,7 +19,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Upload Files"),
             html.P(
-                "Upload a raw count/abundance table and a matching metadata table, or pick "one of the curated examples."
+                "Upload a raw count/abundance table and a matching metadata table, or pick one of the curated examples."
             ),
             html.Div(
                 [
@@ -27,7 +27,7 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Manual uploads accept CSV files. "
+                                "Manual uploads accept CSV files."
                             ),
                             html.Li(
                                 "The matrix must use features as rows, samples as columns, and omit row/column names. Use consistent feature order between the matrix and metadata to avoid mismatches."
@@ -75,7 +75,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Batch Effect Correction"),
             html.P(
-                "Select one or more correction strategies to run on the uploaded data. "
+                "Select one or more correction strategies to run on the uploaded data."
             ),
             html.Ul(
                 [
@@ -153,6 +153,10 @@ HELP_MODAL_SECTIONS: List = [
                         "method best balances batch removal with phenotype separation."
                     ),
                     html.Li(
+                        "Click any detail table column title to filter, sort, and re-rank methods "
+                        "on the fly."
+                    ),
+                    html.Li(
                         "When you are satisfied, click \"Download results\" from the navbar to "
                         "export every corrected matrix, assessment figure, and log file."
                     ),
@@ -170,9 +174,9 @@ HELP_MODAL_SECTIONS: List = [
                                 "target label."
                             ),
                             html.Li(
-                                "Details: Lists the Alignment Score ↑ column so you can compare the "
-                                "exact numeric values that feed the ranking table. Scores close to 1 "
-                                "indicate that most neighbours originate from different batches."
+                                "Alignment Score column: Lists the numeric values used for ranking. "
+                                "Scores close to 1 indicate that most neighbours originate from "
+                                "different batches, confirming strong mixing."
                             ),
                         ]
                     ),
@@ -195,10 +199,19 @@ HELP_MODAL_SECTIONS: List = [
                                 "retain the target label ordering even after batches overlap."
                             ),
                             html.Li(
-                                "Details: Centroid Distance (Batch ↓ / Target ↑) captures between-"
-                                "group spacing, Ellipse Overlap (Batch ↑ / Target ↓) summarises "
-                                "cluster overlap, and Target vs Batch Centroid Delta ↑ highlights "
-                                "target separation relative to batch."
+                                "Centroid Distance: Captures between-group spacing; smaller batch "
+                                "distances imply tighter batch mixing while larger target distances "
+                                "signal preserved biology."
+                            ),
+                            html.Li(
+                                "Ellipse Overlap: Summarises how much batch or target clusters "
+                                "overlap. More overlap for batches and less overlap for targets "
+                                "indicate good correction."
+                            ),
+                            html.Li(
+                                "Target vs Batch Centroid Delta: Highlights how far apart target "
+                                "centroids remain relative to batch centroids so you can prioritise "
+                                "methods that preserve target structure."
                             ),
                         ]
                     ),
@@ -221,8 +234,17 @@ HELP_MODAL_SECTIONS: List = [
                                 "axes that flip order when corrections change the distance rankings."
                             ),
                             html.Li(
-                                "Details: Shares the same Centroid Distance, Ellipse Overlap, and "
-                                "Target vs Batch Centroid Delta metrics as PCA."
+                                "Centroid Distance: Interpreted the same way as PCA but applied to "
+                                "CLR or TSS geometries."
+                            ),
+                            html.Li(
+                                "Ellipse Overlap: Reports geometry-specific overlap so you can "
+                                "compare how each correction behaves under CLR vs. TSS distances."
+                            ),
+                            html.Li(
+                                "Target vs Batch Centroid Delta: Measures the relative spacing of "
+                                "target and batch centroids per geometry to catch geometry-specific "
+                                "trade-offs."
                             ),
                         ]
                     ),
@@ -245,10 +267,20 @@ HELP_MODAL_SECTIONS: List = [
                                 "signal that a correction only helped a subset of compositions."
                             ),
                             html.Li(
-                                "Details: NMDS Stress ↓ reports fit quality, while Centroid Distance, "
-                                "Ellipse Overlap, and Target vs Batch Centroid Delta mirror the "
-                                "PCA/PCoA diagnostics. Prioritise methods with both low stress and "
-                                "high target-vs-batch deltas."
+                                "NMDS Stress: Reports fit quality; lower stress indicates that the "
+                                "NMDS embedding faithfully represents the dissimilarities."
+                            ),
+                            html.Li(
+                                "Centroid Distance: Uses NMDS coordinates to capture between-group "
+                                "spacing with the same interpretation as PCA/PCoA."
+                            ),
+                            html.Li(
+                                "Ellipse Overlap: Summarises NMDS cluster overlap so you can spot "
+                                "batches that still dominate the manifold."
+                            ),
+                            html.Li(
+                                "Target vs Batch Centroid Delta: Emphasises methods with high "
+                                "target-vs-batch separation ratios while keeping stress low."
                             ),
                         ]
                     ),
@@ -269,8 +301,10 @@ HELP_MODAL_SECTIONS: List = [
                                 "tones along off-diagonals imply reduced cross-batch separation."
                             ),
                             html.Li(
-                                "Details: ANOSIM R ↓ indicates how batch labels explain the distance "
-                                "matrix—values near 0 mean little batch-driven structure."
+                                "ANOSIM R: Quantifies whether within-batch distances are smaller than "
+                                "between-batch distances. Values near 0 mean little batch-driven "
+                                "structure, while values above ~0.5 flag strong residual batch "
+                                "effects. Use the companion p-value column to confirm significance."
                             ),
                         ]
                     ),
@@ -290,9 +324,8 @@ HELP_MODAL_SECTIONS: List = [
                                 "smaller R² implies weaker batch association."
                             ),
                             html.Li(
-                                "Details: The R² ↓ column records the proportion of variance explained "
-                                "by batch. Values "
-                                "below 0.05 typically indicate minimal batch impact."
+                                "PERMANOVA R²: Records the proportion of variance explained by batch. "
+                                "Values below ~0.05 typically indicate minimal batch impact."
                             ),
                         ]
                     ),
@@ -312,8 +345,12 @@ HELP_MODAL_SECTIONS: List = [
                                 "method so you can aim for high treatment signal and low batch signal."
                             ),
                             html.Li(
-                                "Details: Median R² (Batch ↓) should shrink after correction, while "
-                                "Median R² (Treatment ↑) indicates preserved biological signal."
+                                "Median R² (Batch): Should shrink after correction to show that batch "
+                                "explains less feature-level variance."
+                            ),
+                            html.Li(
+                                "Median R² (Treatment): Higher values indicate preserved biological "
+                                "signal across features."
                             ),
                         ]
                     ),
@@ -336,9 +373,20 @@ HELP_MODAL_SECTIONS: List = [
                                 "segments."
                             ),
                             html.Li(
-                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ "
-                                "columns spell out the precise variance fractions per geometry. High "
-                                "intersection fractions imply remaining confounding between labels."
+                                "Treatment variance: Shows the fraction of constrained variance "
+                                "attributed to the target label—higher bars are preferred."
+                            ),
+                            html.Li(
+                                "Batch variance: Reports how much variance batch still explains. "
+                                "Lower fractions suggest better correction."
+                            ),
+                            html.Li(
+                                "Intersection variance: Captures overlap between batch and treatment "
+                                "effects; large intersections imply residual confounding."
+                            ),
+                            html.Li(
+                                "Residual variance: Reflects unexplained variance so you can assess "
+                                "model fit when treatment and batch effects are small."
                             ),
                         ]
                     ),
@@ -358,9 +406,19 @@ HELP_MODAL_SECTIONS: List = [
                                 "variance shrinks relative to treatment across corrected matrices."
                             ),
                             html.Li(
-                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ mirror "
-                                "the PRDA table but derive from PVCA components. Use the residual bar "
-                                "to gauge whether unmodelled factors dominate after correction."
+                                "Treatment variance: PVCA-estimated fraction attributed to treatment."
+                            ),
+                            html.Li(
+                                "Batch variance: PVCA-estimated batch contribution that should drop "
+                                "after correction."
+                            ),
+                            html.Li(
+                                "Intersection variance: PVCA overlap between batch and treatment "
+                                "effects, highlighting confounding."
+                            ),
+                            html.Li(
+                                "Residual variance: PVCA residual component that signals unmodelled "
+                                "noise or covariates."
                             ),
                         ]
                     ),
@@ -376,9 +434,8 @@ HELP_MODAL_SECTIONS: List = [
                                 "entropy = better batch mixing)."
                             ),
                             html.Li(
-                                "Details: The EBM ↑ column exposes the average entropy value across "
-                                "anchor pools that feeds the ranking score. Values above 0.8 suggest "
-                                "near-perfect mixing."
+                                "EBM column: Exposes the average entropy value across anchor pools "
+                                "used for ranking. Values above 0.8 suggest near-perfect mixing."
                             ),
                         ]
                     ),
@@ -395,9 +452,9 @@ HELP_MODAL_SECTIONS: List = [
                                 "batch removal."
                             ),
                             html.Li(
-                                "Details: The Silhouette ↑ column reports the rescaled mean silhouette "
-                                "width so you can audit the precise values. Scores near 0.5 signal "
-                                "modest separation, while >0.7 reflects well-separated targets."
+                                "Silhouette column: Reports the rescaled mean silhouette width so you "
+                                "can audit the precise values. Scores near 0.5 signal modest "
+                                "separation, while >0.7 reflects well-separated targets."
                             ),
                         ]
                     ),
