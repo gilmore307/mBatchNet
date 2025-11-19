@@ -62,11 +62,16 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("PCA", "pca.png"),
-    FigureSpec("PCoA (Aitchison)", "pcoa_aitchison.png"),
-    FigureSpec("PCoA (Bray-Curtis)", "pcoa_braycurtis.png"),
-    FigureSpec("NMDS (Aitchison)", "nmds_aitchison.png"),
-    FigureSpec("NMDS (Bray-Curtis)", "nmds_braycurtis.png"),
+    FigureSpec("PCA (Batch grouping)", "pca_batch.png"),
+    FigureSpec("PCA (Target grouping)", "pca_target.png"),
+    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.png"),
+    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.png"),
+    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.png"),
+    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.png"),
+    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.png"),
+    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.png"),
+    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.png"),
+    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.png"),
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
     FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
@@ -181,28 +186,51 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "pca": (
-        ("Var12_PCA", "up"),
-        ("Batch_Distance_PCA", "down"),
-        ("R_within_PCA", "down"),
-        ("Mixing_k10_PCA", "up"),
-        ("n_features_used_PCA", "up"),
-        ("n_features_total_PCA", "up"),
+        ("Centroid_Distance_PCA", "down"),
+        ("Ellipse_Size_CV_PCA", "down"),
+        ("Ellipse_Angle_Dispersion_deg_PCA", "down"),
     ),
     "pcoa": (
-        ("Var12_PCoA", "up"),
-        ("Batch_Distance_PCoA", "down"),
-        ("R_within_PCoA", "down"),
-        ("Mixing_k10_PCoA", "up"),
-        ("n_features_used_PCoA", "up"),
-        ("n_features_total_PCoA", "up"),
+        ("Centroid_Distance_PCoA", "down"),
+        ("Ellipse_Size_CV_PCoA", "down"),
+        ("Ellipse_Angle_Dispersion_deg_PCoA", "down"),
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
-        ("Shepard_R2", "up"),
-        ("Site_GoF_Median", "up"),
-        ("Batch_Distance_NMDS", "down"),
-        ("R_within_NMDS", "down"),
-        ("Mixing_k10_NMDS", "up"),
+        ("Centroid_Distance_NMDS", "down"),
+        ("Ellipse_Size_CV_NMDS", "down"),
+        ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),
+    ),
+    "dissimilarity": (
+        ("ANOSIM_R", "down"),
+    ),
+    "permanova": (
+        ("R²", "down"),
+    ),
+    "r2": (
+        ("Median R² (Batch)", "down"),
+        ("Median R² (Treatment)", "up"),
+    ),
+    "prda": (
+        ("Treatment", "up"),
+        ("Batch", "down"),
+        ("Intersection", "down"),
+        ("Residuals", "down"),
+    ),
+    "pvca": (
+        ("Treatment", "up"),
+        ("Batch", "down"),
+        ("Intersection", "down"),
+        ("Residuals", "down"),
+    ),
+    "alignment": (
+        ("Alignment Score", "up"),
+    ),
+    "ebm": (
+        ("EBM", "up"),
+    ),
+    "silhouette": (
+        ("Silhouette", "up"),
     ),
 }
 
@@ -984,9 +1012,10 @@ def _load_info_table_for_key(
             _append_column(geometry_idx, "Geometry", "Geometry")
 
         trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
+        arrow_map = {"up": "↑", "down": "↓", "flat": "↔"}
         for column_name, trend in trend_spec:
             idx = header_lookup.get(column_name.lower())
-            arrow = "↑" if trend == "up" else "↓"
+            arrow = arrow_map.get(trend.lower(), "↔")
             display = f"{column_name} {arrow}"
             _append_column(idx, display, column_name)
 
@@ -1298,26 +1327,57 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         return html.Div([img], style={"width": "100%"})
 
     # Resolve filenames in this group
-    g: Dict[str, Optional[str]] = {"ait": None, "bray": None, "single": None, "title": key}
+    def _init_group_config(group_key: str) -> Dict[str, Optional[str]]:
+        if group_key == "pcoa":
+            return {
+                "title": "PCoA",
+                "ait_batch": None,
+                "ait_target": None,
+                "bray_batch": None,
+                "bray_target": None,
+            }
+        if group_key == "nmds":
+            return {
+                "title": "NMDS",
+                "ait_batch": None,
+                "ait_target": None,
+                "bray_batch": None,
+                "bray_target": None,
+            }
+        if group_key == "pca":
+            return {
+                "title": group_key.upper(),
+                "batch": None,
+                "target": None,
+            }
+        return {"ait": None, "bray": None, "single": None, "title": group_key}
+
+    g: Dict[str, Optional[str]] = _init_group_config(key)
     for spec in figures:
         low = spec.filename.lower()
         if key == "pcoa":
-            if low.startswith("pcoa_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("pcoa_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "PCoA"
+            if low.startswith("pcoa_aitchison_batch"):
+                g["ait_batch"] = spec.filename
+            elif low.startswith("pcoa_aitchison_target"):
+                g["ait_target"] = spec.filename
+            elif low.startswith("pcoa_braycurtis_batch"):
+                g["bray_batch"] = spec.filename
+            elif low.startswith("pcoa_braycurtis_target"):
+                g["bray_target"] = spec.filename
         elif key == "nmds":
-            if low.startswith("nmds_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("nmds_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "NMDS"
+            if low.startswith("nmds_aitchison_batch"):
+                g["ait_batch"] = spec.filename
+            elif low.startswith("nmds_aitchison_target"):
+                g["ait_target"] = spec.filename
+            elif low.startswith("nmds_braycurtis_batch"):
+                g["bray_batch"] = spec.filename
+            elif low.startswith("nmds_braycurtis_target"):
+                g["bray_target"] = spec.filename
         elif key == "dissimilarity":
             if low.startswith("dissimilarity_heatmaps_aitchison"):
                 g["ait"] = spec.filename
-            elif low.startswith("dissimilarity_heatmaps_braycurtis"):
-                g["bray"] = spec.filename
+                elif low.startswith("dissimilarity_heatmaps_braycurtis"):
+                    g["bray"] = spec.filename
             g["title"] = "Dissimilarity heatmaps"
         elif key == "permanova":
             if low.startswith("permanova_aitchison"):
@@ -1342,8 +1402,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         elif key == "alignment" and spec.filename.lower() in {"alignment_score.png", "alignment.png"}:
             g["single"] = spec.filename
             g["title"] = "Alignment score"
-        elif key == "pca" and spec.filename.lower() == "pca.png":
-            g["single"] = spec.filename; g["title"] = "PCA"
+        elif key == "pca":
+            if low == "pca_batch.png":
+                g["batch"] = spec.filename
+            elif low == "pca_target.png":
+                g["target"] = spec.filename
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
             g["single"] = spec.filename; g["title"] = "PVCA"
         elif key == "ebm" and spec.filename.lower() == "ebm.png":
@@ -1352,19 +1415,59 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["single"] = spec.filename; g["title"] = "Silhouette score"
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
-    has_ait = bool(g["ait"])
-    has_bray = bool(g["bray"])
-    has_single = bool(g["single"])
-    if has_ait:
-        label = "Plot" if not has_bray and not has_single else "Aitchison"
-        sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
-    if has_bray:
-        label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
-        sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
-    if has_single and not (has_ait or has_bray):
-        sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
+    rep_candidates: List[Optional[str]] = []
 
-    rep = g["ait"] or g["bray"] or g["single"]
+    if key == "pcoa":
+        mapping = [
+            ("Aitchison (Batch)", f"{key}-ait-batch", g.get("ait_batch")),
+            ("Aitchison (Target)", f"{key}-ait-target", g.get("ait_target")),
+            ("Bray-Curtis (Batch)", f"{key}-bray-batch", g.get("bray_batch")),
+            ("Bray-Curtis (Target)", f"{key}-bray-target", g.get("bray_target")),
+        ]
+        rep_candidates.extend([g.get("ait_batch"), g.get("ait_target"), g.get("bray_batch"), g.get("bray_target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    elif key == "nmds":
+        mapping = [
+            ("Aitchison (Batch)", f"{key}-ait-batch", g.get("ait_batch")),
+            ("Aitchison (Target)", f"{key}-ait-target", g.get("ait_target")),
+            ("Bray-Curtis (Batch)", f"{key}-bray-batch", g.get("bray_batch")),
+            ("Bray-Curtis (Target)", f"{key}-bray-target", g.get("bray_target")),
+        ]
+        rep_candidates.extend([g.get("ait_batch"), g.get("ait_target"), g.get("bray_batch"), g.get("bray_target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    elif key == "pca":
+        mapping = [
+            ("Batch grouping", f"{key}-batch", g.get("batch")),
+            ("Target grouping", f"{key}-target", g.get("target")),
+        ]
+        rep_candidates.extend([g.get("batch"), g.get("target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    else:
+        has_ait = bool(g.get("ait"))
+        has_bray = bool(g.get("bray"))
+        has_single = bool(g.get("single"))
+        if has_ait:
+            label = "Plot" if not has_bray and not has_single else "Aitchison"
+            sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
+            rep_candidates.append(g.get("ait"))
+        if has_bray:
+            label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
+            sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
+            rep_candidates.append(g.get("bray"))
+        if has_single and not (has_ait or has_bray):
+            sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
+            rep_candidates.append(g.get("single"))
+
+    if not rep_candidates:
+        rep_candidates.append(g.get("single"))
+
+    rep = next((cand for cand in rep_candidates if cand), None)
     third_label = "Details"
     third_content = _load_info_table_for_key(session_dir, stage, key, rep)
     if third_content is None and key.lower() == "r2":
