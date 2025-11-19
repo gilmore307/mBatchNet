@@ -1376,8 +1376,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         elif key == "dissimilarity":
             if low.startswith("dissimilarity_heatmaps_aitchison"):
                 g["ait"] = spec.filename
-                elif low.startswith("dissimilarity_heatmaps_braycurtis"):
-                    g["bray"] = spec.filename
+            elif low.startswith("dissimilarity_heatmaps_braycurtis"):
+                g["bray"] = spec.filename
             g["title"] = "Dissimilarity heatmaps"
         elif key == "permanova":
             if low.startswith("permanova_aitchison"):
