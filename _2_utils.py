@@ -13,6 +13,7 @@ import subprocess
 import textwrap
 import time
 import hashlib
+from io import BytesIO
 from datetime import datetime
 from statistics import mean
 from collections import defaultdict
@@ -107,6 +108,10 @@ POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
     "Silhouette.R",
 )
 
+
+PNG_MAX_DISPLAY_SIDE = 1400
+
+
 RANKING_SCORE_LABELS: Dict[str, str] = {
     "alignment": "Alignment score",
     "pca": "PCA score",
@@ -120,6 +125,51 @@ RANKING_SCORE_LABELS: Dict[str, str] = {
     "ebm": "Entropy score",
     "silhouette": "Silhouette score",
 }
+
+
+def _guess_mime_type(path: Path) -> str:
+    ext = path.suffix.lower()
+    if ext == ".png":
+        return "image/png"
+    if ext in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if ext in {".tif", ".tiff"}:
+        return "image/tiff"
+    return "application/octet-stream"
+
+
+def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE) -> str:
+    """Return a data URI for an image.
+
+    PNGs are downscaled/compressed to ease frontend payload size, while other
+    formats (e.g., TIFF) are kept at their original resolution.
+    """
+
+    mime_type = _guess_mime_type(path)
+    data: bytes
+
+    if path.suffix.lower() == ".png":
+        try:
+            from PIL import Image
+
+            image = Image.open(path)
+            image = image.convert("RGBA")
+            resample = getattr(Image, "Resampling", None)
+            resample_method = resample.LANCZOS if resample else Image.LANCZOS
+
+            if max(image.size) > max_png_side:
+                image.thumbnail((max_png_side, max_png_side), resample_method)
+
+            buffer = BytesIO()
+            image.save(buffer, format="PNG", optimize=True, compress_level=9)
+            data = buffer.getvalue()
+        except Exception:
+            data = path.read_bytes()
+    else:
+        data = path.read_bytes()
+
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {
@@ -789,8 +839,7 @@ def render_figures(session_dir: Path, figures: Sequence[FigureSpec]):
         file_path = session_dir / spec.filename
         if not file_path.exists():
             continue
-        encoded = base64.b64encode(file_path.read_bytes()).decode("ascii")
-        src = f"data:image/png;base64,{encoded}"
+        src = _encode_image_source(file_path)
         cards.append(
             dbc.Col(
                 dbc.Card(
@@ -1194,8 +1243,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         img_path = session_dir / filename
         if not img_path.exists():
             return html.Div("Image not found.")
-        encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
-        src = f"data:image/png;base64,{encoded}"
+        src = _encode_image_source(img_path)
         img = html.Img(
             src=src,
             style={
@@ -1339,8 +1387,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         img_path = session_dir / filename
         if not img_path.exists():
             return html.Div("Image not found.")
-        encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
-        src = f"data:image/png;base64,{encoded}"
+        src = _encode_image_source(img_path)
         img = html.Img(
             src=src,
             style={
