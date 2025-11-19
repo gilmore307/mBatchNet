@@ -107,6 +107,40 @@ HELP_MODAL_SECTIONS: List = [
             html.Ul(
                 [
                     html.Li(
+                        [
+                            "Table columns:",
+                            html.Ul(
+                                [
+                                    html.Li(
+                                        "Methods lists each available algorithm so you can scan the "
+                                        "options alongside their references."
+                                    ),
+                                    html.Li(
+                                        "Avg Time (s) displays the median runtime gathered from prior "
+                                        "sessions to help gauge how long a run may take."
+                                    ),
+                                    html.Li(
+                                        "Status shows whether that method already has outputs stored for "
+                                        "the current session."
+                                    ),
+                                    html.Li(
+                                        "Run Correction launches the job once both uploads are mapped. The "
+                                        "button disables itself after results are saved."
+                                    ),
+                                    html.Li(
+                                        "Delete removes the stored outputs so you can re-run the method "
+                                        "with different settings."
+                                    ),
+                                    html.Li(
+                                        "Citation links to the publication or documentation for the "
+                                        "selected method."
+                                    ),
+                                ],
+                                className="mt-2",
+                            ),
+                        ]
+                    ),
+                    html.Li(
                         "The sidebar keeps track of which methods have finished and which are "
                         "still queued."
                     ),
