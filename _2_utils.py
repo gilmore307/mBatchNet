@@ -218,6 +218,21 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Intersection", "down"),
         ("Residuals", "down"),
     ),
+    "pvca": (
+        ("Treatment", "up"),
+        ("Batch", "down"),
+        ("Intersection", "down"),
+        ("Residuals", "down"),
+    ),
+    "alignment": (
+        ("Alignment Score", "up"),
+    ),
+    "ebm": (
+        ("EBM", "up"),
+    ),
+    "silhouette": (
+        ("Silhouette", "up"),
+    ),
 }
 
 def _normalize_method_code(value: str) -> str:
