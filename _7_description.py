@@ -30,21 +30,25 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Manual uploads accept CSV files."
+                                "Manual uploads accept CSV files. Keep one dataset per file so the"
+                                " mappings remain unambiguous."
                             ),
                             html.Li(
                                 "The matrix must use features as rows, samples as columns, and "
-                                "omit row/column names."
+                                "omit row/column names. Use consistent feature order between the "
+                                "matrix and metadata to avoid mismatches."
                             ),
                             html.Li(
                                 "Metadata CSVs must include: a Batch column (batch IDs), a target "
                                 "column (target label such as treatment/phenotype), and optional "
-                                "covariance columns (keep the count modest to avoid slow runs)."
+                                "covariance columns (keep the count modest to avoid slow runs). If "
+                                "any column headers have spaces, wrap them in double quotes."
                             ),
                             html.Li(
                                 "Use the dropdowns below each table preview to map the batch, "
                                 "target, and covariance columns. These mappings are remembered in "
-                                "the session."
+                                "the session, so you can swap matrices without reselecting the "
+                                "fields."
                             ),
                         ]
                     ),
@@ -56,13 +60,15 @@ HELP_MODAL_SECTIONS: List = [
                     html.P(
                         "The mosaic plot cross-tabulates the Batch and target mappings so you "
                         "can confirm how many samples fall into each batch/label combination "
-                        "before running corrections."
+                        "before running corrections. It acts as a quick imbalance diagnostic "
+                        "before investing time in lengthy methods."
                     ),
                     html.Ul(
                         [
                             html.Li(
                                 "Click \"Generate mosaic plot\" after both files (or an example) "
-                                "are loaded to render the batch-by-target grid."
+                                "are loaded to render the batch-by-target grid. The plot updates "
+                                "any time you remap columns or reload data."
                             ),
                             html.Li(
                                 "Tile area encodes the sample count for that combination: evenly "
@@ -71,7 +77,9 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Hover to see exact counts and percentages so you can decide "
-                                "whether to rebalance or drop sparse categories before proceeding."
+                                "whether to rebalance or drop sparse categories before proceeding. "
+                                "Consider re-labelling or excluding categories that occupy fewer "
+                                "than ~5 samples to keep downstream statistics stable."
                             ),
                         ]
                     ),
@@ -84,11 +92,13 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Example datasets auto-populate every mapping field with the "
-                                "recommended Batch, target, and covariance selections."
+                                "recommended Batch, target, and covariance selections, mirroring "
+                                "how the authors curated the demo study."
                             ),
                             html.Li(
                                 "Review the previews to learn the expected formatting before "
-                                "switching back to manual uploads."
+                                "switching back to manual uploads. Use them as templates for "
+                                "column order, delimiter usage, and typical covariates."
                             ),
                         ]
                     ),
@@ -113,7 +123,8 @@ HELP_MODAL_SECTIONS: List = [
                                 [
                                     html.Li(
                                         "Methods lists each available algorithm so you can scan the "
-                                        "options alongside their references."
+                                        "options alongside their references. Expand the accordion on "
+                                        "each method to review parameter presets before launching."
                                     ),
                                     html.Li(
                                         "Avg Time (s) displays the median runtime gathered from prior "
@@ -121,7 +132,8 @@ HELP_MODAL_SECTIONS: List = [
                                     ),
                                     html.Li(
                                         "Status shows whether that method already has outputs stored for "
-                                        "the current session."
+                                        "the current session. Hover the badge to see timestamps and "
+                                        "runtime summaries."
                                     ),
                                     html.Li(
                                         "Run Correction launches the job once both uploads are mapped. The "
@@ -129,7 +141,8 @@ HELP_MODAL_SECTIONS: List = [
                                     ),
                                     html.Li(
                                         "Delete removes the stored outputs so you can re-run the method "
-                                        "with different settings."
+                                        "with different settings. This action only affects the selected "
+                                        "method; other results remain intact."
                                     ),
                                     html.Li(
                                         "Citation links to the publication or documentation for the "
@@ -142,15 +155,18 @@ HELP_MODAL_SECTIONS: List = [
                     ),
                     html.Li(
                         "The sidebar keeps track of which methods have finished and which are "
-                        "still queued."
+                        "still queued, so you can quickly jump between outputs without "
+                        "scrolling the table."
                     ),
                     html.Li(
                         "Jobs run sequentially and stream status updates to the run log. You can "
-                        "re-open the log modal while methods are running."
+                        "re-open the log modal while methods are running to watch stdout, "
+                        "stderr, and timer checkpoints in real time."
                     ),
                     html.Li(
                         "Once a method completes, its corrected matrix is stored for the "
-                        "post-correction assessments and final download bundle."
+                        "post-correction assessments and final download bundle. Use \"Download "
+                        "results\" to export intermediate corrections at any time."
                     ),
                 ]
             ),
@@ -169,11 +185,13 @@ HELP_MODAL_SECTIONS: List = [
                 [
                     html.Li(
                         "Choose which scoring families to run (alignment, ordination, PVCA, etc.) "
-                        "and configure their parameters via the tooltips."
+                        "and configure their parameters via the tooltips. For reproducibility, "
+                        "note any customised settings in the session log."
                     ),
                     html.Li(
                         "Trigger a run to queue the selected analyses. Progress appears in the "
-                        "log modal and each finished figure is embedded on the page."
+                        "log modal and each finished figure is embedded on the page. Figures "
+                        "update automatically when you re-run assessments after new corrections."
                     ),
                     html.Li(
                         "Use the ranking table to compare pre vs. post scores and identify which "
@@ -192,16 +210,20 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Quantifies how well batches mix in k-NN space after "
-                                "correction (higher = stronger batch mixing)."
+                                "correction (higher = stronger batch mixing). Use it to confirm "
+                                "whether corrected embeddings blend batches without erasing the "
+                                "target label."
                             ),
                             html.Li(
                                 "Figure: Bars show the alignment score for each method across the "
                                 "selected geometries so you can instantly spot which runs draw "
-                                "neighbours from multiple batches."
+                                "neighbours from multiple batches. Hover the bars to inspect the "
+                                "variance retention and number of PCs used during scoring."
                             ),
                             html.Li(
                                 "Details: Lists the Alignment Score ↑ column so you can compare the "
-                                "exact numeric values that feed the ranking table."
+                                "exact numeric values that feed the ranking table. Scores close to 1 "
+                                "indicate that most neighbours originate from different batches."
                             ),
                         ]
                     ),
@@ -215,18 +237,21 @@ HELP_MODAL_SECTIONS: List = [
                             html.Li(
                                 "Purpose: Visualises global variance structure to check whether "
                                 "batch dominates the first two PCs or if the target label remains "
-                                "separable."
+                                "separable. Because PCA is linear, it exposes broad-scale batch "
+                                "gradients that might be hidden in nonlinear views."
                             ),
                             html.Li(
                                 "Figure: Each panel plots PC1 vs PC2 with ellipses around batch and "
                                 "target groups. Balanced overlap and short batch-to-batch centroid "
-                                "distances indicate effective correction."
+                                "distances indicate effective correction. Watch whether ellipses "
+                                "retain the target label ordering even after batches overlap."
                             ),
                             html.Li(
                                 "Details: Centroid Distance (Batch ↓ / Target ↑) captures between-"
                                 "group spacing, Ellipse Overlap (Batch ↑ / Target ↓) summarises "
                                 "cluster overlap, and Target vs Batch Centroid Delta ↑ highlights "
-                                "phenotype separation relative to batch."
+                                "phenotype separation relative to batch. These metrics are provided "
+                                "per geometry so you can decide whether CLR or TSS performs better."
                             ),
                         ]
                     ),
@@ -239,17 +264,20 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Performs Principal Coordinates Analysis in CLR and TSS "
-                                "geometries to reveal geometry-specific batch structure."
+                                "geometries to reveal geometry-specific batch structure, especially "
+                                "when Euclidean PCA misses compositional trends."
                             ),
                             html.Li(
                                 "Figure: Use the Aitchison vs Bray-Curtis sub-tabs to see how "
                                 "batches overlap on each geometry; tighter batch ellipses and clear "
-                                "target separation imply successful corrections."
+                                "target separation imply successful corrections. Pay attention to "
+                                "axes that flip order when corrections change the distance rankings."
                             ),
                             html.Li(
                                 "Details: Shares the same Centroid Distance, Ellipse Overlap, and "
                                 "Target vs Batch Centroid Delta metrics as PCA so you can compare "
-                                "directions across geometries."
+                                "directions across geometries. Lower CLR scores paired with higher "
+                                "TSS scores may suggest compositional artefacts."
                             ),
                         ]
                     ),
@@ -262,17 +290,20 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Uses non-metric multidimensional scaling on CLR and TSS "
-                                "dissimilarities to examine nonlinear structure."
+                                "dissimilarities to examine nonlinear structure, highlighting "
+                                "curved manifolds that PCA/PCoA flatten."
                             ),
                             html.Li(
                                 "Figure: Inspect NMDS1 vs NMDS2 scatterplots and ensure stress "
                                 "values remain below ~0.3 while batches overlap and targets stay "
-                                "separable."
+                                "separable. Runs with diverging stress between geometries often "
+                                "signal that a correction only helped a subset of compositions."
                             ),
                             html.Li(
                                 "Details: NMDS Stress ↓ reports fit quality, while Centroid Distance, "
                                 "Ellipse Overlap, and Target vs Batch Centroid Delta mirror the "
-                                "PCA/PCoA diagnostics."
+                                "PCA/PCoA diagnostics. Prioritise methods with both low stress and "
+                                "high target-vs-batch deltas."
                             ),
                         ]
                     ),
@@ -285,7 +316,8 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Compares pairwise distance matrices (CLR & TSS) to spot "
-                                "batches that remain isolated after correction."
+                                "batches that remain isolated after correction. Use it when you need "
+                                "to confirm that distance shrinkage is uniform across all batches."
                             ),
                             html.Li(
                                 "Figure: Heatmaps display within- vs between-batch distances. Cool "
@@ -293,7 +325,8 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Details: ANOSIM R ↓ indicates how batch labels explain the distance "
-                                "matrix—values near 0 mean little batch-driven structure."
+                                "matrix—values near 0 mean little batch-driven structure. Use the "
+                                "exact value to compare CLR vs TSS sensitivity."
                             ),
                         ]
                     ),
@@ -310,11 +343,13 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Figure: Box or bar plots show the pseudo-F distributions per method; "
-                                "smaller R² implies weaker batch association."
+                                "smaller R² implies weaker batch association. Confidence intervals "
+                                "help decide if differences between methods are meaningful."
                             ),
                             html.Li(
                                 "Details: The R² ↓ column records the proportion of variance explained "
-                                "by batch so you can track how each method suppresses it."
+                                "by batch so you can track how each method suppresses it. Values "
+                                "below 0.05 typically indicate minimal batch impact."
                             ),
                         ]
                     ),
@@ -327,15 +362,19 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Summarises how much of each feature's variance is explained "
-                                "by batch vs. treatment using per-feature ANOVA."
+                                "by batch vs. treatment using per-feature ANOVA. This highlights "
+                                "features that remain confounded so you can inspect them manually."
                             ),
                             html.Li(
                                 "Figure: Dual bars show the competing batch and treatment medians per "
                                 "method so you can aim for high treatment signal and low batch signal."
+                                " Hover to reveal quartiles for each distribution."
                             ),
                             html.Li(
                                 "Details: Median R² (Batch ↓) should shrink after correction, while "
-                                "Median R² (Treatment ↑) indicates preserved biological signal."
+                                "Median R² (Treatment ↑) indicates preserved biological signal. Large "
+                                "gaps between the two columns suggest the method avoids over-"
+                                "correction."
                             ),
                         ]
                     ),
@@ -349,7 +388,8 @@ HELP_MODAL_SECTIONS: List = [
                             html.Li(
                                 "Purpose: Decomposes constrained variance into treatment, batch, and "
                                 "shared components to check whether correction prioritises the target "
-                                "label."
+                                "label. The analysis partials out covariates so you can attribute "
+                                "changes to the chosen label."
                             ),
                             html.Li(
                                 "Figure: Stacked bars show how much partial RDA variance is assigned "
@@ -358,7 +398,8 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ "
-                                "columns spell out the precise variance fractions per geometry."
+                                "columns spell out the precise variance fractions per geometry. High "
+                                "intersection fractions imply remaining confounding between labels."
                             ),
                         ]
                     ),
@@ -379,7 +420,8 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ mirror "
-                                "the PRDA table but derive from PVCA components."
+                                "the PRDA table but derive from PVCA components. Use the residual bar "
+                                "to gauge whether unmodelled factors dominate after correction."
                             ),
                         ]
                     ),
@@ -392,15 +434,18 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Measures k-NN batch entropy within UMAP embeddings (higher "
-                                "entropy = better batch mixing)."
+                                "entropy = better batch mixing). This is especially sensitive to "
+                                "local structure, complementing the global ordination metrics."
                             ),
                             html.Li(
                                 "Figure: Line or bar plots summarise the mean EBM value per method so "
-                                "you can prioritise corrections that fully intermingle batches."
+                                "you can prioritise corrections that fully intermingle batches. Drag "
+                                "across the legend to isolate specific methods for comparison."
                             ),
                             html.Li(
                                 "Details: The EBM ↑ column exposes the average entropy value across "
-                                "anchor pools that feeds the ranking score."
+                                "anchor pools that feeds the ranking score. Values above 0.8 suggest "
+                                "near-perfect mixing."
                             ),
                         ]
                     ),
@@ -413,15 +458,19 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Evaluates how well target-label clusters remain compact and "
-                                "separated after correction."
+                                "separated after correction, ensuring biological signal survives the "
+                                "batch removal."
                             ),
                             html.Li(
                                 "Figure: Bars or ridgelines show the mean silhouette width derived "
-                                "from the UMAP embedding—higher values mean cleaner target clusters."
+                                "from the UMAP embedding—higher values mean cleaner target clusters. "
+                                "Compare pre vs. post to verify that silhouette improvements align "
+                                "with qualitative UMAP panels."
                             ),
                             html.Li(
                                 "Details: The Silhouette ↑ column reports the rescaled mean silhouette "
-                                "width so you can audit the precise values."
+                                "width so you can audit the precise values. Scores near 0.5 signal "
+                                "modest separation, while >0.7 reflects well-separated targets."
                             ),
                         ]
                     ),
