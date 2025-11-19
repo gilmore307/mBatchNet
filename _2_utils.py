@@ -200,7 +200,6 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     ),
     "dissimilarity": (
         ("ANOSIM_R", "down"),
-        ("ANOSIM_p", "down"),
     ),
     "permanova": (
         ("R²", "down"),
