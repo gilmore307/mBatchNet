@@ -234,6 +234,10 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     ),
 }
 
+_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "nmds", "dissimilarity", "permanova"}
+_AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
+_BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
+
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
@@ -965,6 +969,7 @@ def _load_info_table_for_key(
     stage: str,
     key: str,
     representative: Optional[str],
+    geometry_filter: Optional[Set[str]] = None,
 ) -> Optional[dag.AgGrid]:
     """Load an informational table for the given metric, excluding score/rank columns."""
 
@@ -978,6 +983,8 @@ def _load_info_table_for_key(
     ]
     if not candidates:
         return None
+
+    geometry_filter_set = {token.lower() for token in (geometry_filter or set())}
 
     for cand in _sort_raw_assessment_names(candidates, stage):
         found = _find_file_case_insensitive(session_dir, cand)
@@ -1010,6 +1017,8 @@ def _load_info_table_for_key(
         geometry_idx = header_lookup.get("geometry")
         if geometry_idx is not None:
             _append_column(geometry_idx, "Geometry", "Geometry")
+        if geometry_filter_set and geometry_idx is None:
+            continue
 
         trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
         arrow_map = {"up": "↑", "down": "↓", "flat": "↔"}
@@ -1037,6 +1046,13 @@ def _load_info_table_for_key(
 
         formatted_rows: List[Dict[str, object]] = []
         for raw_row in data:
+            if geometry_filter_set:
+                geometry_raw: Optional[str] = None
+                if geometry_idx is not None and geometry_idx < len(raw_row):
+                    geometry_raw = raw_row[geometry_idx]
+                token = _canonical_geometry_token(geometry_raw)
+                if token is None or token.lower() not in geometry_filter_set:
+                    continue
             row_dict: Dict[str, object] = {}
             for idx, display, canonical in column_info:
                 if idx is None or idx >= len(raw_row):
@@ -1052,6 +1068,9 @@ def _load_info_table_for_key(
                     numeric_value = _safe_float(cell)
                     row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
             formatted_rows.append(row_dict)
+
+        if not formatted_rows:
+            continue
 
         numeric_headers = {
             col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -1469,8 +1488,39 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
 
     rep = next((cand for cand in rep_candidates if cand), None)
     third_label = "Details"
-    third_content = _load_info_table_for_key(session_dir, stage, key, rep)
-    if third_content is None and key.lower() == "r2":
+    third_content: Optional[html.Div] = None
+    key_lower = key.lower()
+
+    if key_lower in _MULTI_GEOMETRY_DETAIL_KEYS:
+        geometry_sections: List[html.Div] = []
+        for geom_label, geom_filter in (
+            ("Aitchison", _AITCHISON_GEOMETRY_TOKENS),
+            ("Bray-Curtis", _BRAY_GEOMETRY_TOKENS),
+        ):
+            table = _load_info_table_for_key(
+                session_dir,
+                stage,
+                key,
+                rep,
+                geometry_filter=geom_filter,
+            )
+            if table is None:
+                continue
+            geometry_sections.append(
+                html.Div(
+                    [
+                        html.H5(geom_label, className="be-detail-geometry-heading"),
+                        table,
+                    ],
+                    style={"marginBottom": "24px"},
+                )
+            )
+        if geometry_sections:
+            third_content = html.Div(geometry_sections, style={"width": "100%"})
+    else:
+        third_content = _load_info_table_for_key(session_dir, stage, key, rep)
+
+    if third_content is None and key_lower == "r2":
         third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
 
     if third_content is not None:
@@ -1667,16 +1717,33 @@ def _display_column_name(name: str) -> str:
     return cleaned
 
 
+_AITCHISON_GEOMETRY_ALIASES: Set[str] = {"ait", "aitch", "aitchison", "clr"}
+_BRAY_GEOMETRY_ALIASES: Set[str] = {"bc", "bray", "braycurtis", "tss"}
+
+
+def _canonical_geometry_token(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return None
+    normalized = re.sub(r"[^a-z]", "", cleaned)
+    if normalized in _AITCHISON_GEOMETRY_ALIASES:
+        return "aitchison"
+    if normalized in _BRAY_GEOMETRY_ALIASES:
+        return "braycurtis"
+    return normalized or None
+
+
 def _format_geometry_value(value: object) -> object:
     if not isinstance(value, str):
         return value
-    cleaned = value.strip()
-    lower = cleaned.lower()
-    if lower in {"ait", "aitch", "aitchison", "clr"}:
+    token = _canonical_geometry_token(value)
+    if token == "aitchison":
         return "Aitchison"
-    if lower in {"bc", "bray", "braycurtis", "bray-curtis", "tss"}:
+    if token == "braycurtis":
         return "Bray-Curtis"
-    return cleaned
+    return value.strip()
 
 
 def _rounded(value: Optional[float], digits: int = 3) -> Optional[float]:
