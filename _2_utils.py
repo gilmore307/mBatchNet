@@ -205,6 +205,19 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("R_norm", "down"),
         ("Mantel_r", "flat"),
     ),
+    "permanova": (
+        ("R²", "down"),
+    ),
+    "r2": (
+        ("Median R² (Batch)", "down"),
+        ("Median R² (Treatment)", "up"),
+    ),
+    "prda": (
+        ("Treatment", "up"),
+        ("Batch", "down"),
+        ("Intersection", "down"),
+        ("Residuals", "down"),
+    ),
 }
 
 def _normalize_method_code(value: str) -> str:
