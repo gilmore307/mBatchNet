@@ -186,20 +186,26 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "pca": (
-        ("Centroid_Distance_PCA", "down"),
-        ("Ellipse_Size_CV_PCA", "down"),
-        ("Ellipse_Angle_Dispersion_deg_PCA", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Overlap_Batch", "up"),
+        ("Ellipse_Overlap_Target", "down"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "pcoa": (
-        ("Centroid_Distance_PCoA", "down"),
-        ("Ellipse_Size_CV_PCoA", "down"),
-        ("Ellipse_Angle_Dispersion_deg_PCoA", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Overlap_Batch", "up"),
+        ("Ellipse_Overlap_Target", "down"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
-        ("Centroid_Distance_NMDS", "down"),
-        ("Ellipse_Size_CV_NMDS", "down"),
-        ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),
+        ("Centroid_Distance_Batch", "down"),
+        ("Centroid_Distance_Target", "up"),
+        ("Ellipse_Overlap_Batch", "up"),
+        ("Ellipse_Overlap_Target", "down"),
+        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "dissimilarity": (
         ("ANOSIM_R", "down"),
@@ -1015,8 +1021,6 @@ def _load_info_table_for_key(
             _append_column(method_idx, "Method", "Method")
 
         geometry_idx = header_lookup.get("geometry")
-        if geometry_idx is not None:
-            _append_column(geometry_idx, "Geometry", "Geometry")
         if geometry_filter_set and geometry_idx is None:
             continue
 
@@ -1031,6 +1035,9 @@ def _load_info_table_for_key(
         for idx, column_name in enumerate(header):
             raw_name = str(column_name)
             lower_name = raw_name.lower()
+            if lower_name == "geometry":
+                # Geometry is now implied by the table grouping, so omit the column
+                continue
             if "rank" in lower_name:
                 continue
             display = _display_column_name(column_name)

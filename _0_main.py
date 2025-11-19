@@ -151,6 +151,19 @@ def serve_layout() -> html.Div:
 
 app.layout = serve_layout
 
+# Provide Dash with a superset layout that enumerates all components referenced by
+# callbacks (across every page) so it won't complain when a callback output is
+# temporarily absent from the active layout (e.g., the Upload-only mosaic preview).
+app.validation_layout = html.Div(
+    [
+        serve_layout(),
+        upload_layout("/upload"),
+        assessment_layout("/pre", stage="pre"),
+        correction_layout("/correction"),
+        assessment_layout("/post", stage="post"),
+    ]
+)
+
 
 # ---- Page routing ----
 @app.callback(Output("page-content", "children"), Input("page-url", "pathname"))
