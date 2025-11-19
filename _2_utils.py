@@ -189,14 +189,14 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Centroid_Distance_Batch", "down"),
         ("Centroid_Distance_Target", "up"),
         ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "flat"),
+        ("Ellipse_Overlap_Target", "down"),
         ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "pcoa": (
         ("Centroid_Distance_Batch", "down"),
         ("Centroid_Distance_Target", "up"),
         ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "flat"),
+        ("Ellipse_Overlap_Target", "down"),
         ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "nmds": (
@@ -204,7 +204,7 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Centroid_Distance_Batch", "down"),
         ("Centroid_Distance_Target", "up"),
         ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "flat"),
+        ("Ellipse_Overlap_Target", "down"),
         ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "dissimilarity": (
