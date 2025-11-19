@@ -1,9 +1,412 @@
 """Centralised text content for help documentation and tooltips."""
 from typing import Dict, List
 
-# Placeholder for future help modal sections. Populate this list with Dash components
-# when help documentation is ready to be displayed in the modal.
-HELP_MODAL_SECTIONS: List = []
+from dash import html
+
+
+HELP_MODAL_SECTIONS: List = [
+    html.Div(
+        [
+            html.H4("Overview"),
+            html.P(
+                "The navigation bar mirrors the workflow: upload your inputs, preview pre-correction diagnostics, launch batch-effect correction methods, and then compare the post-correction assessments before downloading the session bundle. "
+                "Use the Logs button at any time to inspect long-running jobs."
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Upload Files"),
+            html.P(
+                "Upload a raw count/abundance table and a matching metadata table, or pick "one of the curated examples."
+            ),
+            html.Div(
+                [
+                    html.H5("Manual upload", className="mb-2 mt-3"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Manual uploads accept CSV files. "
+                            ),
+                            html.Li(
+                                "The matrix must use features as rows, samples as columns, and omit row/column names. Use consistent feature order between the matrix and metadata to avoid mismatches."
+                            ),
+                            html.Li(
+                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as treatment/phenotype), and optional covariance columns (keep the count modest to avoid slow runs)."
+                            ),
+                            html.Li(
+                                "Use the dropdowns below each table preview to map the batch, target, and covariance columns."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Example dataset", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Example datasets auto-populate every mapping field with the recommended Batch, target, and covariance selections."
+                            ),
+                            html.Li(
+                                "Choose from six curated datasets that have different batch sizes, feature counts, and batch/target distributions."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Mosaic plot", className="mb-2 mt-4"),
+                    html.P(
+                        "The mosaic plot cross-tabulates the Batch and target mappings so you "
+                        "can confirm how many samples fall into each batch/label combination "
+                        "before running corrections. It acts as a quick imbalance diagnostic "
+                        "before investing time in lengthy methods."
+                    ),
+                ]
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Batch Effect Correction"),
+            html.P(
+                "Select one or more correction strategies to run on the uploaded data. "
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        [
+                            "Table columns:",
+                            html.Ul(
+                                [
+                                    html.Li(
+                                        "Methods lists each available algorithm so you can scan the "
+                                        "options alongside their references. Expand the accordion on "
+                                        "each method to review parameter presets before launching."
+                                    ),
+                                    html.Li(
+                                        "Avg Time (s) displays the average runtime gathered from prior "
+                                        "sessions to help gauge how long a run may take."
+                                    ),
+                                    html.Li(
+                                        "Status shows whether that method already has outputs stored for "
+                                        "the current session."
+                                    ),
+                                    html.Li(
+                                        "Run Correction launches the job. The button disables itself after results are saved."
+                                    ),
+                                    html.Li(
+                                        "Delete removes the stored outputs so you can re-run the method "
+                                        "with different settings. This action only affects the selected "
+                                        "method, while other results remain intact."
+                                    ),
+                                    html.Li(
+                                        "Citation links to the publication or documentation for the "
+                                        "selected method."
+                                    ),
+                                ],
+                                className="mt-2",
+                            ),
+                        ]
+                    ),
+                    html.Li(
+                        "Jobs run sequentially and stream status updates to the run log. You can "
+                        "re-open the log modal while methods are running to watch the process in real time."
+                    ),
+                    html.Li(
+                        "Once a method completes, its corrected matrix is stored for the "
+                        "post-correction assessments and final download bundle. Use \"Download "
+                        "results\" to export intermediate corrections at any time."
+                    ),
+                ]
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Assessment (Pre & Post)"),
+            html.P(
+                "Assessment pages share the same controls. Pre-correction runs compute a "
+                "baseline using the uploaded data, while post-correction runs let you compare "
+                "each method's output."
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        "Choose which scoring families to run (alignment, ordination, PVCA, etc.) "
+                        "and configure their parameters via the tooltips. For reproducibility, "
+                        "note any customised settings in the session log."
+                    ),
+                    html.Li(
+                        "Trigger a run to queue the selected analyses. Progress appears in the "
+                        "log modal and each finished figure is embedded on the page. Figures "
+                        "update automatically when you re-run assessments after new corrections."
+                    ),
+                    html.Li(
+                        "Use the detail table to compare pre vs. post performance and identify which "
+                        "method best balances batch removal with phenotype separation."
+                    ),
+                    html.Li(
+                        "When you are satisfied, click \"Download results\" from the navbar to "
+                        "export every corrected matrix, assessment figure, and log file."
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Alignment score", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Quantifies how well batches mix in k-NN space after "
+                                "correction (higher = stronger batch mixing). Use it to confirm "
+                                "whether corrected embeddings blend batches without erasing the "
+                                "target label."
+                            ),
+                            html.Li(
+                                "Details: Lists the Alignment Score ↑ column so you can compare the "
+                                "exact numeric values that feed the ranking table. Scores close to 1 "
+                                "indicate that most neighbours originate from different batches."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PCA ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Visualises global variance structure to check whether "
+                                "batch dominates the first two PCs or if the target label remains "
+                                "separable."
+                            ),
+                            html.Li(
+                                "Figure: Each panel plots PC1 vs PC2 with ellipses around batch and "
+                                "target groups. Balanced overlap and short batch-to-batch centroid "
+                                "distances indicate effective correction. Watch whether ellipses "
+                                "retain the target label ordering even after batches overlap."
+                            ),
+                            html.Li(
+                                "Details: Centroid Distance (Batch ↓ / Target ↑) captures between-"
+                                "group spacing, Ellipse Overlap (Batch ↑ / Target ↓) summarises "
+                                "cluster overlap, and Target vs Batch Centroid Delta ↑ highlights "
+                                "target separation relative to batch."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PCoA ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Performs Principal Coordinates Analysis in CLR and TSS "
+                                "geometries to reveal geometry-specific batch structure, especially "
+                                "when Euclidean PCA misses compositional trends."
+                            ),
+                            html.Li(
+                                "Figure: Use the Aitchison vs Bray-Curtis sub-tabs to see how "
+                                "batches overlap on each geometry; tighter batch ellipses and clear "
+                                "target separation imply successful corrections. Pay attention to "
+                                "axes that flip order when corrections change the distance rankings."
+                            ),
+                            html.Li(
+                                "Details: Shares the same Centroid Distance, Ellipse Overlap, and "
+                                "Target vs Batch Centroid Delta metrics as PCA."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("NMDS ordination", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Uses non-metric multidimensional scaling on CLR and TSS "
+                                "dissimilarities to examine nonlinear structure, highlighting "
+                                "curved manifolds that PCA/PCoA flatten."
+                            ),
+                            html.Li(
+                                "Figure: Inspect NMDS1 vs NMDS2 scatterplots and ensure stress "
+                                "values remain below ~0.3 while batches overlap and targets stay "
+                                "separable. Runs with diverging stress between geometries often "
+                                "signal that a correction only helped a subset of compositions."
+                            ),
+                            html.Li(
+                                "Details: NMDS Stress ↓ reports fit quality, while Centroid Distance, "
+                                "Ellipse Overlap, and Target vs Batch Centroid Delta mirror the "
+                                "PCA/PCoA diagnostics. Prioritise methods with both low stress and "
+                                "high target-vs-batch deltas."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Dissimilarity heatmaps", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Compares pairwise distance matrices (CLR & TSS) to spot "
+                                "batches that remain isolated after correction. Use it when you need "
+                                "to confirm that distance shrinkage is uniform across all batches."
+                            ),
+                            html.Li(
+                                "Figure: Heatmaps display within- vs between-batch distances. Cool "
+                                "tones along off-diagonals imply reduced cross-batch separation."
+                            ),
+                            html.Li(
+                                "Details: ANOSIM R ↓ indicates how batch labels explain the distance "
+                                "matrix—values near 0 mean little batch-driven structure."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PERMANOVA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Tests whether batch explains a significant portion of the "
+                                "distance matrix variance in each geometry."
+                            ),
+                            html.Li(
+                                "Figure: Box or bar plots show the distributions per method; "
+                                "smaller R² implies weaker batch association."
+                            ),
+                            html.Li(
+                                "Details: The R² ↓ column records the proportion of variance explained "
+                                "by batch. Values "
+                                "below 0.05 typically indicate minimal batch impact."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Per-feature ANOVA (Median R²)", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Summarises how much of each feature's variance is explained "
+                                "by batch vs. treatment using per-feature ANOVA."
+                            ),
+                            html.Li(
+                                "Figure: Dual bars show the competing batch and treatment medians per "
+                                "method so you can aim for high treatment signal and low batch signal."
+                            ),
+                            html.Li(
+                                "Details: Median R² (Batch ↓) should shrink after correction, while "
+                                "Median R² (Treatment ↑) indicates preserved biological signal."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Partial RDA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Decomposes constrained variance into treatment, batch, and "
+                                "shared components to check whether correction prioritises the target "
+                                "label. The analysis partials out covariates so you can attribute "
+                                "changes to the chosen label."
+                            ),
+                            html.Li(
+                                "Figure: Stacked bars show how much partial RDA variance is assigned "
+                                "to each component—seek taller treatment segments and shrunken batch "
+                                "segments."
+                            ),
+                            html.Li(
+                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ "
+                                "columns spell out the precise variance fractions per geometry. High "
+                                "intersection fractions imply remaining confounding between labels."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("PVCA", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Applies Principal Variance Component Analysis to apportion "
+                                "variance across batch, treatment, and residual sources."
+                            ),
+                            html.Li(
+                                "Figure: Similar to partial RDA, stacked bars reveal whether batch "
+                                "variance shrinks relative to treatment across corrected matrices."
+                            ),
+                            html.Li(
+                                "Details: Treatment ↑, Batch ↓, Intersection ↓, and Residuals ↓ mirror "
+                                "the PRDA table but derive from PVCA components. Use the residual bar "
+                                "to gauge whether unmodelled factors dominate after correction."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Entropy batch mixing (EBM)", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Measures k-NN batch entropy within UMAP embeddings (higher "
+                                "entropy = better batch mixing)."
+                            ),
+                            html.Li(
+                                "Details: The EBM ↑ column exposes the average entropy value across "
+                                "anchor pools that feeds the ranking score. Values above 0.8 suggest "
+                                "near-perfect mixing."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("UMAP silhouette", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Purpose: Evaluates how well target-label clusters remain compact and "
+                                "separated after correction, ensuring biological signal survives the "
+                                "batch removal."
+                            ),
+                            html.Li(
+                                "Details: The Silhouette ↑ column reports the rescaled mean silhouette "
+                                "width so you can audit the precise values. Scores near 0.5 signal "
+                                "modest separation, while >0.7 reflects well-separated targets."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ],
+        className="mb-0",
+    ),
+]
 
 # Parameter tooltips for assessment configuration controls.
 ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
