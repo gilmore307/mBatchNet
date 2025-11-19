@@ -432,7 +432,7 @@ for (nm in names(file_list)) {
 
 build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
   if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
-  lapply(names(frames_cache), function(nm) {
+  plots <- lapply(names(frames_cache), function(nm) {
     fr <- frames_cache[[nm]]
     if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
     if (!(color_var %in% names(fr$plot.df))) return(NULL)
@@ -445,7 +445,8 @@ build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
       label     = label_nm,
       palette_name = palette_label
     )
-  }) |> Filter(function(x) !is.null(x))
+  })
+  Filter(function(x) !is.null(x), plots)
 }
 
 save_pca_plot_set <- function(plot_list, filename_stub) {
