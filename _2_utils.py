@@ -181,28 +181,29 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "pca": (
-        ("Var12_PCA", "up"),
-        ("Batch_Distance_PCA", "down"),
-        ("R_within_PCA", "down"),
-        ("Mixing_k10_PCA", "up"),
-        ("n_features_used_PCA", "up"),
-        ("n_features_total_PCA", "up"),
+        ("Centroid_Distance_PCA", "down"),
+        ("Ellipse_Size_CV_PCA", "down"),
+        ("Ellipse_Angle_Dispersion_deg_PCA", "down"),
     ),
     "pcoa": (
-        ("Var12_PCoA", "up"),
-        ("Batch_Distance_PCoA", "down"),
-        ("R_within_PCoA", "down"),
-        ("Mixing_k10_PCoA", "up"),
-        ("n_features_used_PCoA", "up"),
-        ("n_features_total_PCoA", "up"),
+        ("Centroid_Distance_PCoA", "down"),
+        ("Ellipse_Size_CV_PCoA", "down"),
+        ("Ellipse_Angle_Dispersion_deg_PCoA", "down"),
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
         ("Shepard_R2", "up"),
         ("Site_GoF_Median", "up"),
-        ("Batch_Distance_NMDS", "down"),
-        ("R_within_NMDS", "down"),
-        ("Mixing_k10_NMDS", "up"),
+        ("Centroid_Distance_NMDS", "down"),
+        ("Ellipse_Size_CV_NMDS", "down"),
+        ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),
+    ),
+    "dissimilarity": (
+        ("Inter_Batch_Dissimilarity", "down"),
+        ("Intra_Batch_Dissimilarity", "down"),
+        ("ANOSIM_R", "down"),
+        ("R_norm", "down"),
+        ("Mantel_r", "flat"),
     ),
 }
 
@@ -984,9 +985,10 @@ def _load_info_table_for_key(
             _append_column(geometry_idx, "Geometry", "Geometry")
 
         trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
+        arrow_map = {"up": "↑", "down": "↓", "flat": "↔"}
         for column_name, trend in trend_spec:
             idx = header_lookup.get(column_name.lower())
-            arrow = "↑" if trend == "up" else "↓"
+            arrow = arrow_map.get(trend.lower(), "↔")
             display = f"{column_name} {arrow}"
             _append_column(idx, display, column_name)
 
