@@ -307,19 +307,13 @@ upper_mean <- function(M) {
 }
 
 safe_anosim <- function(dist_obj, grouping) {
-  if (is.null(dist_obj) || is.null(grouping)) return(NA_real_)
+  default <- c(ANOSIM_R = NA_real_, ANOSIM_p = NA_real_)
+  if (is.null(dist_obj) || is.null(grouping)) return(default)
   grouping <- droplevels(factor(grouping))
-  if (nlevels(grouping) < 2) return(NA_real_)
+  if (nlevels(grouping) < 2) return(default)
   out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping), error = function(e) NULL)
-  if (is.null(out)) return(NA_real_)
-  unname(out$statistic)
-}
-
-compute_normalized_inter_vs_intra <- function(between, within) {
-  if (!is.finite(between) || !is.finite(within)) return(NA_real_)
-  denom <- between + within
-  if (!is.finite(denom) || denom == 0) return(NA_real_)
-  (between - within) / denom
+  if (is.null(out)) return(default)
+  c(ANOSIM_R = unname(out$statistic), ANOSIM_p = unname(out$signif))
 }
 
 # ==== A) Aitchison RMSE heatmaps ====
@@ -462,11 +456,12 @@ only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before c
 output_name <- if (only_baseline) "dissimilarity_raw_assessment_pre.csv" else "dissimilarity_raw_assessment_post.csv"
 
 build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
+  anosim_vals <- safe_anosim(dist_obj, grouping)
   tibble::tibble(
     Method = method,
     Geometry = geometry,
-    Normalized_Inter_vs_Intra = compute_normalized_inter_vs_intra(between, within),
-    ANOSIM_R = safe_anosim(dist_obj, grouping),
+    ANOSIM_R = anosim_vals[["ANOSIM_R"]],
+    ANOSIM_p = anosim_vals[["ANOSIM_p"]],
   )
 }
 

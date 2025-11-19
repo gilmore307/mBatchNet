@@ -199,8 +199,8 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Ellipse_Angle_Dispersion_deg_NMDS", "down"),
     ),
     "dissimilarity": (
-        ("Normalized_Inter_vs_Intra", "down"),
         ("ANOSIM_R", "down"),
+        ("ANOSIM_p", "down"),
     ),
     "permanova": (
         ("R²", "down"),
