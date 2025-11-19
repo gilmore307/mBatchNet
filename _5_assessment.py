@@ -392,7 +392,14 @@ def assessment_layout(active_path: str, stage: str):
                 [
                     html.H2(header),
                     html.Div(
-                        "Click Run inside a tab to compute only that assessment.",
+                        [
+                            html.Div(
+                                "Click Run inside a tab to compute only that assessment.",
+                            ),
+                            html.Div(
+                                "PNG previews are compressed to reduce page load; download TIFF files for full-resolution images.",
+                            ),
+                        ],
                         className="text-muted mb-3",
                     ),
                     tabs,
