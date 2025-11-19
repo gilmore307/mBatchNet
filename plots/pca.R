@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(patchwork)  # legend collecting & layout
   library(rlang)
+  library(jsonlite)
 })
 
 # ---- helpers ----
@@ -182,6 +183,37 @@ if (!("sample_id" %in% names(metadata))) {
 }
 metadata <- metadata |> mutate(sample_id = as.character(sample_id))
 
+label_col <- "phenotype"
+try({
+  cfg_path <- file.path(output_folder, "session_config.json")
+  if (file.exists(cfg_path)) {
+    cfg <- jsonlite::fromJSON(cfg_path)
+    if (!is.null(cfg$label_column)) label_col <- cfg$label_column
+  }
+}, silent = TRUE)
+if (!(label_col %in% names(metadata))) {
+  fallback <- c("target", "group", "condition", "status", "class", "label")
+  cand <- fallback[fallback %in% names(metadata)]
+  if (length(cand)) {
+    label_col <- cand[1]
+  } else {
+    guessed <- guess_shape_var(metadata, batch_col = "batch")
+    if (!is.na(guessed) && guessed %in% names(metadata)) {
+      label_col <- guessed
+    } else if ("phenotype" %in% names(metadata)) {
+      label_col <- "phenotype"
+    } else {
+      stop("No label column available for PCA plots.")
+    }
+  }
+}
+
+if (!("batch" %in% names(metadata))) {
+  metadata$batch <- NA
+}
+
+target_var <- label_col
+
 # --------- Collect CLR files ---------
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
 
@@ -259,7 +291,7 @@ compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_
 }
 
 # ==== panel: scatter + marginal densities; legend kept (not collected here) ====
-mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
+mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch") {
   
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
@@ -292,7 +324,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL) {
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
-    scale_color_manual(values = mbecCols, name = "Batch") +
+    scale_color_manual(values = mbecCols, name = palette_name) +
     guides(
       colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +
@@ -378,75 +410,93 @@ CB
 
 # ==== choose covariates (auto-detect shape var) ====
 batch_var  <- "batch"
-model_vars <- c(batch_var)
+model_vars_common <- unique(Filter(function(x) {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) return(FALSE)
+  nzchar(as.character(x))
+}, c(batch_var, target_var)))
+if (!length(model_vars_common)) model_vars_common <- c(batch_var)
 message(sprintf("Using color=%s (shape: none)", batch_var))
 
 # ==== build + save PCA panels for each matrix (single legend across ALL) ====
 pcs_to_plot <- c(1, 2)
 frames_cache <- list()   # <--- build this for assessment summaries
-plots <- list()
 
 for (nm in names(file_list)) {
   cat("Processing:", nm, "\n")
   df <- read_csv(file_list[[nm]], show_col_types = FALSE)
   
-  frames <- compute_pca_frames(df, metadata, model.vars = model_vars, n_pcs = max(pcs_to_plot))
+  frames <- compute_pca_frames(df, metadata, model.vars = model_vars_common, n_pcs = max(pcs_to_plot))
   frames_cache[[nm]] <- frames
-  
-  plt <- mbecPCAPlot(
-    plot.df   = frames$plot.df,
-    metric.df = frames$metric.df,
-    model.vars = frames$used.vars,
-    pca.axes  = pcs_to_plot,
-    label     = nm
-  )
-  
-  plots[[nm]] <- plt
+
 }
 
-# ---- Combine ALL panels and keep ONLY ONE legend at the bottom (horizontal) ----
-ncol_grid <- 3
-if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
-  ncol_grid <- max(1, opt_fig_ncol)
-}
-n_panels  <- length(plots)
-if (n_panels == 0L) stop("No PCA panels to plot.")
-
-panel_cols <- 1L
-panel_rows <- 1L
-base_fig_width_in  <- 2800 / 300
-base_fig_height_in <- 1800 / 300
-base_col_width_in  <- base_fig_width_in / 3
-base_row_height_in <- base_fig_height_in
-if (n_panels == 1L) {
-  combined <- plots[[1]] +
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin      = margin(8, 14, 8, 14)
+build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
+  plots <- lapply(names(frames_cache), function(nm) {
+    fr <- frames_cache[[nm]]
+    if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
+    if (!(color_var %in% names(fr$plot.df))) return(NULL)
+    label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
+    mbecPCAPlot(
+      plot.df   = fr$plot.df,
+      metric.df = fr$metric.df,
+      model.vars = c(color_var),
+      pca.axes  = pcs_to_plot,
+      label     = label_nm,
+      palette_name = palette_label
     )
-  w <- base_fig_width_in; h <- base_fig_height_in
-} else {
-  panel_cols <- min(ncol_grid, n_panels)
-  panel_rows <- ceiling(n_panels / ncol_grid)
-  combined <- wrap_plots(plots, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin      = margin(8, 14, 8, 14)
-    )
-  w <- base_col_width_in * panel_cols
-  h <- base_row_height_in * panel_rows
+  })
+  Filter(function(x) !is.null(x), plots)
 }
 
-fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-ggsave(file.path(output_folder, "pca.png"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
-ggsave(file.path(output_folder, "pca.tif"),
-       plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+save_pca_plot_set <- function(plot_list, filename_stub) {
+  plot_list <- Filter(function(x) !is.null(x), plot_list)
+  if (!length(plot_list)) return(invisible(NULL))
+  ncol_grid <- 3
+  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+    ncol_grid <- max(1, opt_fig_ncol)
+  }
+  n_panels <- length(plot_list)
+  panel_cols <- 1L
+  panel_rows <- 1L
+  base_fig_width_in  <- 2800 / 300
+  base_fig_height_in <- 1800 / 300
+  base_col_width_in  <- base_fig_width_in / 3
+  base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    combined <- plot_list[[1]] +
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / ncol_grid)
+    combined <- wrap_plots(plot_list, ncol = ncol_grid) +
+      plot_layout(guides = "collect") &
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".png")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+}
+
+batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
+save_pca_plot_set(batch_plots, "pca_batch")
+target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
+save_pca_plot_set(target_plots, "pca_target")
 
 # =========================
 # PCA assessment summaries

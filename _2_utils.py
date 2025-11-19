@@ -62,11 +62,16 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("PCA", "pca.png"),
-    FigureSpec("PCoA (Aitchison)", "pcoa_aitchison.png"),
-    FigureSpec("PCoA (Bray-Curtis)", "pcoa_braycurtis.png"),
-    FigureSpec("NMDS (Aitchison)", "nmds_aitchison.png"),
-    FigureSpec("NMDS (Bray-Curtis)", "nmds_braycurtis.png"),
+    FigureSpec("PCA (Batch grouping)", "pca_batch.png"),
+    FigureSpec("PCA (Target grouping)", "pca_target.png"),
+    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.png"),
+    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.png"),
+    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.png"),
+    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.png"),
+    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.png"),
+    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.png"),
+    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.png"),
+    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.png"),
     FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
     FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
     FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
@@ -228,6 +233,10 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Silhouette", "up"),
     ),
 }
+
+_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "nmds", "dissimilarity", "permanova"}
+_AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
+_BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
 
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
@@ -883,7 +892,7 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
         bases = ["ebm"]
     elif s == "silhouette":
         bases = ["silhouette"]
-    elif s == "pca":
+    elif s == "pca" or s.startswith("pca_") or s.startswith("pca-"):
         bases = ["pca"]
     else:
         bases = [stem]
@@ -960,6 +969,7 @@ def _load_info_table_for_key(
     stage: str,
     key: str,
     representative: Optional[str],
+    geometry_filter: Optional[Set[str]] = None,
 ) -> Optional[dag.AgGrid]:
     """Load an informational table for the given metric, excluding score/rank columns."""
 
@@ -973,6 +983,8 @@ def _load_info_table_for_key(
     ]
     if not candidates:
         return None
+
+    geometry_filter_set = {token.lower() for token in (geometry_filter or set())}
 
     for cand in _sort_raw_assessment_names(candidates, stage):
         found = _find_file_case_insensitive(session_dir, cand)
@@ -1005,6 +1017,8 @@ def _load_info_table_for_key(
         geometry_idx = header_lookup.get("geometry")
         if geometry_idx is not None:
             _append_column(geometry_idx, "Geometry", "Geometry")
+        if geometry_filter_set and geometry_idx is None:
+            continue
 
         trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
         arrow_map = {"up": "↑", "down": "↓", "flat": "↔"}
@@ -1032,6 +1046,13 @@ def _load_info_table_for_key(
 
         formatted_rows: List[Dict[str, object]] = []
         for raw_row in data:
+            if geometry_filter_set:
+                geometry_raw: Optional[str] = None
+                if geometry_idx is not None and geometry_idx < len(raw_row):
+                    geometry_raw = raw_row[geometry_idx]
+                token = _canonical_geometry_token(geometry_raw)
+                if token is None or token.lower() not in geometry_filter_set:
+                    continue
             row_dict: Dict[str, object] = {}
             for idx, display, canonical in column_info:
                 if idx is None or idx >= len(raw_row):
@@ -1047,6 +1068,9 @@ def _load_info_table_for_key(
                     numeric_value = _safe_float(cell)
                     row_dict[display] = _rounded(numeric_value) if numeric_value is not None else cell
             formatted_rows.append(row_dict)
+
+        if not formatted_rows:
+            continue
 
         numeric_headers = {
             col for col in display_headers if any(isinstance(row.get(col), (int, float)) for row in formatted_rows)
@@ -1322,21 +1346,52 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         return html.Div([img], style={"width": "100%"})
 
     # Resolve filenames in this group
-    g: Dict[str, Optional[str]] = {"ait": None, "bray": None, "single": None, "title": key}
+    def _init_group_config(group_key: str) -> Dict[str, Optional[str]]:
+        if group_key == "pcoa":
+            return {
+                "title": "PCoA",
+                "ait_batch": None,
+                "ait_target": None,
+                "bray_batch": None,
+                "bray_target": None,
+            }
+        if group_key == "nmds":
+            return {
+                "title": "NMDS",
+                "ait_batch": None,
+                "ait_target": None,
+                "bray_batch": None,
+                "bray_target": None,
+            }
+        if group_key == "pca":
+            return {
+                "title": group_key.upper(),
+                "batch": None,
+                "target": None,
+            }
+        return {"ait": None, "bray": None, "single": None, "title": group_key}
+
+    g: Dict[str, Optional[str]] = _init_group_config(key)
     for spec in figures:
         low = spec.filename.lower()
         if key == "pcoa":
-            if low.startswith("pcoa_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("pcoa_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "PCoA"
+            if low.startswith("pcoa_aitchison_batch"):
+                g["ait_batch"] = spec.filename
+            elif low.startswith("pcoa_aitchison_target"):
+                g["ait_target"] = spec.filename
+            elif low.startswith("pcoa_braycurtis_batch"):
+                g["bray_batch"] = spec.filename
+            elif low.startswith("pcoa_braycurtis_target"):
+                g["bray_target"] = spec.filename
         elif key == "nmds":
-            if low.startswith("nmds_aitchison"):
-                g["ait"] = spec.filename
-            elif low.startswith("nmds_braycurtis"):
-                g["bray"] = spec.filename
-            g["title"] = "NMDS"
+            if low.startswith("nmds_aitchison_batch"):
+                g["ait_batch"] = spec.filename
+            elif low.startswith("nmds_aitchison_target"):
+                g["ait_target"] = spec.filename
+            elif low.startswith("nmds_braycurtis_batch"):
+                g["bray_batch"] = spec.filename
+            elif low.startswith("nmds_braycurtis_target"):
+                g["bray_target"] = spec.filename
         elif key == "dissimilarity":
             if low.startswith("dissimilarity_heatmaps_aitchison"):
                 g["ait"] = spec.filename
@@ -1366,8 +1421,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         elif key == "alignment" and spec.filename.lower() in {"alignment_score.png", "alignment.png"}:
             g["single"] = spec.filename
             g["title"] = "Alignment score"
-        elif key == "pca" and spec.filename.lower() == "pca.png":
-            g["single"] = spec.filename; g["title"] = "PCA"
+        elif key == "pca":
+            if low == "pca_batch.png":
+                g["batch"] = spec.filename
+            elif low == "pca_target.png":
+                g["target"] = spec.filename
         elif key == "pvca" and spec.filename.lower() == "pvca.png":
             g["single"] = spec.filename; g["title"] = "PVCA"
         elif key == "ebm" and spec.filename.lower() == "ebm.png":
@@ -1376,22 +1434,93 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             g["single"] = spec.filename; g["title"] = "Silhouette score"
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
-    has_ait = bool(g["ait"])
-    has_bray = bool(g["bray"])
-    has_single = bool(g["single"])
-    if has_ait:
-        label = "Plot" if not has_bray and not has_single else "Aitchison"
-        sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
-    if has_bray:
-        label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
-        sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
-    if has_single and not (has_ait or has_bray):
-        sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
+    rep_candidates: List[Optional[str]] = []
 
-    rep = g["ait"] or g["bray"] or g["single"]
+    if key == "pcoa":
+        mapping = [
+            ("Aitchison (Batch)", f"{key}-ait-batch", g.get("ait_batch")),
+            ("Aitchison (Target)", f"{key}-ait-target", g.get("ait_target")),
+            ("Bray-Curtis (Batch)", f"{key}-bray-batch", g.get("bray_batch")),
+            ("Bray-Curtis (Target)", f"{key}-bray-target", g.get("bray_target")),
+        ]
+        rep_candidates.extend([g.get("ait_batch"), g.get("ait_target"), g.get("bray_batch"), g.get("bray_target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    elif key == "nmds":
+        mapping = [
+            ("Aitchison (Batch)", f"{key}-ait-batch", g.get("ait_batch")),
+            ("Aitchison (Target)", f"{key}-ait-target", g.get("ait_target")),
+            ("Bray-Curtis (Batch)", f"{key}-bray-batch", g.get("bray_batch")),
+            ("Bray-Curtis (Target)", f"{key}-bray-target", g.get("bray_target")),
+        ]
+        rep_candidates.extend([g.get("ait_batch"), g.get("ait_target"), g.get("bray_batch"), g.get("bray_target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    elif key == "pca":
+        mapping = [
+            ("Batch grouping", f"{key}-batch", g.get("batch")),
+            ("Target grouping", f"{key}-target", g.get("target")),
+        ]
+        rep_candidates.extend([g.get("batch"), g.get("target")])
+        for label, value, filename in mapping:
+            if filename:
+                sub_defs.append((label, value, content_for_image(filename)))
+    else:
+        has_ait = bool(g.get("ait"))
+        has_bray = bool(g.get("bray"))
+        has_single = bool(g.get("single"))
+        if has_ait:
+            label = "Plot" if not has_bray and not has_single else "Aitchison"
+            sub_defs.append((label, f"{key}-ait", content_for_image(g["ait"])) )
+            rep_candidates.append(g.get("ait"))
+        if has_bray:
+            label = "Plot" if not has_ait and not has_single else "Bray-Curtis"
+            sub_defs.append((label, f"{key}-bray", content_for_image(g["bray"])) )
+            rep_candidates.append(g.get("bray"))
+        if has_single and not (has_ait or has_bray):
+            sub_defs.append(("Plot", f"{key}-plot", content_for_image(g["single"])) )
+            rep_candidates.append(g.get("single"))
+
+    if not rep_candidates:
+        rep_candidates.append(g.get("single"))
+
+    rep = next((cand for cand in rep_candidates if cand), None)
     third_label = "Details"
-    third_content = _load_info_table_for_key(session_dir, stage, key, rep)
-    if third_content is None and key.lower() == "r2":
+    third_content: Optional[html.Div] = None
+    key_lower = key.lower()
+
+    if key_lower in _MULTI_GEOMETRY_DETAIL_KEYS:
+        geometry_sections: List[html.Div] = []
+        for geom_label, geom_filter in (
+            ("Aitchison", _AITCHISON_GEOMETRY_TOKENS),
+            ("Bray-Curtis", _BRAY_GEOMETRY_TOKENS),
+        ):
+            table = _load_info_table_for_key(
+                session_dir,
+                stage,
+                key,
+                rep,
+                geometry_filter=geom_filter,
+            )
+            if table is None:
+                continue
+            geometry_sections.append(
+                html.Div(
+                    [
+                        html.H5(geom_label, className="be-detail-geometry-heading"),
+                        table,
+                    ],
+                    style={"marginBottom": "24px"},
+                )
+            )
+        if geometry_sections:
+            third_content = html.Div(geometry_sections, style={"width": "100%"})
+    else:
+        third_content = _load_info_table_for_key(session_dir, stage, key, rep)
+
+    if third_content is None and key_lower == "r2":
         third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
 
     if third_content is not None:
@@ -1588,16 +1717,33 @@ def _display_column_name(name: str) -> str:
     return cleaned
 
 
+_AITCHISON_GEOMETRY_ALIASES: Set[str] = {"ait", "aitch", "aitchison", "clr"}
+_BRAY_GEOMETRY_ALIASES: Set[str] = {"bc", "bray", "braycurtis", "tss"}
+
+
+def _canonical_geometry_token(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return None
+    normalized = re.sub(r"[^a-z]", "", cleaned)
+    if normalized in _AITCHISON_GEOMETRY_ALIASES:
+        return "aitchison"
+    if normalized in _BRAY_GEOMETRY_ALIASES:
+        return "braycurtis"
+    return normalized or None
+
+
 def _format_geometry_value(value: object) -> object:
     if not isinstance(value, str):
         return value
-    cleaned = value.strip()
-    lower = cleaned.lower()
-    if lower in {"ait", "aitch", "aitchison", "clr"}:
+    token = _canonical_geometry_token(value)
+    if token == "aitchison":
         return "Aitchison"
-    if lower in {"bc", "bray", "braycurtis", "bray-curtis", "tss"}:
+    if token == "braycurtis":
         return "Bray-Curtis"
-    return cleaned
+    return value.strip()
 
 
 def _rounded(value: Optional[float], digits: int = 3) -> Optional[float]:

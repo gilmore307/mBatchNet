@@ -194,6 +194,8 @@ if (!("batch" %in% names(metadata))) {
   metadata$batch <- NA  # or some default value
 }
 
+target_var <- label_col
+
 # ---- Find normalized files ----
 clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", full.names = TRUE)
 tss_paths <- list.files(output_folder, pattern = "^normalized_.*_tss\\.csv$", full.names = TRUE)
@@ -463,13 +465,17 @@ CB
 
 # ==== Params ====
 batch_var  <- "batch"
-model_vars <- c(batch_var)
 axes_to_plot <- c(1, 2)
 ncol_grid <- 3
 if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
   ncol_grid <- max(1, opt_fig_ncol)
 }
 SYMMETRIC_AXES <- FALSE  # set TRUE to force symmetry about 0 (optional)
+model_vars_common <- unique(Filter(function(x) {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) return(FALSE)
+  nzchar(as.character(x))
+}, c(batch_var, target_var)))
+if (!length(model_vars_common)) model_vars_common <- c(batch_var)
 
 # =========================
 # Set 1: Aitchison (CLR)
@@ -481,78 +487,10 @@ frames_cache_clr <- list()
 for (nm in names(file_list_clr)) {
   cat("Computing CLR frames:", nm, "\n")
   df <- read_csv(file_list_clr[[nm]], show_col_types = FALSE)
-  fr <- compute_pcoa_frames_aitch(df, metadata, model.vars = model_vars, n_axes = max(axes_to_plot))
+  fr <- compute_pcoa_frames_aitch(df, metadata, model.vars = model_vars_common, n_axes = max(axes_to_plot))
   frames_cache_clr[[nm]] <- fr
 }
 
-plots_clr <- lapply(names(file_list_clr), function(nm) {
-  fr <- frames_cache_clr[[nm]]
-  label_nm <- if (has_dual_geometries) sprintf("%s - Aitchison", nm) else nm
-  x_override <- NULL
-  y_override <- NULL
-  if (isTRUE(SYMMETRIC_AXES)) {
-    xcol <- paste0("PCo", axes_to_plot[1])
-    ycol <- paste0("PCo", axes_to_plot[2])
-    scores <- data.frame(
-      AX1 = fr$plot.df[[xcol]],
-      AX2 = fr$plot.df[[ycol]],
-      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-    )
-    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-    xr <- finite_range(scores$AX1, eb$x)
-    yr <- finite_range(scores$AX2, eb$y)
-    half <- max(abs(c(xr, yr)))
-    x_override <- c(-half, half)
-    y_override <- c(-half, half)
-  }
-  pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
-             axes = axes_to_plot, label = label_nm,
-             xlim_override = x_override, ylim_override = y_override,
-             palette_name = "Batch")
-})
-names(plots_clr) <- names(file_list_clr)
-
-# ---- Combine & save (CLR) ----
-n_panels_clr <- length(plots_clr)
-panel_cols_clr <- 1L
-panel_rows_clr <- 1L
-base_fig_width_in  <- 2800 / 300
-base_fig_height_in <- 1800 / 300
-base_col_width_in  <- base_fig_width_in / 3
-base_row_height_in <- base_fig_height_in
-if (n_panels_clr == 1L) {
-  combined_clr <- plots_clr[[1]] +
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin = margin(8, 14, 8, 14)
-    )
-  w_clr <- base_fig_width_in; h_clr <- base_fig_height_in
-} else {
-  panel_cols_clr <- min(ncol_grid, n_panels_clr)
-  panel_rows_clr <- ceiling(n_panels_clr / ncol_grid)
-  combined_clr <- wrap_plots(plots_clr, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin = margin(8, 14, 8, 14)
-    )
-  w_clr <- base_col_width_in * panel_cols_clr
-  h_clr <- base_row_height_in * panel_rows_clr
-}
-fig_dims_clr <- apply_fig_overrides(w_clr, h_clr, 300, panel_cols_clr, panel_rows_clr)
-ggsave(file.path(output_folder, "pcoa_aitchison.png"),
-       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
-ggsave(file.path(output_folder, "pcoa_aitchison.tif"),
-       plot = combined_clr, width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-
-# =========================
-# Set 2: Bray–Curtis (TSS)
-# =========================
 message(sprintf("PCoA (Bray–Curtis on TSS): color=%s (shape: none)", batch_var))
 
 frames_cache_tss <- list()
@@ -560,70 +498,102 @@ frames_cache_tss <- list()
 for (nm in names(file_list_tss)) {
   cat("Computing TSS/Bray frames:", nm, "\n")
   df <- read_csv(file_list_tss[[nm]], show_col_types = FALSE)
-  fr <- compute_pcoa_frames_bray(df, metadata, model.vars = model_vars, n_axes = max(axes_to_plot))
+  fr <- compute_pcoa_frames_bray(df, metadata, model.vars = model_vars_common, n_axes = max(axes_to_plot))
   frames_cache_tss[[nm]] <- fr
 }
 
-plots_tss <- lapply(names(file_list_tss), function(nm) {
-  fr <- frames_cache_tss[[nm]]
-  label_nm <- if (has_dual_geometries) sprintf("%s - Bray-Curtis", nm) else nm
-  x_override <- NULL
-  y_override <- NULL
-  if (isTRUE(SYMMETRIC_AXES)) {
-    xcol <- paste0("PCo", axes_to_plot[1])
-    ycol <- paste0("PCo", axes_to_plot[2])
-    scores <- data.frame(
-      AX1 = fr$plot.df[[xcol]],
-      AX2 = fr$plot.df[[ycol]],
-      batch = if (batch_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[batch_var]]) else factor(1)
-    )
-    if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
-    eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
-    xr <- finite_range(scores$AX1, eb$x)
-    yr <- finite_range(scores$AX2, eb$y)
-    half <- max(abs(c(xr, yr)))
-    x_override <- c(-half, half)
-    y_override <- c(-half, half)
-  }
-  pcoa_panel(fr$plot.df, fr$metric.df, model_vars,
-             axes = axes_to_plot, label = label_nm,
-             xlim_override = x_override, ylim_override = y_override,
-             palette_name = "Batch")
-})
-names(plots_tss) <- names(file_list_tss)
-
-# ---- Combine & save (TSS) ----
-n_panels_tss <- length(plots_tss)
-panel_cols_tss <- 1L
-panel_rows_tss <- 1L
-if (n_panels_tss == 1L) {
-  combined_tss <- plots_tss[[1]] +
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin = margin(8, 14, 8, 14)
-    )
-  w_tss <- base_fig_width_in; h_tss <- base_fig_height_in
-} else {
-  panel_cols_tss <- min(ncol_grid, n_panels_tss)
-  panel_rows_tss <- ceiling(n_panels_tss / ncol_grid)
-  combined_tss <- wrap_plots(plots_tss, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(
-      legend.position  = "bottom",
-      legend.direction = "horizontal",
-      legend.box       = "vertical",
-      plot.margin = margin(8, 14, 8, 14)
-    )
-  w_tss <- base_col_width_in * panel_cols_tss
-  h_tss <- base_row_height_in * panel_rows_tss
+build_pcoa_plot_list <- function(frames_cache, geometry_label, color_var, palette_label) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
+  plots <- lapply(names(frames_cache), function(nm) {
+    fr <- frames_cache[[nm]]
+    if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
+    if (!(color_var %in% names(fr$plot.df))) return(NULL)
+    label_parts <- c(nm)
+    if (has_dual_geometries && nzchar(geometry_label)) {
+      label_parts <- c(label_parts, geometry_label)
+    }
+    grouping_label <- if (identical(palette_label, "Batch")) "Batch" else "Target"
+    label_parts <- c(label_parts, grouping_label)
+    label_nm <- paste(label_parts, collapse = " - ")
+    x_override <- NULL
+    y_override <- NULL
+    if (isTRUE(SYMMETRIC_AXES)) {
+      xcol <- paste0("PCo", axes_to_plot[1])
+      ycol <- paste0("PCo", axes_to_plot[2])
+      scores <- data.frame(
+        AX1 = fr$plot.df[[xcol]],
+        AX2 = fr$plot.df[[ycol]],
+        batch = if (color_var %in% names(fr$plot.df)) droplevels(fr$plot.df[[color_var]]) else factor(1)
+      )
+      if (!is.factor(scores$batch)) scores$batch <- factor(scores$batch)
+      eb <- ellipse_union_bounds(scores, "batch", level = 0.95, n = 240)
+      xr <- finite_range(scores$AX1, eb$x)
+      yr <- finite_range(scores$AX2, eb$y)
+      half <- max(abs(c(xr, yr)))
+      x_override <- c(-half, half)
+      y_override <- c(-half, half)
+    }
+    pcoa_panel(fr$plot.df, fr$metric.df, c(color_var),
+               axes = axes_to_plot, label = label_nm,
+               xlim_override = x_override, ylim_override = y_override,
+               palette_name = palette_label)
+  })
+  Filter(function(x) !is.null(x), plots)
 }
-fig_dims_tss <- apply_fig_overrides(w_tss, h_tss, 300, panel_cols_tss, panel_rows_tss)
-ggsave(file.path(output_folder, "pcoa_braycurtis.png"),
-       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi)
-ggsave(file.path(output_folder, "pcoa_braycurtis.tif"),
-       plot = combined_tss, width = fig_dims_tss$width, height = fig_dims_tss$height, dpi = fig_dims_tss$dpi, compression = "lzw")
+
+save_pcoa_plot_set <- function(plot_list, filename_stub) {
+  plot_list <- Filter(function(x) !is.null(x), plot_list)
+  if (!length(plot_list)) return(invisible(NULL))
+  n_panels <- length(plot_list)
+  panel_cols <- 1L
+  panel_rows <- 1L
+  base_fig_width_in  <- 2800 / 300
+  base_fig_height_in <- 1800 / 300
+  base_col_width_in  <- base_fig_width_in / 3
+  base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    combined <- plot_list[[1]] +
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / ncol_grid)
+    combined <- wrap_plots(plot_list, ncol = ncol_grid) +
+      plot_layout(guides = "collect") &
+      theme(
+        legend.position  = "bottom",
+        legend.direction = "horizontal",
+        legend.box       = "vertical",
+        plot.margin      = margin(8, 14, 8, 14)
+      )
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".png")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+}
+
+if (length(frames_cache_clr)) {
+  batch_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots, "pcoa_aitchison_batch")
+  target_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", target_var, "Target")
+  save_pcoa_plot_set(target_plots, "pcoa_aitchison_target")
+}
+
+if (length(frames_cache_tss)) {
+  batch_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots_bc, "pcoa_braycurtis_batch")
+  target_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", target_var, "Target")
+  save_pcoa_plot_set(target_plots_bc, "pcoa_braycurtis_target")
+}
 
 # =========================
 # Unified PCoA summaries (Aitchison + Bray combined)
