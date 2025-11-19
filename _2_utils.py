@@ -110,6 +110,23 @@ POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
 
 
 PNG_MAX_DISPLAY_SIDE = 1400
+# Certain plots should be more aggressively downscaled to keep payloads light
+PNG_MAX_BY_FILENAME: Dict[str, int] = {
+    # Ordination plots
+    "pca_batch.png": 1000,
+    "pca_target.png": 1000,
+    "pcoa_aitchison_batch.png": 1000,
+    "pcoa_aitchison_target.png": 1000,
+    "pcoa_braycurtis_batch.png": 1000,
+    "pcoa_braycurtis_target.png": 1000,
+    "nmds_aitchison_batch.png": 1000,
+    "nmds_aitchison_target.png": 1000,
+    "nmds_braycurtis_batch.png": 1000,
+    "nmds_braycurtis_target.png": 1000,
+    # Heatmaps
+    "dissimilarity_heatmaps_aitchison.png": 1000,
+    "dissimilarity_heatmaps_braycurtis.png": 1000,
+}
 
 
 RANKING_SCORE_LABELS: Dict[str, str] = {
@@ -170,6 +187,14 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
 
     encoded = base64.b64encode(data).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _resolve_png_max_side(path: Path) -> int:
+    """Return the downscale max side for a PNG, falling back to the default."""
+
+    if path.suffix.lower() != ".png":
+        return PNG_MAX_DISPLAY_SIDE
+    return PNG_MAX_BY_FILENAME.get(path.name.lower(), PNG_MAX_DISPLAY_SIDE)
 
 
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {
@@ -839,7 +864,7 @@ def render_figures(session_dir: Path, figures: Sequence[FigureSpec]):
         file_path = session_dir / spec.filename
         if not file_path.exists():
             continue
-        src = _encode_image_source(file_path)
+        src = _encode_image_source(file_path, max_png_side=_resolve_png_max_side(file_path))
         cards.append(
             dbc.Col(
                 dbc.Card(
@@ -1243,7 +1268,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         img_path = session_dir / filename
         if not img_path.exists():
             return html.Div("Image not found.")
-        src = _encode_image_source(img_path)
+        src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))
         img = html.Img(
             src=src,
             style={
@@ -1387,7 +1412,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         img_path = session_dir / filename
         if not img_path.exists():
             return html.Div("Image not found.")
-        src = _encode_image_source(img_path)
+        src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))
         img = html.Img(
             src=src,
             style={
