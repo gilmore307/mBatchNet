@@ -115,6 +115,8 @@ def serve_layout() -> html.Div:
                 id="help-modal",
                 is_open=False,
                 centered=True,
+                size="xl",
+                scrollable=True,
             ),
 
             # Run log modal

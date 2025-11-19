@@ -1,9 +1,160 @@
 """Centralised text content for help documentation and tooltips."""
 from typing import Dict, List
 
-# Placeholder for future help modal sections. Populate this list with Dash components
-# when help documentation is ready to be displayed in the modal.
-HELP_MODAL_SECTIONS: List = []
+from dash import html
+
+
+HELP_MODAL_SECTIONS: List = [
+    html.Div(
+        [
+            html.H4("Overview"),
+            html.P(
+                "The navigation bar mirrors the workflow: upload your inputs, preview pre-"
+                "correction diagnostics, launch batch-effect correction methods, and then "
+                "compare the post-correction assessments before downloading the session "
+                "bundle. Use the Logs button at any time to inspect long-running jobs."
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Upload Files"),
+            html.P(
+                "Upload a raw count/abundance table and a matching metadata table, or pick "
+                "one of the curated examples."
+            ),
+            html.Div(
+                [
+                    html.H5("Manual upload", className="mb-2 mt-3"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Manual uploads accept CSV files."
+                            ),
+                            html.Li(
+                                "The matrix must use features as rows, samples as columns, and "
+                                "omit row/column names."
+                            ),
+                            html.Li(
+                                "Metadata CSVs must include: a Batch column (batch IDs), a target "
+                                "column (target label such as treatment/phenotype), and optional "
+                                "covariance columns (keep the count modest to avoid slow runs)."
+                            ),
+                            html.Li(
+                                "Use the dropdowns below each table preview to map the batch, "
+                                "target, and covariance columns. These mappings are remembered in "
+                                "the session."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Mosaic plot", className="mb-2 mt-4"),
+                    html.P(
+                        "The mosaic plot cross-tabulates the Batch and target mappings so you "
+                        "can confirm how many samples fall into each batch/label combination "
+                        "before running corrections."
+                    ),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Click \"Generate mosaic plot\" after both files (or an example) "
+                                "are loaded to render the batch-by-target grid."
+                            ),
+                            html.Li(
+                                "Tile area encodes the sample count for that combination: evenly "
+                                "sized tiles imply balanced coverage, while thin or missing tiles "
+                                "highlight under-represented groups."
+                            ),
+                            html.Li(
+                                "Hover to see exact counts and percentages so you can decide "
+                                "whether to rebalance or drop sparse categories before proceeding."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Example dataset", className="mb-2 mt-4"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Example datasets auto-populate every mapping field with the "
+                                "recommended Batch, target, and covariance selections."
+                            ),
+                            html.Li(
+                                "Review the previews to learn the expected formatting before "
+                                "switching back to manual uploads."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Batch Effect Correction"),
+            html.P(
+                "Select one or more correction strategies, tune their optional parameters, "
+                "and launch them as a batch job."
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        "The sidebar keeps track of which methods have finished and which are "
+                        "still queued."
+                    ),
+                    html.Li(
+                        "Jobs run sequentially and stream status updates to the run log. You can "
+                        "re-open the log modal while methods are running."
+                    ),
+                    html.Li(
+                        "Once a method completes, its corrected matrix is stored for the "
+                        "post-correction assessments and final download bundle."
+                    ),
+                ]
+            ),
+        ],
+        className="mb-4",
+    ),
+    html.Div(
+        [
+            html.H4("Assessment (Pre & Post)"),
+            html.P(
+                "Assessment pages share the same controls. Pre-correction runs compute a "
+                "baseline using the uploaded data, while post-correction runs let you compare "
+                "each method's output."
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        "Choose which scoring families to run (alignment, ordination, PVCA, etc.) "
+                        "and configure their parameters via the tooltips."
+                    ),
+                    html.Li(
+                        "Trigger a run to queue the selected analyses. Progress appears in the "
+                        "log modal and each finished figure is embedded on the page."
+                    ),
+                    html.Li(
+                        "Use the ranking table to compare pre vs. post scores and identify which "
+                        "method best balances batch removal with phenotype separation."
+                    ),
+                    html.Li(
+                        "When you are satisfied, click \"Download results\" from the navbar to "
+                        "export every corrected matrix, assessment figure, and log file."
+                    ),
+                ]
+            ),
+        ],
+        className="mb-0",
+    ),
+]
 
 # Parameter tooltips for assessment configuration controls.
 ASSESSMENT_PARAM_TOOLTIPS: Dict[str, Dict[str, str]] = {
