@@ -30,6 +30,7 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
+    _materialize_png_sidecar,
 )
 
 
@@ -112,12 +113,16 @@ def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) 
         return False
 
     def _exists_with_fallback(name: str) -> bool:
-        path = session_dir / name
-        if path.exists():
+        png_path = session_dir / name
+        if png_path.exists():
             return True
-        if path.suffix.lower() in {".tif", ".tiff"}:
-            alt = path.with_suffix(".png")
-            return alt.exists()
+
+        for alt_ext in (".tif", ".tiff"):
+            alt = png_path.with_suffix(alt_ext)
+            if alt.exists():
+                _materialize_png_sidecar(alt)
+                return png_path.exists()
+
         return False
 
     return all(_exists_with_fallback(name) for name in expected_files)
