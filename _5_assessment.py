@@ -8,7 +8,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
@@ -108,9 +108,13 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
     return unique
 
 
-def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) -> bool:
+def _assessment_outputs_status(
+    session_dir: Path, expected_files: Sequence[str]
+) -> Tuple[bool, int, int]:
+    """Return readiness plus how many expected files are available."""
+
     if not expected_files:
-        return False
+        return False, 0, 0
 
     def _exists_with_fallback(name: str) -> bool:
         png_path = session_dir / name
@@ -125,7 +129,13 @@ def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) 
 
         return False
 
-    return all(_exists_with_fallback(name) for name in expected_files)
+    ready = 0
+    for fname in expected_files:
+        if _exists_with_fallback(fname):
+            ready += 1
+
+    total = len(expected_files)
+    return ready == total, ready, total
 
 
 def _param_controls(stage: str, key: str):
@@ -778,7 +788,9 @@ def register_pre_post_callbacks(app):
                 raise dash.exceptions.PreventUpdate
 
             expected = run_state.get("expected") if run_state_valid else expected_files
-            files_ready = _assessment_outputs_ready(session_dir, expected or expected_files)
+            files_ready, ready_count, total_expected = _assessment_outputs_status(
+                session_dir, expected or expected_files
+            )
 
             if not run_state_valid:
                 if files_ready:
@@ -815,8 +827,13 @@ def register_pre_post_callbacks(app):
                 )
 
             if not files_ready:
+                progress = (
+                    f"Waiting for output files ({ready_count}/{total_expected})..."
+                    if total_expected
+                    else "Waiting for output files..."
+                )
                 placeholder = dbc.Spinner(
-                    html.Div("Waiting for output files..."),
+                    html.Div(progress),
                     color="primary",
                     type="border",
                     size="md",
