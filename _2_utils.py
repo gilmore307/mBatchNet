@@ -145,8 +145,9 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
     PNGs are downscaled/compressed to ease frontend payload size and the
     rewritten file is saved back to disk so the user directory mirrors the
     preview size. TIFFs are converted to downscaled PNGs (1400px max side)
-    for display to avoid storing a redundant full-size PNG. Other formats
-    are kept at their original resolution.
+    for display, and only the downscaled preview is written alongside the
+    original TIFF so no full-size PNG copy is created. Other formats are
+    kept at their original resolution.
     """
 
     mime_type = _guess_mime_type(path)
@@ -198,6 +199,14 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
                 image.save(buffer, format="PNG", optimize=True, compress_level=9)
                 data = buffer.getvalue()
                 mime_type = "image/png"
+
+            # Persist only the downscaled preview (no full-size PNG),
+            # keeping the original TIFF as the source asset.
+            try:
+                preview_path = path.with_suffix(".png")
+                preview_path.write_bytes(data)
+            except OSError:
+                pass
         except Exception:
             data = path.read_bytes()
     else:
