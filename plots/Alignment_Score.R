@@ -209,8 +209,6 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as,
-         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "alignment_score.tif"), p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   
@@ -243,8 +241,6 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "alignment_score.png"), p_as,
-         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "alignment_score.tif"), p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 }
