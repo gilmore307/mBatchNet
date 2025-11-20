@@ -250,6 +250,17 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
     h <- opt_fig_height_px / dpi
   }
+  if (is.finite(dpi) && dpi > 0) {
+    width_px <- w * dpi
+    height_px <- h * dpi
+    longest <- max(width_px, height_px)
+    max_png_side_px <- 1400
+    if (is.finite(longest) && longest > max_png_side_px) {
+      scale <- max_png_side_px / longest
+      w <- w * scale
+      h <- h * scale
+    }
+  }
   list(width = w, height = h, dpi = dpi)
 }
 
@@ -424,7 +435,7 @@ combined <- gridExtra::arrangeGrob(
   heights = grid::unit.c(grid::unit(1, "null"), spacer_height, sum(tbl_grob$heights))
 )
 
-hist_dims <- apply_fig_overrides(1400 / 300, 700 / 300, 300)
+hist_dims <- apply_fig_overrides(2800 / 300, 1400 / 300, 300)
 table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
 table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
 final_width  <- max(hist_dims$width, table_width_in)

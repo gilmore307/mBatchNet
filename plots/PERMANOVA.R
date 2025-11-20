@@ -49,6 +49,17 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
   w <- width_in; h <- height_in
   if (!is.na(opt_fig_width_px)  && opt_fig_width_px  > 0 && dpi > 0) w <- opt_fig_width_px  / dpi
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) h <- opt_fig_height_px / dpi
+  if (is.finite(dpi) && dpi > 0) {
+    width_px <- w * dpi
+    height_px <- h * dpi
+    longest <- max(width_px, height_px)
+    max_png_side_px <- 1400
+    if (is.finite(longest) && longest > max_png_side_px) {
+      scale <- max_png_side_px / longest
+      w <- w * scale
+      h <- h * scale
+    }
+  }
   list(width = w, height = h, dpi = dpi)
 }
 
@@ -191,7 +202,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(1400 / 300, 900 / 300, 300)
+fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, sprintf("permanova_%s.png", geom_key)), p,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, sprintf("permanova_%s.tif", geom_key)), p,

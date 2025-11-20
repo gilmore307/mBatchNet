@@ -98,6 +98,15 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
       width_px / scale, height_px / scale, max_total_pixels, scale, width_px, height_px
     ))
   }
+  longest_side_px <- max(width_px, height_px)
+  max_png_side_px <- 1400
+  if (is.finite(dpi) && dpi > 0 && is.finite(longest_side_px) && longest_side_px > max_png_side_px) {
+    scale <- max_png_side_px / longest_side_px
+    w <- w * scale
+    h <- h * scale
+    width_px <- w * dpi
+    height_px <- h * dpi
+  }
   list(width = w, height = h, dpi = dpi)
 }
 
@@ -382,8 +391,8 @@ for (nm in names(mat_list_ait)) {
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
 panel_rows_ait <- 1L
-base_fig_width_in  <- 1400 / 300
-base_fig_height_in <- 900 / 300
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
 base_col_width_in  <- base_fig_width_in / 3
 base_row_height_in <- base_fig_height_in
 if (n_panels_ait == 1L) {
