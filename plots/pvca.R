@@ -424,7 +424,7 @@ combined <- gridExtra::arrangeGrob(
   heights = grid::unit.c(grid::unit(1, "null"), spacer_height, sum(tbl_grob$heights))
 )
 
-hist_dims <- apply_fig_overrides(1400 / 300, 700 / 300, 300)
+hist_dims <- apply_fig_overrides(10, 5, 300)
 table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
 table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
 final_width  <- max(hist_dims$width, table_width_in)

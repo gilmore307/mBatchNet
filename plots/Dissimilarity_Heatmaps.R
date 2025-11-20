@@ -382,8 +382,8 @@ for (nm in names(mat_list_ait)) {
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
 panel_rows_ait <- 1L
-base_fig_width_in  <- 1400 / 300
-base_fig_height_in <- 900 / 300
+base_fig_width_in  <- 2800 / 300
+base_fig_height_in <- 1800 / 300
 base_col_width_in  <- base_fig_width_in / 3
 base_row_height_in <- base_fig_height_in
 if (n_panels_ait == 1L) {

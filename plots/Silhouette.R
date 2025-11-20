@@ -247,7 +247,7 @@ if (only_baseline) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(1400 / 300, 900 / 300, 300)
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "silhouette.png"), p_sil,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "silhouette.tif"), p_sil,
@@ -277,7 +277,7 @@ if (only_baseline) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(1400 / 300, 900 / 300, 300)
+  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
   ggsave(file.path(output_folder, "silhouette.png"), p_sil,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, "silhouette.tif"), p_sil,
