@@ -50,7 +50,7 @@ FIGURE_DEFAULTS = {
 
 
 def _expected_figure_files(stage: str, key: str) -> List[str]:
-    """Return expected output filenames for a given assessment group."""
+    """Return expected output filenames (figures + assessment tables) for a group."""
 
     figures: Sequence = PRE_FIGURES if stage == "pre" else POST_FIGURES
     key = key.lower()
@@ -60,6 +60,15 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
         if condition and filename:
             expected.append(filename)
 
+    def add_assessment_tables(base_name: Optional[str], multi_geometry: bool = False):
+        if not base_name:
+            return
+        suffix = "pre" if stage == "pre" else "post"
+        expected.append(f"{base_name}_raw_assessment_{suffix}.csv")
+        if multi_geometry:
+            expected.append(f"{base_name}_aitchison_raw_assessment_{suffix}.csv")
+            expected.append(f"{base_name}_braycurtis_raw_assessment_{suffix}.csv")
+
     for spec in figures:
         low = spec.filename.lower()
         stem = Path(low).stem
@@ -68,35 +77,46 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
             add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_batch"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_target"), spec.filename)
+            add_assessment_tables("pcoa", multi_geometry=True)
         elif key == "nmds":
             add_if(low.startswith("nmds_aitchison_batch"), spec.filename)
             add_if(low.startswith("nmds_aitchison_target"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_batch"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_target"), spec.filename)
+            add_assessment_tables("nmds", multi_geometry=True)
         elif key == "dissimilarity":
             add_if(low.startswith("dissimilarity_heatmaps_aitchison"), spec.filename)
             add_if(low.startswith("dissimilarity_heatmaps_braycurtis"), spec.filename)
+            add_assessment_tables("dissimilarity", multi_geometry=True)
         elif key == "permanova":
             add_if(low.startswith("permanova_aitchison"), spec.filename)
             add_if(low.startswith("permanova_braycurtis"), spec.filename)
             add_if(low.startswith("permanova"), spec.filename)
+            add_assessment_tables("permanova", multi_geometry=True)
         elif key == "r2":
             add_if(low.startswith("anova_aitchison"), spec.filename)
             add_if(low.startswith("anova_braycurtis"), spec.filename)
+            add_assessment_tables("anova")
         elif key == "prda":
             add_if(low.startswith("prda_aitchison"), spec.filename)
             add_if(low.startswith("prda_braycurtis"), spec.filename)
+            add_assessment_tables("pRDA")
         elif key == "alignment" and stem in {"alignment_score", "alignment"}:
             add_if(True, spec.filename)
+            add_assessment_tables("alignment_score")
         elif key == "pca":
             add_if(stem == "pca_batch", spec.filename)
             add_if(stem == "pca_target", spec.filename)
+            add_assessment_tables("pca")
         elif key == "pvca" and stem == "pvca":
             add_if(True, spec.filename)
+            add_assessment_tables("PVCA")
         elif key == "ebm" and stem == "ebm":
             add_if(True, spec.filename)
+            add_assessment_tables("ebm")
         elif key == "silhouette" and stem == "silhouette":
             add_if(True, spec.filename)
+            add_assessment_tables("silhouette")
 
     # Preserve order but drop None/duplicates
     seen = set()

@@ -1038,13 +1038,13 @@ def _candidate_csvs_for_image(filename: str) -> List[str]:
     bases: List[str] = []
     # image families with shared tables
     if s.startswith("pcoa_"):
-        bases = ["pcoa"]
+        bases = ["pcoa", "pcoa_aitchison", "pcoa_braycurtis"]
     elif s.startswith("nmds_"):
-        bases = ["nmds"]
+        bases = ["nmds", "nmds_aitchison", "nmds_braycurtis"]
     elif s.startswith("dissimilarity_") or s.startswith("dissimilarity-") or s.startswith("dissimilarity"):
-        bases = ["dissimilarity"]
+        bases = ["dissimilarity", "dissimilarity_aitchison", "dissimilarity_braycurtis"]
     elif s.startswith("permanova"):
-        bases = ["permanova"]
+        bases = ["permanova", "permanova_aitchison", "permanova_braycurtis"]
     elif s.startswith("anova_") or s == "anova":
         bases = ["anova", "r2"]
     elif s.startswith("prda_") or s.startswith("prda"):

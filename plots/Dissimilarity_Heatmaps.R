@@ -470,7 +470,30 @@ mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else nume
 
 all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
-output_name <- if (only_baseline) "dissimilarity_raw_assessment_pre.csv" else "dissimilarity_raw_assessment_post.csv"
+stage_suffix <- if (only_baseline) "pre" else "post"
+output_name <- sprintf("dissimilarity_raw_assessment_%s.csv", stage_suffix)
+
+write_assessment_outputs <- function(df) {
+  readr::write_csv(df, file.path(output_folder, output_name))
+  if (!nrow(df)) return(invisible(NULL))
+
+  geom_map <- c(
+    "Ait" = "aitchison",
+    "Aitchison" = "aitchison",
+    "BC" = "braycurtis",
+    "Bray-Curtis" = "braycurtis"
+  )
+
+  for (geom in unique(df$Geometry)) {
+    token <- geom_map[[as.character(geom)]]
+    if (is.null(token)) {
+      token <- tolower(gsub("[^A-Za-z0-9]+", "", geom))
+    }
+    fname <- sprintf("dissimilarity_%s_raw_assessment_%s.csv", token, stage_suffix)
+    geom_df <- df[df$Geometry == geom, , drop = FALSE]
+    readr::write_csv(geom_df, file.path(output_folder, fname))
+  }
+}
 
 build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
   anosim_vals <- safe_anosim(dist_obj, grouping)
@@ -521,7 +544,7 @@ if (only_baseline) {
     assess_df <- dplyr::bind_rows(assess_rows)
 
     print(assess_df, n = nrow(assess_df))
-    readr::write_csv(assess_df, file.path(output_folder, output_name))
+    write_assessment_outputs(assess_df)
 
   # No correction recommendation messages
 
@@ -554,5 +577,5 @@ if (only_baseline) {
     dplyr::arrange(Geometry, Method)
 
   print(assessment_tbl, n = nrow(assessment_tbl))
-  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
+  write_assessment_outputs(assessment_tbl)
 }
