@@ -76,19 +76,6 @@ if (length(outcome_levels) != 2) {
 metadata <- metadata %>% mutate(.outcome = factor(.data[[PHENO_COL]], levels = outcome_levels))
 OUTCOME_TITLE <- if (!is.null(PHENO_COL)) PHENO_COL else "Outcome"
 
-scale_to_max_side <- function(width_in, height_in, dpi, max_side_px = 1400) {
-  if (!is.finite(dpi) || dpi <= 0) return(list(width = width_in, height = height_in, dpi = dpi))
-  width_px <- width_in * dpi
-  height_px <- height_in * dpi
-  longest <- max(width_px, height_px)
-  if (is.finite(longest) && longest > max_side_px) {
-    scale <- max_side_px / longest
-    width_in <- width_in * scale
-    height_in <- height_in * scale
-  }
-  list(width = width_in, height = height_in, dpi = dpi)
-}
-
 # ==== Collect files (e.g., normalized files) ====
 file_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
 raw_path <- file.path(output_folder, "raw.csv")
@@ -236,19 +223,18 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch', '.outcome'))
-dims <- scale_to_max_side(12, 8, 300)
 ggsave(
   file.path(output_folder, "mosaic_plot.png"),
   plot = plot.mosaic,
-  width = dims$width,
-  height = dims$height,
-  dpi = dims$dpi
+  width = 1400 / 300,
+  height = (1400 / 300) * (2 / 3),
+  dpi = 300
 )
 ggsave(
   file.path(output_folder, "mosaic_plot.tif"),
   plot = plot.mosaic,
-  width = dims$width,
-  height = dims$height,
-  dpi = dims$dpi,
+  width = 1400 / 300,
+  height = (1400 / 300) * (2 / 3),
+  dpi = 300,
   compression = "lzw"
 )
