@@ -768,12 +768,48 @@ def register_pre_post_callbacks(app):
                 )
 
             # Polling branch
-            if isinstance(run_state, dict) and run_state.get("session") != session_id:
+            run_state_valid = isinstance(run_state, dict) and run_state.get("session") == session_id
+            if isinstance(run_state, dict) and not run_state_valid:
                 raise dash.exceptions.PreventUpdate
 
-            expected = run_state.get("expected") if isinstance(run_state, dict) else expected_files
+            expected = run_state.get("expected") if run_state_valid else expected_files
+            files_ready = _assessment_outputs_ready(session_dir, expected or expected_files)
 
-            if not _assessment_outputs_ready(session_dir, expected or expected_files):
+            if not run_state_valid:
+                if files_ready:
+                    content = render_group_tabset(session_dir, _stage, _key)
+                    run_state_payload = {
+                        "session": session_id,
+                        "expected": expected or expected_files,
+                        "stage": _stage,
+                        "key": _key,
+                        "complete": True,
+                    }
+                    stage_flag = True if _stage == "pre" else dash.no_update
+                    return _output(
+                        content,
+                        stage_flag,
+                        log_path_value=str(log_path),
+                        log_meta=None,
+                        modal_open=dash.no_update,
+                        log_interval_disabled=dash.no_update,
+                        param_store=persisted_payload,
+                        poll_disabled=True,
+                        poll_count=poll_ticks,
+                        run_state_value=run_state_payload,
+                    )
+
+                placeholder = html.Div("Click Run to generate results.")
+                return _output(
+                    placeholder,
+                    dash.no_update,
+                    param_store=persisted_payload,
+                    poll_disabled=True,
+                    poll_count=poll_ticks,
+                    run_state_value=None,
+                )
+
+            if not files_ready:
                 placeholder = dbc.Spinner(
                     html.Div("Waiting for output files..."),
                     color="primary",
