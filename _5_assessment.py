@@ -110,7 +110,17 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
 def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) -> bool:
     if not expected_files:
         return False
-    return all((session_dir / name).exists() for name in expected_files)
+
+    def _exists_with_fallback(name: str) -> bool:
+        path = session_dir / name
+        if path.exists():
+            return True
+        if path.suffix.lower() in {".tif", ".tiff"}:
+            alt = path.with_suffix(".png")
+            return alt.exists()
+        return False
+
+    return all(_exists_with_fallback(name) for name in expected_files)
 
 
 def _param_controls(stage: str, key: str):
@@ -419,7 +429,7 @@ def assessment_layout(active_path: str, stage: str):
                             disabled=True,
                         ),
                         *(controls or []),
-                        dcc.Loading(
+                        html.Div(
                             [
                                 dbc.Button(
                                     "Run",
@@ -439,8 +449,7 @@ def assessment_layout(active_path: str, stage: str):
                                         "marginLeft": "0",
                                     },
                                 ),
-                            ],
-                            type="default",
+                            ]
                         ),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
@@ -759,10 +768,12 @@ def register_pre_post_callbacks(app):
                 )
 
             # Polling branch
-            if not isinstance(run_state, dict) or run_state.get("session") != session_id:
+            if isinstance(run_state, dict) and run_state.get("session") != session_id:
                 raise dash.exceptions.PreventUpdate
 
-            if not _assessment_outputs_ready(session_dir, run_state.get("expected") or expected_files):
+            expected = run_state.get("expected") if isinstance(run_state, dict) else expected_files
+
+            if not _assessment_outputs_ready(session_dir, expected or expected_files):
                 placeholder = dbc.Spinner(
                     html.Div("Waiting for output files..."),
                     color="primary",
@@ -780,7 +791,9 @@ def register_pre_post_callbacks(app):
                 )
 
             content = render_group_tabset(session_dir, _stage, _key)
-            run_state_payload = dict(run_state)
+            run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
+            run_state_payload.setdefault("session", session_id)
+            run_state_payload.setdefault("expected", expected)
             run_state_payload["complete"] = True
             stage_flag = True if _stage == "pre" else dash.no_update
             return _output(
