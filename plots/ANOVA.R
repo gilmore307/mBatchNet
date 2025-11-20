@@ -8,18 +8,9 @@ suppressPackageStartupMessages({
   library(jsonlite)
 })
 
-# ----------------- Args / IO -----------------
+source(file.path("plots", "helper.R"))
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v }, USE.NAMES = FALSE)
-}
+# ----------------- Args / IO -----------------
 
 format_method_label <- function(label) {
   if (identical(label, "Before correction")) {
@@ -66,19 +57,6 @@ for (a in args[-1]) {
     opt_fig_ncol <- suppressWarnings(as.integer(sub("^--fig-ncol=", "", a)))
     if (!is.finite(opt_fig_ncol) || opt_fig_ncol <= 0) opt_fig_ncol <- NA_integer_
   }
-}
-
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
-  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
-  w <- width_in
-  h <- height_in
-  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
-  }
-  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
-  }
-  list(width = w, height = h, dpi = dpi)
 }
 
 # ----------------- Read metadata -----------------
@@ -320,8 +298,9 @@ p_clr <- make_boxplot(
 )
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
+  png_dims_clr <- compute_png_dims(fig_dims_clr)
   ggsave(file.path(output_folder, "anova_aitchison.png"), p_clr,
-         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
+         width = png_dims_clr$width, height = png_dims_clr$height, units = "px")
   ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
   message("Saved figures: anova_aitchison.png / .tif")

@@ -6,18 +6,9 @@ suppressPackageStartupMessages({
   library(vegan)   # adonis2 / betadisper
 })
 
-# --------- Args / config ---------
+source(file.path("plots", "helper.R"))
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
+# --------- Args / config ---------
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -44,14 +35,6 @@ for (a in args[-1]) {
     if (!is.finite(opt_fig_dpi) || opt_fig_dpi <= 0) opt_fig_dpi <- NA_real_
   }
 }
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
-  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
-  w <- width_in; h <- height_in
-  if (!is.na(opt_fig_width_px)  && opt_fig_width_px  > 0 && dpi > 0) w <- opt_fig_width_px  / dpi
-  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) h <- opt_fig_height_px / dpi
-  list(width = w, height = h, dpi = dpi)
-}
-
 # --------- Load metadata ---------
 meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
   file.path(output_folder, "metadata_origin.csv")
@@ -192,8 +175,9 @@ for (idx in seq_len(nrow(geometry_specs))) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
+  png_dims <- compute_png_dims(fig_dims)
   ggsave(file.path(output_folder, sprintf("permanova_%s.png", geom_key)), p,
-         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+         width = png_dims$width, height = png_dims$height, units = "px")
   ggsave(file.path(output_folder, sprintf("permanova_%s.tif", geom_key)), p,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
 }

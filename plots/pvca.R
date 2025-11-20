@@ -9,19 +9,9 @@ suppressPackageStartupMessages({
   library(grid)       # rectGrob, segmentsGrob
   library(gtable)     # add borders/lines to table grob
   library(jsonlite)
-
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
-
 })
+
+source(file.path("plots", "helper.R"))
 
 if (!requireNamespace("lme4", quietly = TRUE)) {
   stop("Package 'lme4' is required. install.packages('lme4')")
@@ -240,19 +230,6 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
-  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
-  w <- width_in
-  h <- height_in
-  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
-  }
-  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
-  }
-  list(width = w, height = h, dpi = dpi)
-}
-
 meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
   file.path(output_folder, "metadata_origin.csv")
 } else {
@@ -431,8 +408,10 @@ final_width  <- max(hist_dims$width, table_width_in)
 final_height <- hist_dims$height + table_height_in +
   grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 
+png_dims <- compute_png_dims(list(width = final_width, height = final_height, dpi = hist_dims$dpi))
+
 ggsave(file.path(output_folder, "PVCA.png"),
-       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi)
+       plot = combined, width = png_dims$width, height = png_dims$height, units = "px")
 
 ggsave(file.path(output_folder, "PVCA.tif"),
        plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")

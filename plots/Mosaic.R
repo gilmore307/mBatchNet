@@ -7,6 +7,8 @@ library(gridExtra)
 library(grid)       # for unit()
 library(jsonlite)
 
+source(file.path("plots", "helper.R"))
+
 # ==== Args / config (for input and output folder) ====
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -223,5 +225,9 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch', '.outcome'))
-ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic, width = 12, height = 8, dpi = 300)
-ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
+fig_dims <- list(width = 12, height = 8, dpi = 300)
+png_dims <- compute_png_dims(fig_dims)
+ggsave(file.path(output_folder, "mosaic_plot.png"), plot = plot.mosaic,
+       width = png_dims$width, height = png_dims$height, units = "px")
+ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic,
+       width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")

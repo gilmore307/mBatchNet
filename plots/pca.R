@@ -8,29 +8,10 @@ suppressPackageStartupMessages({
   library(jsonlite)
 })
 
+source(file.path("plots", "helper.R"))
+
 # ---- helpers ----
 mbecUpperCase <- function(x) paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x)))
-
-# Map method codes from filenames to short display labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization",
-    bmc = "BMC",
-    limma = "Limma",
-    conqur = "ConQuR",
-    plsda = "PLSDA-batch",
-    combat = "ComBat",
-    fsqn = "FSQN",
-    mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB",
-    metadict = "MetaDICT",
-    pn = "Percentile Normalization",
-    fabatch = "FAbatch",
-    combatseq = "ComBat-seq",
-    debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
 
 guess_shape_var <- function(meta, batch_col = "batch") {
   cand <- c("group","phenotype","condition","status","case_control","class","disease","label")
@@ -143,49 +124,6 @@ for (a in args[-1]) {
     val <- tolower(sub("^--fig-per-panel=", "", a))
     opt_fig_per_panel <- val %in% c("1", "true", "yes", "y")
   }
-}
-
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
-                               panel_cols = 1, panel_rows = 1,
-                               max_total_pixels = 35e6) {
-  dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
-  w <- width_in
-  h <- height_in
-  panel_cols <- max(1, as.integer(panel_cols))
-  panel_rows <- max(1, as.integer(panel_rows))
-  if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    per_panel <- opt_fig_width_px / dpi
-    if (isTRUE(opt_fig_per_panel)) {
-      w <- per_panel * panel_cols
-    } else {
-      w <- per_panel
-    }
-  }
-  if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    per_panel <- opt_fig_height_px / dpi
-    if (isTRUE(opt_fig_per_panel)) {
-      h <- per_panel * panel_rows
-    } else {
-      h <- per_panel
-    }
-  }
-  width_px <- w * dpi
-  height_px <- h * dpi
-  total_px <- width_px * height_px
-  if (is.finite(total_px) && total_px > max_total_pixels &&
-      is.finite(width_px) && is.finite(height_px) &&
-      width_px > 0 && height_px > 0) {
-    scale <- sqrt(max_total_pixels / total_px)
-    w <- w * scale
-    h <- h * scale
-    width_px <- w * dpi
-    height_px <- h * dpi
-    message(sprintf(
-      "Requested canvas %.0f×%.0f px exceeds limit %.0f; scaling by %.3f to %.0f×%.0f px",
-      width_px / scale, height_px / scale, max_total_pixels, scale, width_px, height_px
-    ))
-  }
-  list(width = w, height = h, dpi = dpi)
 }
 
 # ==== Read Metadata ====
@@ -504,8 +442,9 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  png_dims <- compute_png_dims(fig_dims)
   ggsave(file.path(output_folder, paste0(filename_stub, ".png")),
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
+         plot = combined, width = png_dims$width, height = png_dims$height, units = "px")
   ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   rm(combined, plot_list)
