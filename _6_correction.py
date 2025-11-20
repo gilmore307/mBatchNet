@@ -4,8 +4,6 @@ import json
 import re
 
 import dash
-import threading
-
 from dash import dcc, html
 from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
@@ -240,29 +238,7 @@ def register_correction_callbacks(app):
             )
             body_rows.append(row)
             row_extras.append(
-                dcc.Store(
-                    id={"type": "method-operation-result", "code": code},
-                    data=None,
-                    storage_type="session",
-                )
-            )
-            row_extras.append(
-                dcc.Store(
-                    id={"type": "method-run-state", "code": code},
-                    data=None,
-                    storage_type="session",
-                )
-            )
-            row_extras.append(
-                dcc.Interval(
-                    id={"type": "method-poll-interval", "code": code},
-                    interval=2000,
-                    n_intervals=0,
-                    disabled=True,
-                    persistence=True,
-                    persisted_props=["disabled", "n_intervals"],
-                    persistence_type="session",
-                )
+                dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
             )
         table = dbc.Table(
             [header, html.Tbody(body_rows)],
@@ -285,168 +261,75 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
-        Output({"type": "method-poll-interval", "code": MATCH}, "disabled", allow_duplicate=True),
-        Output({"type": "method-poll-interval", "code": MATCH}, "n_intervals", allow_duplicate=True),
-        Output({"type": "method-run-state", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
-        Input({"type": "method-poll-interval", "code": MATCH}, "n_intervals"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
         State("method-operation-trigger", "data"),
-        State({"type": "method-run-state", "code": MATCH}, "data"),
         prevent_initial_call=True,
     )
-    def run_correction_method(
-        n_clicks: int,
-        poll_ticks: int,
-        component_id: Dict[str, str],
-        session_id: str | None,
-        refresh_token: int | None,
-        run_state: Dict[str, object] | None,
-    ):
-        ctx = dash.callback_context
-        if not ctx.triggered:
+    def run_correction_method(n_clicks: int, component_id: Dict[str, str], session_id: str | None, refresh_token: int | None):
+        if not n_clicks:
             raise dash.exceptions.PreventUpdate
-        trigger_id_raw = ctx.triggered[0]["prop_id"].split(".")[0]
-        try:
-            trigger_id = json.loads(trigger_id_raw)
-        except json.JSONDecodeError:
-            raise dash.exceptions.PreventUpdate
-
         method_code = component_id.get("code") if isinstance(component_id, dict) else None
         if not method_code:
             raise dash.exceptions.PreventUpdate
-
-        run_trigger = {"type": "method-run-button", "code": method_code}
-        poll_trigger = {"type": "method-poll-interval", "code": method_code}
         refresh_value = int(refresh_token or 0)
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
-
-        def _status_content(label: str, spinning: bool = False):
-            if not spinning:
-                return label
-            return dbc.Spinner(
-                html.Span(label),
-                color="primary",
-                type="border",
-                size="sm",
-            )
-
-        def _payload(
-            status_content,
-            run_disabled,
-            delete_disabled,
-            message,
-            payload_extra: Dict[str, object] | None = None,
-            run_state_value: Dict[str, object] | None = None,
-            poll_disabled: bool | None = None,
-            poll_value: int | None = None,
-        ):
-            base_payload = {"message": message}
-            if payload_extra:
-                base_payload.update(payload_extra)
-            run_color = "secondary" if run_disabled else "success"
-            delete_color = "secondary" if delete_disabled else "success"
-            return (
-                status_content,
-                run_disabled,
-                run_color,
-                delete_disabled,
-                delete_color,
-                base_payload,
-                True if poll_disabled is None else poll_disabled,
-                0 if poll_value is None else poll_value,
-                run_state_value,
-            )
-
-        if trigger_id == run_trigger:
-            if not n_clicks:
-                raise dash.exceptions.PreventUpdate
-        elif trigger_id != poll_trigger:
-            raise dash.exceptions.PreventUpdate
-
         if not session_id:
             message = "Session not initialised. Upload data before running corrections."
-            return _payload(_status_content("Not selected"), True, True, message)
-
+            payload = {"message": message}
+            return (
+                "Not selected",
+                True,
+                "secondary",
+                True,
+                "secondary",
+                payload,
+            )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
             message = "Upload data before running corrections."
-            return _payload(_status_content("Not selected"), True, True, message)
-
+            payload = {"message": message}
+            return (
+                "Not selected",
+                True,
+                "secondary",
+                True,
+                "secondary",
+                payload,
+            )
         log_path = session_dir / "run.log"
-
-        if trigger_id == run_trigger:
-            def _worker():
-                success, _ = run_single_method(session_dir, method_code, log_path=log_path)
-                if success:
-                    mark_method_completed(session_dir, method_code)
-                else:
-                    clear_method_completion(session_dir, method_code)
-
-            threading.Thread(target=_worker, daemon=True).start()
-            run_state_payload = {
-                "session": session_id,
-                "method": method_code,
-            }
-            payload_extra = {
-                "complete": any_method_outputs(session_dir),
-                "refresh": refresh_value,
-                "log_path": str(log_path),
-                "log_meta": None,
-                "interval_disabled": False,
-            }
-            return _payload(
-                _status_content("Running...", spinning=True),
-                True,
-                True,
-                f"{display_name} started...",
-                payload_extra,
-                run_state_value=run_state_payload,
-                poll_disabled=False,
-                poll_value=0,
-            )
-
-        if not isinstance(run_state, dict) or run_state.get("session") != session_id:
-            raise dash.exceptions.PreventUpdate
-
-        if not method_output_exists(session_dir, method_code):
-            payload_extra = {
-                "log_path": str(log_path),
-                "log_meta": None,
-                "interval_disabled": False,
-            }
-            return _payload(
-                _status_content("Running...", spinning=True),
-                True,
-                True,
-                f"{display_name} running...",
-                payload_extra,
-                run_state_value=run_state,
-                poll_disabled=False,
-                poll_value=poll_ticks,
-            )
-
-        mark_method_completed(session_dir, method_code)
+        success, _ = run_single_method(session_dir, method_code, log_path=log_path)
         new_refresh = refresh_value + 1
+        if success:
+            mark_method_completed(session_dir, method_code)
+            status_text = "Selected"
+            run_disabled = True
+            delete_disabled = False
+            message = f"{display_name} correction complete."
+        else:
+            clear_method_completion(session_dir, method_code)
+            status_text = "Not selected"
+            run_disabled = False
+            delete_disabled = True
+            message = f"{display_name} correction failed. Check logs."
         complete_flag = any_method_outputs(session_dir)
-        payload_extra = {
-            "message": f"{display_name} correction complete.",
+        payload = {
+            "message": message,
             "complete": bool(complete_flag),
             "refresh": new_refresh,
             "log_path": str(log_path),
             "log_meta": None,
-            "interval_disabled": True,
         }
-        return _payload(
-            _status_content("Selected"),
-            True,
-            False,
-            payload_extra["message"],
-            payload_extra,
-            run_state_value=dict(run_state, complete=True),
-            poll_disabled=True,
-            poll_value=poll_ticks,
+        run_color = "secondary" if run_disabled else "success"
+        delete_color = "secondary" if delete_disabled else "success"
+        return (
+            status_text,
+            run_disabled,
+            run_color,
+            delete_disabled,
+            delete_color,
+            payload,
         )
 
     @app.callback(
@@ -512,9 +395,6 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
-        Output({"type": "method-poll-interval", "code": MATCH}, "disabled", allow_duplicate=True),
-        Output({"type": "method-poll-interval", "code": MATCH}, "n_intervals", allow_duplicate=True),
-        Output({"type": "method-run-state", "code": MATCH}, "data", allow_duplicate=True),
         Input({"type": "method-delete-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -538,7 +418,7 @@ def register_correction_callbacks(app):
             message = "Session not initialised."
             payload = {"message": message}
             return (
-                _status_content("Not selected"),
+                "Not selected",
                 True,
                 "secondary",
                 True,
@@ -548,7 +428,7 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
-        status_text = _status_content("Not selected")
+        status_text = "Not selected"
         run_disabled = not session_ready
         delete_disabled = True
         message = f"Removed outputs for {display_name}." if removed else f"No outputs found for {display_name}."
@@ -567,7 +447,4 @@ def register_correction_callbacks(app):
             delete_disabled,
             delete_color,
             payload,
-            True,
-            0,
-            None,
         )
