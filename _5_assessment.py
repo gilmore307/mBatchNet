@@ -768,10 +768,12 @@ def register_pre_post_callbacks(app):
                 )
 
             # Polling branch
-            if not isinstance(run_state, dict) or run_state.get("session") != session_id:
+            if isinstance(run_state, dict) and run_state.get("session") != session_id:
                 raise dash.exceptions.PreventUpdate
 
-            if not _assessment_outputs_ready(session_dir, run_state.get("expected") or expected_files):
+            expected = run_state.get("expected") if isinstance(run_state, dict) else expected_files
+
+            if not _assessment_outputs_ready(session_dir, expected or expected_files):
                 placeholder = dbc.Spinner(
                     html.Div("Waiting for output files..."),
                     color="primary",
@@ -789,7 +791,9 @@ def register_pre_post_callbacks(app):
                 )
 
             content = render_group_tabset(session_dir, _stage, _key)
-            run_state_payload = dict(run_state)
+            run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
+            run_state_payload.setdefault("session", session_id)
+            run_state_payload.setdefault("expected", expected)
             run_state_payload["complete"] = True
             stage_flag = True if _stage == "pre" else dash.no_update
             return _output(
