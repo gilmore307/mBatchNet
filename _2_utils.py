@@ -132,6 +132,8 @@ def _guess_mime_type(path: Path) -> str:
     ext = path.suffix.lower()
     if ext == ".png":
         return "image/png"
+    if ext == ".gif":
+        return "image/gif"
     if ext in {".jpg", ".jpeg"}:
         return "image/jpeg"
     if ext in {".tif", ".tiff"}:
@@ -144,14 +146,17 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
 
     PNGs are downscaled/compressed to ease frontend payload size and the
     rewritten file is saved back to disk so the user directory mirrors the
-    preview size. Other formats (e.g., TIFF) are kept at their original
-    resolution.
+    preview size. GIFs are converted to downscaled PNGs (1400px max side)
+    for display to avoid storing a redundant full-size PNG. Other formats
+    (e.g., TIFF) are kept at their original resolution.
     """
 
     mime_type = _guess_mime_type(path)
     data: bytes
 
-    if path.suffix.lower() == ".png":
+    suffix = path.suffix.lower()
+
+    if suffix == ".png":
         try:
             from PIL import Image
 
@@ -177,6 +182,24 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
             except OSError:
                 # If we cannot write (e.g., permissions), fall back to in-memory only.
                 pass
+        except Exception:
+            data = path.read_bytes()
+    elif suffix == ".gif":
+        try:
+            from PIL import Image
+
+            with Image.open(path) as image:
+                image = image.convert("RGBA")
+                resample = getattr(Image, "Resampling", None)
+                resample_method = resample.LANCZOS if resample else Image.LANCZOS
+
+                if max(image.size) > max_png_side:
+                    image.thumbnail((max_png_side, max_png_side), resample_method)
+
+                buffer = BytesIO()
+                image.save(buffer, format="PNG", optimize=True, compress_level=9)
+                data = buffer.getvalue()
+                mime_type = "image/png"
         except Exception:
             data = path.read_bytes()
     else:
