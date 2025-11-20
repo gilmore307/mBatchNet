@@ -596,6 +596,8 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  rm(combined, plot_list)
+  gc()
 }
 
 if (length(frames_cache_clr)) {

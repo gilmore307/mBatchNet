@@ -158,8 +158,10 @@ def _guess_mime_type(path: Path) -> str:
 def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE) -> str:
     """Return a data URI for an image.
 
-    PNGs are downscaled/compressed to ease frontend payload size, while other
-    formats (e.g., TIFF) are kept at their original resolution.
+    PNGs are downscaled/compressed to ease frontend payload size and the
+    rewritten file is saved back to disk so the user directory mirrors the
+    preview size. Other formats (e.g., TIFF) are kept at their original
+    resolution.
     """
 
     mime_type = _guess_mime_type(path)
@@ -169,17 +171,28 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
         try:
             from PIL import Image
 
-            image = Image.open(path)
-            image = image.convert("RGBA")
-            resample = getattr(Image, "Resampling", None)
-            resample_method = resample.LANCZOS if resample else Image.LANCZOS
+            with Image.open(path) as image:
+                image = image.convert("RGBA")
+                resample = getattr(Image, "Resampling", None)
+                resample_method = resample.LANCZOS if resample else Image.LANCZOS
 
-            if max(image.size) > max_png_side:
-                image.thumbnail((max_png_side, max_png_side), resample_method)
+                original_size = image.size
+                if max(image.size) > max_png_side:
+                    image.thumbnail((max_png_side, max_png_side), resample_method)
 
-            buffer = BytesIO()
-            image.save(buffer, format="PNG", optimize=True, compress_level=9)
-            data = buffer.getvalue()
+                buffer = BytesIO()
+                image.save(buffer, format="PNG", optimize=True, compress_level=9)
+                data = buffer.getvalue()
+
+            # Write the compressed/downscaled bytes back to disk when they
+            # meaningfully change the stored file (size difference or resize).
+            try:
+                needs_update = max(original_size) > max_png_side or path.stat().st_size != len(data)
+                if needs_update:
+                    path.write_bytes(data)
+            except OSError:
+                # If we cannot write (e.g., permissions), fall back to in-memory only.
+                pass
         except Exception:
             data = path.read_bytes()
     else:

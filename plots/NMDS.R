@@ -490,6 +490,8 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  rm(combined, plot_list)
+  gc()
 }
 
 render_geometry_plots <- function(frames_cache, geometry_label, filename_prefix) {
