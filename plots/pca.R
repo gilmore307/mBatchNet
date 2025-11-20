@@ -508,6 +508,8 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  rm(combined, plot_list)
+  gc()
 }
 
 batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")

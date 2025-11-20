@@ -404,6 +404,8 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.png"),
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
+rm(combined_ait, plots_ait)
+gc()
 
 # ==== B) Bray-Curtis heatmaps ====
 mat_list_bc <- list()
@@ -463,6 +465,8 @@ ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.png"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi)
 ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
+rm(combined_bc, plots_bc)
+gc()
 
 # ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
