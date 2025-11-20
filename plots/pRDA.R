@@ -329,8 +329,6 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   final_height <- hist_dims$height + table_height_in +
     grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 
-  ggsave(file.path(output_folder, paste0(outfile_prefix, ".png")),
-         plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi)
   ggsave(file.path(output_folder, paste0(outfile_prefix, ".tif")),
          plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")
   

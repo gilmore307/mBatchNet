@@ -886,8 +886,8 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
 def render_figures(session_dir: Path, figures: Sequence[FigureSpec]):
     cards = []
     for spec in figures:
-        file_path = session_dir / spec.filename
-        if not file_path.exists():
+        file_path = _resolve_image_path(session_dir, spec.filename)
+        if file_path is None:
             continue
         src = _encode_image_source(file_path, max_png_side=_resolve_png_max_side(file_path))
         cards.append(
@@ -969,6 +969,35 @@ def _find_file_case_insensitive(directory: Path, target_name: str) -> Path | Non
     for p in directory.iterdir():
         if p.is_file() and p.name.lower() == t:
             return p
+    return None
+
+
+def _resolve_image_path(session_dir: Path, preferred_name: str) -> Path | None:
+    """Find an image path, preferring the requested name but falling back to TIFF.
+
+    The UI expects PNG previews, but we store high-resolution TIFFs as the source.
+    This helper allows us to locate a TIFF (or case-insensitive match) when the
+    PNG is not present so that previews can be generated without a full-size PNG
+    written by the R scripts.
+    """
+
+    preferred_path = session_dir / preferred_name
+    if preferred_path.exists():
+        return preferred_path
+
+    ci_match = _find_file_case_insensitive(session_dir, preferred_name)
+    if ci_match:
+        return ci_match
+
+    stem = Path(preferred_name).stem
+    for ext in (".tif", ".tiff", ".png"):
+        candidate = session_dir / f"{stem}{ext}"
+        if candidate.exists():
+            return candidate
+        ci_candidate = _find_file_case_insensitive(session_dir, f"{stem}{ext}")
+        if ci_candidate:
+            return ci_candidate
+
     return None
 
 
