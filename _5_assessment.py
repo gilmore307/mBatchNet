@@ -811,6 +811,7 @@ def register_pre_post_callbacks(app):
             files_ready, ready_count, total_expected = _assessment_outputs_status(
                 session_dir, expected or expected_files
             )
+            almost_ready = total_expected > 0 and ready_count >= max(total_expected - 1, 0)
 
             if not run_state_valid:
                 if files_ready:
@@ -852,6 +853,28 @@ def register_pre_post_callbacks(app):
                     if total_expected
                     else "Waiting for output files..."
                 )
+
+                if almost_ready:
+                    remaining = max(total_expected - ready_count, 0)
+                    content = html.Div(
+                        [
+                            dbc.Alert(
+                                f"Partial results are ready. Waiting for {remaining} more file(s) to finish...",
+                                color="info",
+                                className="mb-2",
+                            ),
+                            render_group_tabset(session_dir, _stage, _key),
+                        ]
+                    )
+                    return _output(
+                        content,
+                        dash.no_update,
+                        param_store=persisted_payload,
+                        poll_disabled=False,
+                        poll_count=poll_ticks,
+                        run_state_value=run_state,
+                    )
+
                 placeholder = dbc.Spinner(
                     html.Div(progress),
                     color="primary",
