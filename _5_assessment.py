@@ -1,11 +1,14 @@
 ﻿# ===============================
 # File: _5_assessment.py
 # ===============================
+import threading
+from pathlib import Path
+
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from typing import List
+from typing import List, Optional, Sequence
 
 from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
@@ -43,6 +46,71 @@ FIGURE_DEFAULTS = {
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
 }
+
+
+def _expected_figure_files(stage: str, key: str) -> List[str]:
+    """Return expected output filenames for a given assessment group."""
+
+    figures: Sequence = PRE_FIGURES if stage == "pre" else POST_FIGURES
+    key = key.lower()
+    expected: List[Optional[str]] = []
+
+    def add_if(condition: bool, filename: Optional[str]):
+        if condition and filename:
+            expected.append(filename)
+
+    for spec in figures:
+        low = spec.filename.lower()
+        stem = Path(low).stem
+        if key == "pcoa":
+            add_if(low.startswith("pcoa_aitchison_batch"), spec.filename)
+            add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
+            add_if(low.startswith("pcoa_braycurtis_batch"), spec.filename)
+            add_if(low.startswith("pcoa_braycurtis_target"), spec.filename)
+        elif key == "nmds":
+            add_if(low.startswith("nmds_aitchison_batch"), spec.filename)
+            add_if(low.startswith("nmds_aitchison_target"), spec.filename)
+            add_if(low.startswith("nmds_braycurtis_batch"), spec.filename)
+            add_if(low.startswith("nmds_braycurtis_target"), spec.filename)
+        elif key == "dissimilarity":
+            add_if(low.startswith("dissimilarity_heatmaps_aitchison"), spec.filename)
+            add_if(low.startswith("dissimilarity_heatmaps_braycurtis"), spec.filename)
+        elif key == "permanova":
+            add_if(low.startswith("permanova_aitchison"), spec.filename)
+            add_if(low.startswith("permanova_braycurtis"), spec.filename)
+            add_if(low.startswith("permanova"), spec.filename)
+        elif key == "r2":
+            add_if(low.startswith("anova_aitchison"), spec.filename)
+            add_if(low.startswith("anova_braycurtis"), spec.filename)
+        elif key == "prda":
+            add_if(low.startswith("prda_aitchison"), spec.filename)
+            add_if(low.startswith("prda_braycurtis"), spec.filename)
+        elif key == "alignment" and stem in {"alignment_score", "alignment"}:
+            add_if(True, spec.filename)
+        elif key == "pca":
+            add_if(stem == "pca_batch", spec.filename)
+            add_if(stem == "pca_target", spec.filename)
+        elif key == "pvca" and stem == "pvca":
+            add_if(True, spec.filename)
+        elif key == "ebm" and stem == "ebm":
+            add_if(True, spec.filename)
+        elif key == "silhouette" and stem == "silhouette":
+            add_if(True, spec.filename)
+
+    # Preserve order but drop None/duplicates
+    seen = set()
+    unique: List[str] = []
+    for fname in expected:
+        if fname and fname not in seen:
+            unique.append(fname)
+            seen.add(fname)
+    return unique
+
+
+def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) -> bool:
+    if not expected_files:
+        return False
+    return all((session_dir / name).exists() for name in expected_files)
 
 
 def _param_controls(stage: str, key: str):
@@ -343,27 +411,37 @@ def assessment_layout(active_path: str, stage: str):
                             id=f"{stage}-{key}-param-store",
                             storage_type="session",
                         ),
+                        dcc.Store(id=f"{stage}-{key}-run-state", storage_type="session"),
+                        dcc.Interval(
+                            id=f"{stage}-{key}-poll-interval",
+                            interval=2000,
+                            n_intervals=0,
+                            disabled=True,
+                        ),
                         *(controls or []),
-                        dcc.Loading([
-                            dbc.Button(
-                                "Run",
-                                id=run_id,
-                                size="sm",
-                                color="success",
-                                className="mb-2",
-                                style={"width": "250px", "marginLeft": "5px"},
-                            ),
-                            html.Div(
-                                id=content_id,
-                                children=placeholder,
-                                style={
-                                    "width": "83vw",
-                                    "minWidth": "83vw",
-                                    "maxWidth": "83vw",
-                                    "marginLeft": "0",
-                                },
-                            ),
-                        ], type="default"),
+                        dcc.Loading(
+                            [
+                                dbc.Button(
+                                    "Run",
+                                    id=run_id,
+                                    size="sm",
+                                    color="success",
+                                    className="mb-2",
+                                    style={"width": "250px", "marginLeft": "5px"},
+                                ),
+                                html.Div(
+                                    id=content_id,
+                                    children=placeholder,
+                                    style={
+                                        "width": "83vw",
+                                        "minWidth": "83vw",
+                                        "maxWidth": "83vw",
+                                        "marginLeft": "0",
+                                    },
+                                ),
+                            ],
+                            type="default",
+                        ),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
                     className="w-100",
@@ -446,6 +524,13 @@ def register_pre_post_callbacks(app):
             Output("runlog-interval", "disabled", allow_duplicate=True),
         ])
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
+        outputs.extend(
+            [
+                Output(f"{sid}-poll-interval", "disabled", allow_duplicate=True),
+                Output(f"{sid}-poll-interval", "n_intervals", allow_duplicate=True),
+                Output(f"{sid}-run-state", "data", allow_duplicate=True),
+            ]
+        )
 
         # Parameter States by group
         states: list = [State("session-id", "data")]
@@ -512,11 +597,14 @@ def register_pre_post_callbacks(app):
         @app.callback(
             *outputs,
             Input(run_id, "n_clicks"),
+            Input(f"{sid}-poll-interval", "n_intervals"),
             *states,
+            State(f"{sid}-run-state", "data"),
             prevent_initial_call=True,
         )
         def _run_one(
             n_clicks: int,
+            poll_ticks: int,
             *values,
             _stage=stage,
             _key=key,
@@ -524,146 +612,189 @@ def register_pre_post_callbacks(app):
             _has_ncol=has_ncol_param,
             _state_ids=state_ids_tuple,
         ):
-            if not n_clicks:
+            ctx = dash.callback_context
+            if not ctx.triggered:
                 raise dash.exceptions.PreventUpdate
+            trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
             # unpack session id
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
-            param_vals = list(values[1:])
+            param_vals = list(values[1:-1])
+            run_state = values[-1] if values else None
             persisted_payload = dash.no_update
             if _state_ids:
                 persisted_payload = {"values": {pid: val for pid, val in zip(_state_ids, param_vals)}}
+
+            def _output(
+                content,
+                stage_flag,
+                log_path_value=dash.no_update,
+                log_meta=dash.no_update,
+                modal_open=dash.no_update,
+                log_interval_disabled=dash.no_update,
+                param_store=persisted_payload,
+                poll_disabled=True,
+                poll_count=dash.no_update,
+                run_state_value=dash.no_update,
+            ):
+                return (
+                    content,
+                    stage_flag,
+                    log_path_value,
+                    log_meta,
+                    modal_open,
+                    log_interval_disabled,
+                    param_store,
+                    poll_disabled,
+                    poll_count,
+                    run_state_value,
+                )
             if not session_id:
+                message = html.Div("Session not initialised.")
                 if _stage == "pre":
-                    return (
-                        html.Div("Session not initialised."),
-                        True,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                    )
-                else:
-                    return (
-                        html.Div("Session not initialised."),
-                        True,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                    )
+                    return _output(message, True, poll_disabled=True)
+                return _output(message, dash.no_update, poll_disabled=True)
+
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
+                message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
-                    return (
-                        html.Div("Upload both raw.csv and metadata.csv first."),
-                        True,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                    )
-                else:
-                    return (
-                        html.Div("Upload both raw.csv and metadata.csv first."),
-                        True,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                        dash.no_update,
-                    )
+                    return _output(message, True, poll_disabled=True)
+                return _output(message, dash.no_update, poll_disabled=True)
 
-            # Append all analysis logs into a single session-wide log file
+            expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
-            # Build CLI flags from parameters
-            flags = []
-            def _add(flag, val, cast=str):
-                if val is None or val == "":
-                    return
-                try:
-                    sval = cast(val)
-                except Exception:
-                    sval = val
-                flags.append(f"--{flag}={sval}")
 
-            pv = param_vals
-            idx = 0
-            if _key == "alignment":
-                _add("k", pv[idx], int)
-                idx += 1
-                _add("var_prop_min", pv[idx], float)
-                idx += 1
-                _add("max_pcs", pv[idx], int)
-                idx += 1
-            elif _key == "ebm":
-                _add("umap_neighbors", pv[idx], int)
-                idx += 1
-                _add("umap_min_dist", pv[idx], float)
-                idx += 1
-                _add("umap_metric", pv[idx], str)
-                idx += 1
-                _add("knn_k", pv[idx], int)
-                idx += 1
-                _add("knn_pools", pv[idx], int)
-                idx += 1
-                _add("knn_per_label", pv[idx], int)
-                idx += 1
-            elif _key == "silhouette":
-                _add("umap_neighbors", pv[idx], int)
-                idx += 1
-                _add("umap_min_dist", pv[idx], float)
-                idx += 1
-                _add("umap_metric", pv[idx], str)
-                idx += 1
+            if trigger_id == run_id:
+                # Build CLI flags from parameters
+                flags = []
 
-            if _stage in {"pre", "post"}:
-                fig_width = pv[idx] if idx < len(pv) else None
-                idx += 1
-                fig_height = pv[idx] if idx < len(pv) else None
-                idx += 1
-                fig_dpi = pv[idx] if idx < len(pv) else None
-                idx += 1
-                fig_ncol = pv[idx] if _has_ncol and idx < len(pv) else None
-                if _has_ncol:
+                def _add(flag, val, cast=str):
+                    if val is None or val == "":
+                        return
+                    try:
+                        sval = cast(val)
+                    except Exception:
+                        sval = val
+                    flags.append(f"--{flag}={sval}")
+
+                pv = param_vals
+                idx = 0
+                if _key == "alignment":
+                    _add("k", pv[idx], int)
                     idx += 1
-                _add("fig-width-px", fig_width, int)
-                _add("fig-height-px", fig_height, int)
-                _add("fig-dpi", fig_dpi, int)
-                if _has_ncol and fig_ncol is not None:
-                    _add("fig-ncol", fig_ncol, int)
-                if _stage == "post" and _has_ncol:
-                    flags.append("--fig-per-panel=true")
+                    _add("var_prop_min", pv[idx], float)
+                    idx += 1
+                    _add("max_pcs", pv[idx], int)
+                    idx += 1
+                elif _key == "ebm":
+                    _add("umap_neighbors", pv[idx], int)
+                    idx += 1
+                    _add("umap_min_dist", pv[idx], float)
+                    idx += 1
+                    _add("umap_metric", pv[idx], str)
+                    idx += 1
+                    _add("knn_k", pv[idx], int)
+                    idx += 1
+                    _add("knn_pools", pv[idx], int)
+                    idx += 1
+                    _add("knn_per_label", pv[idx], int)
+                    idx += 1
+                elif _key == "silhouette":
+                    _add("umap_neighbors", pv[idx], int)
+                    idx += 1
+                    _add("umap_min_dist", pv[idx], float)
+                    idx += 1
+                    _add("umap_metric", pv[idx], str)
+                    idx += 1
 
-            success, _ = run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
+                if _stage in {"pre", "post"}:
+                    fig_width = pv[idx] if idx < len(pv) else None
+                    idx += 1
+                    fig_height = pv[idx] if idx < len(pv) else None
+                    idx += 1
+                    fig_dpi = pv[idx] if idx < len(pv) else None
+                    idx += 1
+                    fig_ncol = pv[idx] if _has_ncol and idx < len(pv) else None
+                    if _has_ncol:
+                        idx += 1
+                    _add("fig-width-px", fig_width, int)
+                    _add("fig-height-px", fig_height, int)
+                    _add("fig-dpi", fig_dpi, int)
+                    if _has_ncol and fig_ncol is not None:
+                        _add("fig-ncol", fig_ncol, int)
+                    if _stage == "post" and _has_ncol:
+                        flags.append("--fig-per-panel=true")
+
+                def _worker():
+                    run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
+
+                threading.Thread(target=_worker, daemon=True).start()
+                run_state_payload = {
+                    "session": session_id,
+                    "expected": expected_files,
+                    "stage": _stage,
+                    "key": _key,
+                }
+                stage_flag = True if _stage == "pre" else dash.no_update
+                spinner = dbc.Spinner(
+                    html.Div("Running..."),
+                    color="primary",
+                    type="border",
+                    size="md",
+                    fullscreen=False,
+                )
+                return _output(
+                    spinner,
+                    stage_flag,
+                    log_path_value=str(log_path),
+                    log_meta=None,
+                    modal_open=dash.no_update,
+                    log_interval_disabled=False,
+                    poll_disabled=False,
+                    poll_count=0,
+                    run_state_value=run_state_payload,
+                )
+
+            # Polling branch
+            if not isinstance(run_state, dict) or run_state.get("session") != session_id:
+                raise dash.exceptions.PreventUpdate
+
+            if not _assessment_outputs_ready(session_dir, run_state.get("expected") or expected_files):
+                placeholder = dbc.Spinner(
+                    html.Div("Waiting for output files..."),
+                    color="primary",
+                    type="border",
+                    size="md",
+                    fullscreen=False,
+                )
+                return _output(
+                    placeholder,
+                    dash.no_update,
+                    param_store=persisted_payload,
+                    poll_disabled=False,
+                    poll_count=poll_ticks,
+                    run_state_value=run_state,
+                )
+
             content = render_group_tabset(session_dir, _stage, _key)
-            if _stage == "pre":
-                # pre: no Overall tab to update
-                return (
-                    content,
-                    True,
-                    str(log_path),
-                    None,
-                    dash.no_update,
-                    dash.no_update,
-                    persisted_payload,
-                )
-            else:
-                return (
-                    content,
-                    True,
-                    str(log_path),
-                    None,
-                    dash.no_update,
-                    dash.no_update,
-                    persisted_payload,
-                )
+            run_state_payload = dict(run_state)
+            run_state_payload["complete"] = True
+            stage_flag = True if _stage == "pre" else dash.no_update
+            return _output(
+                content,
+                stage_flag,
+                log_path_value=str(log_path),
+                log_meta=None,
+                modal_open=dash.no_update,
+                log_interval_disabled=dash.no_update,
+                param_store=persisted_payload,
+                poll_disabled=True,
+                poll_count=poll_ticks,
+                run_state_value=run_state_payload,
+            )
 
         if state_ids_tuple:
 
