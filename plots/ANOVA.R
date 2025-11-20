@@ -320,11 +320,9 @@ p_clr <- make_boxplot(
 )
 if (!is.null(p_clr)) {
   fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
-  ggsave(file.path(output_folder, "anova_aitchison.png"), p_clr,
-         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi)
   ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-  message("Saved figures: anova_aitchison.png / .tif")
+  message("Saved figure: anova_aitchison.tif")
 } else {
   message("No data to plot; skip figure export.")
 }

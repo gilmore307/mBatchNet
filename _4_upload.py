@@ -5,7 +5,6 @@ from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import shutil
 import json
-import base64
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -20,6 +19,7 @@ from _2_utils import (
     run_r_scripts,
     BASE_DIR,
     _make_ag_grid,
+    _encode_image_source,
 )
 
 
@@ -90,15 +90,15 @@ def _example_mapping_for(key: Optional[str]) -> Optional[Dict[str, str]]:
 
 def _render_mosaic_card(session_dir: Path) -> html.Div:
     """Return a card displaying the mosaic plot if it exists."""
-    img_path = session_dir / "mosaic_plot.png"
+    img_path = session_dir / "mosaic_plot.tif"
     if not img_path.exists():
         return html.Div("Mosaic plot not generated yet.", className="text-muted")
     try:
-        encoded = base64.b64encode(img_path.read_bytes()).decode("ascii")
+        encoded = _encode_image_source(img_path)
     except Exception:
         return html.Div("Failed to read mosaic plot image.", className="text-danger")
     img = html.Img(
-        src=f"data:image/png;base64,{encoded}",
+        src=encoded,
         alt="Mosaic plot",
         style={"maxWidth": "100%", "height": "auto"},
     )

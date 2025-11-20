@@ -504,8 +504,6 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  ggsave(file.path(output_folder, paste0(filename_stub, ".png")),
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   rm(combined, plot_list)

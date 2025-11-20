@@ -431,9 +431,6 @@ final_width  <- max(hist_dims$width, table_width_in)
 final_height <- hist_dims$height + table_height_in +
   grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 
-ggsave(file.path(output_folder, "PVCA.png"),
-       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi)
-
 ggsave(file.path(output_folder, "PVCA.tif"),
        plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")
 
