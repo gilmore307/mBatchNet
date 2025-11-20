@@ -419,7 +419,7 @@ def assessment_layout(active_path: str, stage: str):
                             disabled=True,
                         ),
                         *(controls or []),
-                        dcc.Loading(
+                        html.Div(
                             [
                                 dbc.Button(
                                     "Run",
@@ -439,8 +439,7 @@ def assessment_layout(active_path: str, stage: str):
                                         "marginLeft": "0",
                                     },
                                 ),
-                            ],
-                            type="default",
+                            ]
                         ),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
