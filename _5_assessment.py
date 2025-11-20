@@ -419,26 +419,29 @@ def assessment_layout(active_path: str, stage: str):
                             disabled=True,
                         ),
                         *(controls or []),
-                        dcc.Loading([
-                            dbc.Button(
-                                "Run",
-                                id=run_id,
-                                size="sm",
-                                color="success",
-                                className="mb-2",
-                                style={"width": "250px", "marginLeft": "5px"},
-                            ),
-                            html.Div(
-                                id=content_id,
-                                children=placeholder,
-                                style={
-                                    "width": "83vw",
-                                    "minWidth": "83vw",
-                                    "maxWidth": "83vw",
-                                    "marginLeft": "0",
-                                },
-                            ),
-                        ], type="default"),
+                        dcc.Loading(
+                            [
+                                dbc.Button(
+                                    "Run",
+                                    id=run_id,
+                                    size="sm",
+                                    color="success",
+                                    className="mb-2",
+                                    style={"width": "250px", "marginLeft": "5px"},
+                                ),
+                                html.Div(
+                                    id=content_id,
+                                    children=placeholder,
+                                    style={
+                                        "width": "83vw",
+                                        "minWidth": "83vw",
+                                        "maxWidth": "83vw",
+                                        "marginLeft": "0",
+                                    },
+                                ),
+                            ],
+                            type="default",
+                        ),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
                     className="w-100",
@@ -736,8 +739,15 @@ def register_pre_post_callbacks(app):
                     "key": _key,
                 }
                 stage_flag = True if _stage == "pre" else dash.no_update
-                return _output(
+                spinner = dbc.Spinner(
                     html.Div("Running..."),
+                    color="primary",
+                    type="border",
+                    size="md",
+                    fullscreen=False,
+                )
+                return _output(
+                    spinner,
                     stage_flag,
                     log_path_value=str(log_path),
                     log_meta=None,
@@ -753,7 +763,13 @@ def register_pre_post_callbacks(app):
                 raise dash.exceptions.PreventUpdate
 
             if not _assessment_outputs_ready(session_dir, run_state.get("expected") or expected_files):
-                placeholder = html.Div("Waiting for output files...")
+                placeholder = dbc.Spinner(
+                    html.Div("Waiting for output files..."),
+                    color="primary",
+                    type="border",
+                    size="md",
+                    fullscreen=False,
+                )
                 return _output(
                     placeholder,
                     dash.no_update,

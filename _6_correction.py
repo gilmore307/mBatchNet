@@ -311,8 +311,18 @@ def register_correction_callbacks(app):
         refresh_value = int(refresh_token or 0)
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
 
+        def _status_content(label: str, spinning: bool = False):
+            if not spinning:
+                return label
+            return dbc.Spinner(
+                html.Span(label),
+                color="primary",
+                type="border",
+                size="sm",
+            )
+
         def _payload(
-            status_text,
+            status_content,
             run_disabled,
             delete_disabled,
             message,
@@ -327,7 +337,7 @@ def register_correction_callbacks(app):
             run_color = "secondary" if run_disabled else "success"
             delete_color = "secondary" if delete_disabled else "success"
             return (
-                status_text,
+                status_content,
                 run_disabled,
                 run_color,
                 delete_disabled,
@@ -346,12 +356,12 @@ def register_correction_callbacks(app):
 
         if not session_id:
             message = "Session not initialised. Upload data before running corrections."
-            return _payload("Not selected", True, True, message)
+            return _payload(_status_content("Not selected"), True, True, message)
 
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
             message = "Upload data before running corrections."
-            return _payload("Not selected", True, True, message)
+            return _payload(_status_content("Not selected"), True, True, message)
 
         log_path = session_dir / "run.log"
 
@@ -376,7 +386,7 @@ def register_correction_callbacks(app):
                 "interval_disabled": False,
             }
             return _payload(
-                "Running...",
+                _status_content("Running...", spinning=True),
                 True,
                 True,
                 f"{display_name} started...",
@@ -396,7 +406,7 @@ def register_correction_callbacks(app):
                 "interval_disabled": False,
             }
             return _payload(
-                "Running...",
+                _status_content("Running...", spinning=True),
                 True,
                 True,
                 f"{display_name} running...",
@@ -418,7 +428,7 @@ def register_correction_callbacks(app):
             "interval_disabled": True,
         }
         return _payload(
-            "Selected",
+            _status_content("Selected"),
             True,
             False,
             payload_extra["message"],
@@ -517,7 +527,7 @@ def register_correction_callbacks(app):
             message = "Session not initialised."
             payload = {"message": message}
             return (
-                "Not selected",
+                _status_content("Not selected"),
                 True,
                 "secondary",
                 True,
@@ -527,7 +537,7 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
-        status_text = "Not selected"
+        status_text = _status_content("Not selected")
         run_disabled = not session_ready
         delete_disabled = True
         message = f"Removed outputs for {display_name}." if removed else f"No outputs found for {display_name}."
