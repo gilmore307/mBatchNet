@@ -296,12 +296,18 @@ def register_correction_callbacks(app):
         ctx = dash.callback_context
         if not ctx.triggered:
             raise dash.exceptions.PreventUpdate
-        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        run_trigger = json.dumps({"type": "method-run-button", "code": component_id.get("code")})
-        poll_trigger = json.dumps({"type": "method-poll-interval", "code": component_id.get("code")})
+        trigger_id_raw = ctx.triggered[0]["prop_id"].split(".")[0]
+        try:
+            trigger_id = json.loads(trigger_id_raw)
+        except json.JSONDecodeError:
+            raise dash.exceptions.PreventUpdate
+
         method_code = component_id.get("code") if isinstance(component_id, dict) else None
         if not method_code:
             raise dash.exceptions.PreventUpdate
+
+        run_trigger = {"type": "method-run-button", "code": method_code}
+        poll_trigger = {"type": "method-poll-interval", "code": method_code}
         refresh_value = int(refresh_token or 0)
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
 
