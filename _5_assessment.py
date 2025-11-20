@@ -110,7 +110,17 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
 def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) -> bool:
     if not expected_files:
         return False
-    return all((session_dir / name).exists() for name in expected_files)
+
+    def _exists_with_fallback(name: str) -> bool:
+        path = session_dir / name
+        if path.exists():
+            return True
+        if path.suffix.lower() in {".tif", ".tiff"}:
+            alt = path.with_suffix(".png")
+            return alt.exists()
+        return False
+
+    return all(_exists_with_fallback(name) for name in expected_files)
 
 
 def _param_controls(stage: str, key: str):
