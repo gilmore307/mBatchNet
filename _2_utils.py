@@ -1319,6 +1319,10 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
 
     def content_for_image(filename: str) -> html.Div:
         img_path = session_dir / filename
+        if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
+            png_path = img_path.with_suffix(".png")
+            if png_path.exists():
+                img_path = png_path
         if not img_path.exists():
             return html.Div("Image not found.")
         src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))
@@ -1464,6 +1468,10 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
 
     def content_for_image(filename: str) -> html.Div:
         img_path = session_dir / filename
+        if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
+            png_path = img_path.with_suffix(".png")
+            if png_path.exists():
+                img_path = png_path
         if not img_path.exists():
             return html.Div("Image not found.")
         src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))
