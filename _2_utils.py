@@ -132,8 +132,6 @@ def _guess_mime_type(path: Path) -> str:
     ext = path.suffix.lower()
     if ext == ".png":
         return "image/png"
-    if ext == ".gif":
-        return "image/gif"
     if ext in {".jpg", ".jpeg"}:
         return "image/jpeg"
     if ext in {".tif", ".tiff"}:
@@ -146,9 +144,9 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
 
     PNGs are downscaled/compressed to ease frontend payload size and the
     rewritten file is saved back to disk so the user directory mirrors the
-    preview size. GIFs are converted to downscaled PNGs (1400px max side)
+    preview size. TIFFs are converted to downscaled PNGs (1400px max side)
     for display to avoid storing a redundant full-size PNG. Other formats
-    (e.g., TIFF) are kept at their original resolution.
+    are kept at their original resolution.
     """
 
     mime_type = _guess_mime_type(path)
@@ -184,7 +182,7 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
                 pass
         except Exception:
             data = path.read_bytes()
-    elif suffix == ".gif":
+    elif suffix in {".tif", ".tiff"}:
         try:
             from PIL import Image
 
