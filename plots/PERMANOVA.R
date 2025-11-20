@@ -191,7 +191,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
       plot.title         = element_text(hjust = 0.5, face = "plain")
     )
 
-  fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
+  fig_dims <- apply_fig_overrides(1400 / 300, 900 / 300, 300)
   ggsave(file.path(output_folder, sprintf("permanova_%s.png", geom_key)), p,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi)
   ggsave(file.path(output_folder, sprintf("permanova_%s.tif", geom_key)), p,
