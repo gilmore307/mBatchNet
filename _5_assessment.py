@@ -155,7 +155,10 @@ def _assessment_outputs_status(
             ready += 1
 
     total = len(expected_files)
-    return ready == total, ready, total
+    if total <= 1:
+        return ready == total, ready, total
+
+    return ready >= total - 1, ready, total
 
 
 def _param_controls(stage: str, key: str):
@@ -811,6 +814,7 @@ def register_pre_post_callbacks(app):
             files_ready, ready_count, total_expected = _assessment_outputs_status(
                 session_dir, expected or expected_files
             )
+            complete = total_expected > 0 and ready_count == total_expected
 
             if not run_state_valid:
                 if files_ready:
@@ -820,9 +824,9 @@ def register_pre_post_callbacks(app):
                         "expected": expected or expected_files,
                         "stage": _stage,
                         "key": _key,
-                        "complete": True,
+                        "complete": complete,
                     }
-                    stage_flag = True if _stage == "pre" else dash.no_update
+                    stage_flag = True if _stage == "pre" and complete else dash.no_update
                     return _output(
                         content,
                         stage_flag,
@@ -831,7 +835,7 @@ def register_pre_post_callbacks(app):
                         modal_open=dash.no_update,
                         log_interval_disabled=dash.no_update,
                         param_store=persisted_payload,
-                        poll_disabled=True,
+                        poll_disabled=complete,
                         poll_count=poll_ticks,
                         run_state_value=run_state_payload,
                     )
@@ -852,6 +856,7 @@ def register_pre_post_callbacks(app):
                     if total_expected
                     else "Waiting for output files..."
                 )
+
                 placeholder = dbc.Spinner(
                     html.Div(progress),
                     color="primary",
@@ -872,8 +877,8 @@ def register_pre_post_callbacks(app):
             run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
             run_state_payload.setdefault("session", session_id)
             run_state_payload.setdefault("expected", expected)
-            run_state_payload["complete"] = True
-            stage_flag = True if _stage == "pre" else dash.no_update
+            run_state_payload["complete"] = complete
+            stage_flag = True if _stage == "pre" and complete else dash.no_update
             return _output(
                 content,
                 stage_flag,
@@ -882,7 +887,7 @@ def register_pre_post_callbacks(app):
                 modal_open=dash.no_update,
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=True,
+                poll_disabled=complete,
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
             )
