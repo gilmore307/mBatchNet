@@ -110,23 +110,7 @@ POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
 
 
 PNG_MAX_DISPLAY_SIDE = 1400
-# Certain plots should be more aggressively downscaled to keep payloads light
-PNG_MAX_BY_FILENAME: Dict[str, int] = {
-    # Ordination plots
-    "pca_batch.png": 1000,
-    "pca_target.png": 1000,
-    "pcoa_aitchison_batch.png": 1000,
-    "pcoa_aitchison_target.png": 1000,
-    "pcoa_braycurtis_batch.png": 1000,
-    "pcoa_braycurtis_target.png": 1000,
-    "nmds_aitchison_batch.png": 1000,
-    "nmds_aitchison_target.png": 1000,
-    "nmds_braycurtis_batch.png": 1000,
-    "nmds_braycurtis_target.png": 1000,
-    # Heatmaps
-    "dissimilarity_heatmaps_aitchison.png": 1000,
-    "dissimilarity_heatmaps_braycurtis.png": 1000,
-}
+# Downscale all PNG previews to a uniform 1400px longest side
 
 
 RANKING_SCORE_LABELS: Dict[str, str] = {
@@ -205,9 +189,7 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
 def _resolve_png_max_side(path: Path) -> int:
     """Return the downscale max side for a PNG, falling back to the default."""
 
-    if path.suffix.lower() != ".png":
-        return PNG_MAX_DISPLAY_SIDE
-    return PNG_MAX_BY_FILENAME.get(path.name.lower(), PNG_MAX_DISPLAY_SIDE)
+    return PNG_MAX_DISPLAY_SIDE
 
 
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {
