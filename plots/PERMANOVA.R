@@ -137,7 +137,30 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
 
 # --------- Compute PERMANOVA per method (both geometries) ---------
 only_baseline <- (length(method_levels) == 1L && identical(method_levels, "Before correction"))
-output_name <- if (only_baseline) "permanova_raw_assessment_pre.csv" else "permanova_raw_assessment_post.csv"
+stage_suffix <- if (only_baseline) "pre" else "post"
+output_name <- sprintf("permanova_raw_assessment_%s.csv", stage_suffix)
+
+write_assessment_outputs <- function(df) {
+  readr::write_csv(df, file.path(output_folder, output_name))
+  if (!nrow(df)) return(invisible(NULL))
+
+  geom_map <- c(
+    "Ait" = "aitchison",
+    "Aitchison" = "aitchison",
+    "BC" = "braycurtis",
+    "Bray-Curtis" = "braycurtis"
+  )
+
+  for (geom in unique(df$Geometry)) {
+    token <- geom_map[[as.character(geom)]]
+    if (is.null(token)) {
+      token <- tolower(gsub("[^A-Za-z0-9]+", "", geom))
+    }
+    fname <- sprintf("permanova_%s_raw_assessment_%s.csv", token, stage_suffix)
+    geom_df <- df[df$Geometry == geom, , drop = FALSE]
+    readr::write_csv(geom_df, file.path(output_folder, fname))
+  }
+}
 
 geometry_specs <- tibble::tibble(
   geometry_label = c("Aitchison", "Bray-Curtis"),
@@ -204,5 +227,5 @@ summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
   ) %>%
   arrange(Geometry, Method)
 
-readr::write_csv(summary_tbl, file.path(output_folder, output_name))
+write_assessment_outputs(summary_tbl)
 print(summary_tbl, n = nrow(summary_tbl))
