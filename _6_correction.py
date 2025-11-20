@@ -240,10 +240,18 @@ def register_correction_callbacks(app):
             )
             body_rows.append(row)
             row_extras.append(
-                dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
+                dcc.Store(
+                    id={"type": "method-operation-result", "code": code},
+                    data=None,
+                    storage_type="session",
+                )
             )
             row_extras.append(
-                dcc.Store(id={"type": "method-run-state", "code": code}, data=None)
+                dcc.Store(
+                    id={"type": "method-run-state", "code": code},
+                    data=None,
+                    storage_type="session",
+                )
             )
             row_extras.append(
                 dcc.Interval(
@@ -251,6 +259,9 @@ def register_correction_callbacks(app):
                     interval=2000,
                     n_intervals=0,
                     disabled=True,
+                    persistence=True,
+                    persisted_props=["disabled", "n_intervals"],
+                    persistence_type="session",
                 )
             )
         table = dbc.Table(
