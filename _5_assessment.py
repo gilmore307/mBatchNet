@@ -113,20 +113,16 @@ def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) 
         return False
 
     def _exists_with_fallback(name: str) -> bool:
-        path = session_dir / name
-        if path.exists():
+        png_path = session_dir / name
+        if png_path.exists():
             return True
-        suffix = path.suffix.lower()
-        if suffix == ".png":
-            for alt_ext in (".tif", ".tiff"):
-                alt = path.with_suffix(alt_ext)
-                if alt.exists():
-                    _materialize_png_sidecar(alt)
-                    return path.exists()
-        elif suffix in {".tif", ".tiff"}:
-            generated = _materialize_png_sidecar(path)
-            if generated is not None:
-                return generated.exists()
+
+        for alt_ext in (".tif", ".tiff"):
+            alt = png_path.with_suffix(alt_ext)
+            if alt.exists():
+                _materialize_png_sidecar(alt)
+                return png_path.exists()
+
         return False
 
     return all(_exists_with_fallback(name) for name in expected_files)
