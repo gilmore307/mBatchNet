@@ -8,7 +8,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
@@ -30,6 +30,7 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
+    _materialize_png_sidecar,
 )
 
 
@@ -107,10 +108,34 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
     return unique
 
 
-def _assessment_outputs_ready(session_dir: Path, expected_files: Sequence[str]) -> bool:
+def _assessment_outputs_status(
+    session_dir: Path, expected_files: Sequence[str]
+) -> Tuple[bool, int, int]:
+    """Return readiness plus how many expected files are available."""
+
     if not expected_files:
+        return False, 0, 0
+
+    def _exists_with_fallback(name: str) -> bool:
+        png_path = session_dir / name
+        if png_path.exists():
+            return True
+
+        for alt_ext in (".tif", ".tiff"):
+            alt = png_path.with_suffix(alt_ext)
+            if alt.exists():
+                _materialize_png_sidecar(alt)
+                return png_path.exists()
+
         return False
-    return all((session_dir / name).exists() for name in expected_files)
+
+    ready = 0
+    for fname in expected_files:
+        if _exists_with_fallback(fname):
+            ready += 1
+
+    total = len(expected_files)
+    return ready == total, ready, total
 
 
 def _param_controls(stage: str, key: str):
@@ -419,7 +444,7 @@ def assessment_layout(active_path: str, stage: str):
                             disabled=True,
                         ),
                         *(controls or []),
-                        dcc.Loading(
+                        html.Div(
                             [
                                 dbc.Button(
                                     "Run",
@@ -439,8 +464,7 @@ def assessment_layout(active_path: str, stage: str):
                                         "marginLeft": "0",
                                     },
                                 ),
-                            ],
-                            type="default",
+                            ]
                         ),
                     ],
                     # Ensure the tab pane provides full width so Bootstrap grid works
@@ -759,12 +783,57 @@ def register_pre_post_callbacks(app):
                 )
 
             # Polling branch
-            if not isinstance(run_state, dict) or run_state.get("session") != session_id:
+            run_state_valid = isinstance(run_state, dict) and run_state.get("session") == session_id
+            if isinstance(run_state, dict) and not run_state_valid:
                 raise dash.exceptions.PreventUpdate
 
-            if not _assessment_outputs_ready(session_dir, run_state.get("expected") or expected_files):
+            expected = run_state.get("expected") if run_state_valid else expected_files
+            files_ready, ready_count, total_expected = _assessment_outputs_status(
+                session_dir, expected or expected_files
+            )
+
+            if not run_state_valid:
+                if files_ready:
+                    content = render_group_tabset(session_dir, _stage, _key)
+                    run_state_payload = {
+                        "session": session_id,
+                        "expected": expected or expected_files,
+                        "stage": _stage,
+                        "key": _key,
+                        "complete": True,
+                    }
+                    stage_flag = True if _stage == "pre" else dash.no_update
+                    return _output(
+                        content,
+                        stage_flag,
+                        log_path_value=str(log_path),
+                        log_meta=None,
+                        modal_open=dash.no_update,
+                        log_interval_disabled=dash.no_update,
+                        param_store=persisted_payload,
+                        poll_disabled=True,
+                        poll_count=poll_ticks,
+                        run_state_value=run_state_payload,
+                    )
+
+                placeholder = html.Div("Click Run to generate results.")
+                return _output(
+                    placeholder,
+                    dash.no_update,
+                    param_store=persisted_payload,
+                    poll_disabled=True,
+                    poll_count=poll_ticks,
+                    run_state_value=None,
+                )
+
+            if not files_ready:
+                progress = (
+                    f"Waiting for output files ({ready_count}/{total_expected})..."
+                    if total_expected
+                    else "Waiting for output files..."
+                )
                 placeholder = dbc.Spinner(
-                    html.Div("Waiting for output files..."),
+                    html.Div(progress),
                     color="primary",
                     type="border",
                     size="md",
@@ -780,7 +849,9 @@ def register_pre_post_callbacks(app):
                 )
 
             content = render_group_tabset(session_dir, _stage, _key)
-            run_state_payload = dict(run_state)
+            run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
+            run_state_payload.setdefault("session", session_id)
+            run_state_payload.setdefault("expected", expected)
             run_state_payload["complete"] = True
             stage_flag = True if _stage == "pre" else dash.no_update
             return _output(
