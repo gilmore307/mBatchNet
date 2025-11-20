@@ -63,29 +63,29 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("PCA (Batch grouping)", "pca_batch.png"),
-    FigureSpec("PCA (Target grouping)", "pca_target.png"),
-    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.png"),
-    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.png"),
-    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.png"),
-    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.png"),
-    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.png"),
-    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.png"),
-    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.png"),
-    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.png"),
-    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
-    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
-    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.png"),
-    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.png"),
-    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("PVCA", "PVCA.png"),
+    FigureSpec("PCA (Batch grouping)", "pca_batch.tif"),
+    FigureSpec("PCA (Target grouping)", "pca_target.tif"),
+    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.tif"),
+    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.tif"),
+    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.tif"),
+    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.tif"),
+    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.tif"),
+    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.tif"),
+    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.tif"),
+    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.tif"),
+    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.tif"),
+    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.tif"),
+    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.tif"),
+    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.tif"),
+    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.tif"),
+    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.tif"),
+    FigureSpec("PVCA", "PVCA.tif"),
 )
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("Entropy score", "ebm.png"),
-    FigureSpec("Silhouette score", "silhouette.png"),
+    FigureSpec("Alignment score", "alignment_score.tif"),
+    FigureSpec("Entropy score", "ebm.tif"),
+    FigureSpec("Silhouette score", "silhouette.tif"),
 )
 
 POST_FIGURES: Sequence[FigureSpec] = PRE_FIGURES + POST_EXTRA_FIGURES
@@ -1312,6 +1312,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     for spec in figures:
         fn = spec.filename
         low = fn.lower()
+        stem = Path(low).stem
         if low.startswith("pcoa_aitchison"):
             add_group_item("pcoa", "PCoA", "ait", fn)
         elif low.startswith("pcoa_braycurtis"):
@@ -1338,7 +1339,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
             add_group_item("prda", "pRDA", "ait", fn)
         elif low.startswith("prda_braycurtis"):
             add_group_item("prda", "pRDA", "bray", fn)
-        elif low == "pca.png":
+        elif stem == "pca":
             add_group_item("pca", "PCA", "ait", fn)
         else:
             # fallback: one tab per figure (with its own assessment sub-tab if any)
@@ -1467,6 +1468,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     g: Dict[str, Optional[str]] = _init_group_config(key)
     for spec in figures:
         low = spec.filename.lower()
+        stem = Path(low).stem
         if key == "pcoa":
             if low.startswith("pcoa_aitchison_batch"):
                 g["ait_batch"] = spec.filename
@@ -1511,19 +1513,19 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
             elif low.startswith("prda_braycurtis"):
                 g["bray"] = spec.filename
             g["title"] = "pRDA"
-        elif key == "alignment" and spec.filename.lower() in {"alignment_score.png", "alignment.png"}:
+        elif key == "alignment" and stem in {"alignment_score", "alignment"}:
             g["single"] = spec.filename
             g["title"] = "Alignment score"
         elif key == "pca":
-            if low == "pca_batch.png":
+            if stem == "pca_batch":
                 g["batch"] = spec.filename
-            elif low == "pca_target.png":
+            elif stem == "pca_target":
                 g["target"] = spec.filename
-        elif key == "pvca" and spec.filename.lower() == "pvca.png":
+        elif key == "pvca" and stem == "pvca":
             g["single"] = spec.filename; g["title"] = "PVCA"
-        elif key == "ebm" and spec.filename.lower() == "ebm.png":
+        elif key == "ebm" and stem == "ebm":
             g["single"] = spec.filename; g["title"] = "Entropy score"
-        elif key == "silhouette" and spec.filename.lower() == "silhouette.png":
+        elif key == "silhouette" and stem == "silhouette":
             g["single"] = spec.filename; g["title"] = "Silhouette score"
 
     sub_defs: List[Tuple[str, str, html.Div]] = []
@@ -1614,7 +1616,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         third_content = _load_info_table_for_key(session_dir, stage, key, rep)
 
     if third_content is None and key_lower == "r2":
-        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
+        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.tif")
 
     if third_content is not None:
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
