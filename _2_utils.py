@@ -144,14 +144,15 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
 
     PNGs are downscaled/compressed to ease frontend payload size and the
     rewritten file is saved back to disk so the user directory mirrors the
-    preview size. Other formats (e.g., TIFF) are kept at their original
-    resolution.
+    preview size. TIFF inputs are converted and downscaled to a PNG preview
+    in-memory to avoid writing an extra full-size PNG.
     """
 
+    ext = path.suffix.lower()
     mime_type = _guess_mime_type(path)
     data: bytes
 
-    if path.suffix.lower() == ".png":
+    if ext == ".png":
         try:
             from PIL import Image
 
@@ -177,6 +178,24 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
             except OSError:
                 # If we cannot write (e.g., permissions), fall back to in-memory only.
                 pass
+        except Exception:
+            data = path.read_bytes()
+    elif ext in {".tif", ".tiff"}:
+        try:
+            from PIL import Image
+
+            with Image.open(path) as image:
+                image = image.convert("RGBA")
+                resample = getattr(Image, "Resampling", None)
+                resample_method = resample.LANCZOS if resample else Image.LANCZOS
+
+                if max(image.size) > max_png_side:
+                    image.thumbnail((max_png_side, max_png_side), resample_method)
+
+                buffer = BytesIO()
+                image.save(buffer, format="PNG", optimize=True, compress_level=9)
+                data = buffer.getvalue()
+                mime_type = "image/png"
         except Exception:
             data = path.read_bytes()
     else:
