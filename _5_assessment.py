@@ -507,7 +507,18 @@ def assessment_layout(active_path: str, stage: str):
     for key, title, _ in groups:
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
-        placeholder = html.Div("Click Run to generate results.")
+        placeholder = html.Div(
+            [
+                html.Div("Click Run to generate results."),
+                html.Div(
+                    [
+                        dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
+                        html.Div(id=f"{sid}-subtab-content"),
+                    ],
+                    style={"display": "none"},
+                ),
+            ]
+        )
         controls = _param_controls(stage, key)
         tab_items.append(
             dcc.Tab(
