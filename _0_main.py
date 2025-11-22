@@ -147,6 +147,9 @@ def serve_layout() -> html.Div:
                 scrollable=True,
             ),
 
+            # Hidden subtab placeholders so callback outputs always target existing IDs
+            *_subtab_validation_placeholders(),
+
         ]
     )
 
