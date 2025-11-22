@@ -48,8 +48,6 @@ FIGURE_DEFAULTS = {
     "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
 }
 
-TAB_REFRESH_CYCLES = 3
-
 
 _FOUND_OUTPUT_LOGS: Set[str] = set()
 
@@ -896,25 +894,17 @@ def register_pre_post_callbacks(app):
 
             if not run_state_valid:
                 if files_ready:
-                    refresh_remaining = TAB_REFRESH_CYCLES
-                    base_content = render_group_tabset(session_dir, _stage, _key)
-                    notice = dbc.Alert(
-                        f"Reloading {_title} tab every 2 seconds to display new results (remaining: {refresh_remaining}).",
-                        color="info",
-                        className="py-2 mb-2",
-                    )
-                    content = html.Div([notice, base_content]) if refresh_remaining else base_content
+                    content = render_group_tabset(session_dir, _stage, _key)
                     run_state_payload = {
                         "session": session_id,
                         "expected": expected or expected_files,
                         "stage": _stage,
                         "key": _key,
                         "complete": True,
-                        "refresh_remaining": refresh_remaining,
                     }
                     append_run_log(
                         log_path,
-                        f"All expected outputs found for {_title}. Auto-refreshing tab every 2 seconds ({refresh_remaining} cycles).",
+                        f"All expected outputs found for {_title}.",
                         icon="✅",
                     )
                     stage_flag = True if _stage == "pre" else dash.no_update
@@ -926,7 +916,7 @@ def register_pre_post_callbacks(app):
                         modal_open=dash.no_update,
                         log_interval_disabled=dash.no_update,
                         param_store=persisted_payload,
-                        poll_disabled=False,
+                        poll_disabled=True,
                         poll_count=poll_ticks,
                         run_state_value=run_state_payload,
                         run_button_disabled=False,
@@ -971,40 +961,16 @@ def register_pre_post_callbacks(app):
             run_state_payload.setdefault("expected", expected)
             run_state_payload.setdefault("stage", _stage)
             run_state_payload.setdefault("key", _key)
-            refresh_remaining = int(run_state_payload.get("refresh_remaining", 0) or 0)
-            notice = None
-            if refresh_remaining <= 0:
-                refresh_remaining = TAB_REFRESH_CYCLES
-                run_state_payload["refresh_remaining"] = refresh_remaining
+            if not run_state_payload.get("complete"):
                 append_run_log(
                     log_path,
-                    f"All expected outputs found for {_title}. Auto-refreshing tab every 2 seconds ({refresh_remaining} cycles).",
+                    f"All expected outputs found for {_title}.",
                     icon="✅",
                 )
-                notice = dbc.Alert(
-                    f"Reloading {_title} tab every 2 seconds to display new results (remaining: {refresh_remaining}).",
-                    color="info",
-                    className="py-2 mb-2",
-                )
-            else:
-                append_run_log(
-                    log_path,
-                    f"Refreshing {_title} tab content ({refresh_remaining} remaining).",
-                    icon="🔄",
-                )
-                notice = dbc.Alert(
-                    f"Reloading {_title} tab to show updated figures (remaining: {refresh_remaining - 1}).",
-                    color="info",
-                    className="py-2 mb-2",
-                )
-                refresh_remaining -= 1
-            run_state_payload["refresh_remaining"] = refresh_remaining
             content = render_group_tabset(session_dir, _stage, _key)
-            if notice:
-                content = html.Div([notice, content])
             stage_flag = True if _stage == "pre" else dash.no_update
             run_state_payload["complete"] = True
-            poll_disabled = refresh_remaining <= 0
+            poll_disabled = True
             run_button_disabled = False
 
             return _output(
