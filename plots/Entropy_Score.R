@@ -5,7 +5,19 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(uwot)     # UMAP
   library(FNN)      # kNN
+  library(magick)
 })
+
+create_png_thumbnail <- function(tif_path, width_px = 2000) {
+  png_path <- sub("\\.tif$", ".png", tif_path)
+  tryCatch({
+    img <- magick::image_read(tif_path)
+    img <- magick::image_scale(img, paste0(width_px))
+    magick::image_write(img, path = png_path, format = "png")
+  }, error = function(e) {
+    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
+  })
+}
 
 # --------- Args / config ---------
 
@@ -318,8 +330,10 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
+  tif_path <- file.path(output_folder, "ebm.tif")
+  ggsave(tif_path, p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   
   # No correction recommendation messages
   
@@ -350,6 +364,8 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
+  tif_path <- file.path(output_folder, "ebm.tif")
+  ggsave(tif_path, p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
 }

@@ -8,6 +8,7 @@ suppressPackageStartupMessages({
   library(readr)
   library(dplyr)
   library(patchwork)   # layouts + legend collection
+  library(magick)
 
 # Map method codes to short labels for figures
 method_short_label <- function(x) {
@@ -24,6 +25,17 @@ method_short_label <- function(x) {
   library(vegan)       # distances + NMDS
   library(jsonlite)
 })
+
+create_png_thumbnail <- function(tif_path, width_px = 2000) {
+  png_path <- sub("\\.tif$", ".png", tif_path)
+  tryCatch({
+    img <- magick::image_read(tif_path)
+    img <- magick::image_scale(img, paste0(width_px))
+    magick::image_write(img, path = png_path, format = "png")
+  }, error = function(e) {
+    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
+  })
+}
 
 # ==== Helpers (robust ranges/padding) ====
 safe_range <- function(v) { v <- v[is.finite(v)]; if (!length(v)) c(0,0) else range(v, na.rm = TRUE) }
@@ -486,8 +498,10 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+  tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
+  ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   rm(combined, plot_list)
   gc()
 }

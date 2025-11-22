@@ -7,8 +7,19 @@ suppressPackageStartupMessages({
   library(rlang)
   library(vegan)      # Bray-Curtis
   library(jsonlite)
+  library(magick)
 })
 # Map method codes to short labels for figures
+create_png_thumbnail <- function(tif_path, width_px = 2000) {
+  png_path <- sub("\\.tif$", ".png", tif_path)
+  tryCatch({
+    img <- magick::image_read(tif_path)
+    img <- magick::image_scale(img, paste0(width_px))
+    magick::image_write(img, path = png_path, format = "png")
+  }, error = function(e) {
+    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
+  })
+}
 method_short_label <- function(x) {
   map <- c(
     qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
@@ -592,8 +603,10 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+  tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
+  ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   rm(combined, plot_list)
   gc()
 }

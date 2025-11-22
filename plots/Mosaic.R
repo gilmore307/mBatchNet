@@ -6,6 +6,18 @@ library(tidyr)      # for pivot_wider()
 library(gridExtra)
 library(grid)       # for unit()
 library(jsonlite)
+library(magick)
+
+create_png_thumbnail <- function(tif_path, width_px = 2000) {
+  png_path <- sub("\\.tif$", ".png", tif_path)
+  tryCatch({
+    img <- magick::image_read(tif_path)
+    img <- magick::image_scale(img, paste0(width_px))
+    magick::image_write(img, path = png_path, format = "png")
+  }, error = function(e) {
+    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
+  })
+}
 
 # ==== Args / config (for input and output folder) ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -223,4 +235,6 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch', '.outcome'))
-ggsave(file.path(output_folder, "mosaic_plot.tif"), plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
+tif_path <- file.path(output_folder, "mosaic_plot.tif")
+ggsave(tif_path, plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
+create_png_thumbnail(tif_path)

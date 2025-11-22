@@ -8,6 +8,7 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(patchwork)
   library(vegan)  # Bray-Curtis
+  library(magick)
   
   # Map method codes to short labels for figures
   method_short_label <- function(x) {
@@ -20,6 +21,17 @@ suppressPackageStartupMessages({
     sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
   }
 })
+
+create_png_thumbnail <- function(tif_path, width_px = 2000) {
+  png_path <- sub("\\.tif$", ".png", tif_path)
+  tryCatch({
+    img <- magick::image_read(tif_path)
+    img <- magick::image_scale(img, paste0(width_px))
+    magick::image_write(img, path = png_path, format = "png")
+  }, error = function(e) {
+    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
+  })
+}
 
 # ==== IO ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -400,8 +412,10 @@ if (n_panels_ait == 1L) {
   h_ait <- base_row_height_in * panel_rows_ait
 }
 fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
-ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
+tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
+ggsave(tif_path_ait,
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
+create_png_thumbnail(tif_path_ait)
 rm(combined_ait, plots_ait)
 gc()
 
@@ -459,8 +473,10 @@ if (n_panels_bc == 1L) {
   h_bc <- base_row_height_in * panel_rows_bc
 }
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
-ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
+tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
+ggsave(tif_path_bc,
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
+create_png_thumbnail(tif_path_bc)
 rm(combined_bc, plots_bc)
 gc()
 
