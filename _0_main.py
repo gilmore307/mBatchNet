@@ -148,7 +148,7 @@ def serve_layout() -> html.Div:
             ),
 
             # Hidden subtab placeholders so callback outputs always target existing IDs
-            *_subtab_validation_placeholders(),
+            _subtab_validation_placeholders(),
 
         ]
     )
@@ -185,19 +185,19 @@ ALL_ASSESSMENT_GROUPS = [
 
 
 def _subtab_validation_placeholders():
-    hidden = []
+    hidden_children = []
     for key, stage in ALL_ASSESSMENT_GROUPS:
         sid = f"{stage}-{key}"
-        hidden.append(
+        hidden_children.append(
             html.Div(
                 [
                     dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
                     html.Div(id=f"{sid}-subtab-content"),
-                ],
-                style={"display": "none"},
+                ]
             )
         )
-    return hidden
+
+    return html.Div(hidden_children, style={"display": "none"})
 
 
 app.validation_layout = html.Div(
@@ -207,7 +207,7 @@ app.validation_layout = html.Div(
         assessment_layout("/pre", stage="pre"),
         correction_layout("/correction"),
         assessment_layout("/post", stage="post"),
-        *_subtab_validation_placeholders(),
+        _subtab_validation_placeholders(),
     ]
 )
 
