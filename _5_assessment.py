@@ -51,6 +51,30 @@ FIGURE_DEFAULTS = {
 _FOUND_OUTPUT_LOGS: Set[str] = set()
 
 
+def _reset_found_logs(log_path: Optional[Path]) -> None:
+    """Drop cached discovery entries for the given run log so re-runs re-log finds."""
+
+    if not log_path:
+        return
+    prefix = f"{log_path.resolve()}::"
+    stale = {entry for entry in _FOUND_OUTPUT_LOGS if entry.startswith(prefix)}
+    if stale:
+        _FOUND_OUTPUT_LOGS.difference_update(stale)
+
+
+def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
+    """Remove prior output files (figures and tables) before starting a run."""
+
+    for fname in expected_files:
+        path = session_dir / fname
+        stem = path.with_suffix("")
+        for target in (path, stem.with_suffix(".png"), stem.with_suffix(".tif"), stem.with_suffix(".tiff")):
+            try:
+                target.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def _expected_figure_files(stage: str, key: str) -> List[str]:
     """Return expected output filenames (figures + assessment tables) for a group."""
 
@@ -738,6 +762,9 @@ def register_pre_post_callbacks(app):
             if trigger_id == run_id:
                 # Build CLI flags from parameters
                 flags = []
+
+                _reset_found_logs(log_path)
+                _clear_outputs(session_dir, expected_files)
 
                 def _add(flag, val, cast=str):
                     if val is None or val == "":
