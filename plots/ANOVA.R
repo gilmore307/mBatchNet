@@ -9,29 +9,9 @@ suppressPackageStartupMessages({
   library(magick)
 })
 
-create_png_thumbnail <- function(tif_path, width_px = 2000) {
-  png_path <- sub("\\.tif$", ".png", tif_path)
-  tryCatch({
-    img <- magick::image_read(tif_path)
-    img <- magick::image_scale(img, paste0(width_px))
-    magick::image_write(img, path = png_path, format = "png")
-  }, error = function(e) {
-    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
-  })
-}
+source("plots/helper.R")
 
 # ----------------- Args / IO -----------------
-
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v }, USE.NAMES = FALSE)
-}
 
 format_method_label <- function(label) {
   if (identical(label, "Before correction")) {
@@ -130,14 +110,6 @@ clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", fu
 # Fallback: if no suffix-specific outputs, use any normalized_*.csv as CLR
 if (!length(clr_paths)) {
   clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
-}
-
-name_from <- function(paths, suffix) {
-  base <- basename(paths)
-  base <- sub("^normalized_", "", base)
-  base <- sub(paste0("_", suffix, "\\.csv$"), "", base)  # handle ..._clr.csv
-  base <- sub("\\.csv$", "", base)                       # handle ... .csv
-  base
 }
 
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))

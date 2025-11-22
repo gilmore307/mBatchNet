@@ -9,40 +9,10 @@ suppressPackageStartupMessages({
   library(magick)
 })
 
+source("plots/helper.R")
+
 # ---- helpers ----
 mbecUpperCase <- function(x) paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x)))
-
-create_png_thumbnail <- function(tif_path, width_px = 2000) {
-  png_path <- sub("\\.tif$", ".png", tif_path)
-  tryCatch({
-    img <- magick::image_read(tif_path)
-    img <- magick::image_scale(img, paste0(width_px))
-    magick::image_write(img, path = png_path, format = "png")
-  }, error = function(e) {
-    warning(sprintf("Failed to create PNG thumbnail for %s: %s", tif_path, e$message))
-  })
-}
-
-# Map method codes from filenames to short display labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization",
-    bmc = "BMC",
-    limma = "Limma",
-    conqur = "ConQuR",
-    plsda = "PLSDA-batch",
-    combat = "ComBat",
-    fsqn = "FSQN",
-    mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB",
-    metadict = "MetaDICT",
-    pn = "Percentile Normalization",
-    fabatch = "FAbatch",
-    combatseq = "ComBat-seq",
-    debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
 
 guess_shape_var <- function(meta, batch_col = "batch") {
   cand <- c("group","phenotype","condition","status","case_control","class","disease","label")
