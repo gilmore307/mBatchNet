@@ -887,6 +887,22 @@ def register_pre_post_callbacks(app):
             if isinstance(run_state, dict) and not run_state_valid:
                 raise dash.exceptions.PreventUpdate
 
+            # If a previous poll already marked completion for this session, avoid further
+            # file checks or log writes—just keep the interval disabled and show results.
+            if run_state_valid and run_state.get("complete"):
+                content = render_group_tabset(session_dir, _stage, _key)
+                stage_flag = True if _stage == "pre" else dash.no_update
+                return _output(
+                    content,
+                    stage_flag,
+                    log_path_value=str(log_path),
+                    param_store=persisted_payload,
+                    poll_disabled=True,
+                    poll_count=dash.no_update,
+                    run_state_value=run_state,
+                    run_button_disabled=False,
+                )
+
             expected = run_state.get("expected") if run_state_valid else expected_files
             files_ready, ready_count, total_expected = _assessment_outputs_status(
                 session_dir, expected or expected_files, log_path=log_path
