@@ -494,11 +494,6 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
   gc()
 }
 
-batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
-save_pca_plot_set(batch_plots, "pca_batch")
-target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
-save_pca_plot_set(target_plots, "pca_target")
-
 # =========================
 # PCA assessment summaries
 # =========================
@@ -693,3 +688,12 @@ if (only_baseline) {
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }
+
+# =========================
+# Plot rendering (after CSVs are written)
+# =========================
+
+batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
+save_pca_plot_set(batch_plots, "pca_batch")
+target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
+save_pca_plot_set(target_plots, "pca_target")

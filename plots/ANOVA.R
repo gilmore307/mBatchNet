@@ -298,21 +298,6 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
   p
 }
 
-p_clr <- make_boxplot(
-  r2_long_clr, method_levels_clr,
-  expression("Feature-wise ANOVA " * R^2 )
-)
-if (!is.null(p_clr)) {
-  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
-  tif_path <- file.path(output_folder, "anova_aitchison.tif")
-  ggsave(tif_path, p_clr,
-         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
-  message("Saved figure: anova_aitchison.tif")
-} else {
-  message("No data to plot; skip figure export.")
-}
-
 # ----------------- Unified assessment table -----------------
 median_r2_by_method <- r2_long_clr %>%
   group_by(Method, Effect) %>%
@@ -373,3 +358,19 @@ readr::write_excel_csv(pre_out,  file.path(output_folder, "anova_raw_assessment_
 readr::write_excel_csv(post_out, file.path(output_folder, "anova_raw_assessment_post_excel.csv"))
 
 message("Saved CSV: anova_raw_assessment_pre.csv / anova_raw_assessment_post.csv (+ *_excel.csv)")
+
+# ----------------- Plot after CSVs are written -----------------
+p_clr <- make_boxplot(
+  r2_long_clr, method_levels_clr,
+  expression("Feature-wise ANOVA " * R^2 )
+)
+if (!is.null(p_clr)) {
+  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
+  tif_path <- file.path(output_folder, "anova_aitchison.tif")
+  ggsave(tif_path, p_clr,
+         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
+  message("Saved figure: anova_aitchison.tif")
+} else {
+  message("No data to plot; skip figure export.")
+}

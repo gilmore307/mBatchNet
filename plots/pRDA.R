@@ -339,12 +339,6 @@ if (length(file_list_clr)) {
     v  <- compute_prda_parts_aitch(df, metadata, batch_col, treat_col)
     tibble::tibble(Method = nm, Fraction = as.numeric(v))
   }) |> bind_rows()
-  
-  plot_prda_with_table(
-    parts_df_aitch, file_list_clr,
-    title_prefix  = "Partial Redundant Analysis: Variance Partition",
-    outfile_prefix = "pRDA_aitchison"
-  )
 }
 
 # ==== pRDA scoring (Aitchison) =========================
@@ -414,4 +408,15 @@ if (only_baseline) {
 
   print(unified, n = nrow(unified))
   readr::write_csv(unified, file.path(output_folder, output_name))
+}
+
+# ========= Plot after CSVs are written =========
+if (exists("parts_df_aitch") && nrow(parts_df_aitch)) {
+  plot_prda_with_table(
+    parts_df_aitch, file_list_clr,
+    title_prefix  = "Partial Redundant Analysis: Variance Partition",
+    outfile_prefix = "pRDA_aitchison"
+  )
+} else {
+  message("No pRDA components available for plotting.")
 }
