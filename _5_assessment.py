@@ -8,7 +8,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 
 from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
@@ -46,6 +46,9 @@ FIGURE_DEFAULTS = {
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
 }
+
+
+_FOUND_OUTPUT_LOGS: Set[str] = set()
 
 
 def _expected_figure_files(stage: str, key: str) -> List[str]:
@@ -141,7 +144,7 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
 
 
 def _assessment_outputs_status(
-    session_dir: Path, expected_files: Sequence[str]
+    session_dir: Path, expected_files: Sequence[str], log_path: Optional[Path] = None
 ) -> Tuple[bool, int, int]:
     """Return readiness plus how many expected files are available."""
 
@@ -151,7 +154,15 @@ def _assessment_outputs_status(
     def _exists(name: str) -> bool:
         png_path = session_dir / name
         if png_path.exists():
-            print(f"Found expected output: {png_path}")
+            if log_path is not None:
+                log_key = f"{log_path.resolve()}::{png_path.resolve()}"
+                if log_key not in _FOUND_OUTPUT_LOGS:
+                    _FOUND_OUTPUT_LOGS.add(log_key)
+                    try:
+                        with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                            logf.write(f"Found expected output: {png_path}\n")
+                    except OSError:
+                        pass
             return True
         return False
 
@@ -815,7 +826,7 @@ def register_pre_post_callbacks(app):
 
             expected = run_state.get("expected") if run_state_valid else expected_files
             files_ready, ready_count, total_expected = _assessment_outputs_status(
-                session_dir, expected or expected_files
+                session_dir, expected or expected_files, log_path=log_path
             )
 
             if not run_state_valid:
