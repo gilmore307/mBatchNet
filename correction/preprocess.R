@@ -29,8 +29,7 @@ if (!file.exists(matrix_path)) {
 # ---------------------------
 # Console Logger & Guards
 # ---------------------------
-.ts <- function() format(Sys.time(), "%H:%M:%S")
-say <- function(...){ cat(sprintf("[%s] ", .ts()), paste0(..., collapse=""), "\n") }
+say <- function(...){ cat(paste0(..., collapse=""), "\n") }
 start_step <- function(name){ say("▶️ START: ", name); proc.time() }
 ok_step    <- function(name, t0){ dt <- proc.time()-t0; say("✅ DONE:  ", name, sprintf(" (%.2fs)", dt["elapsed"])) }
 warn_step  <- function(name, msg){ say("⚠️ WARN:  ", name, " — ", msg) }
