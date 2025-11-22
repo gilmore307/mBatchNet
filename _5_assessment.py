@@ -179,18 +179,32 @@ def _assessment_outputs_status(
         return False, 0, 0
 
     def _exists(name: str) -> bool:
-        png_path = session_dir / name
-        if png_path.exists():
-            if log_path is not None:
-                log_key = f"{log_path.resolve()}::{png_path.resolve()}"
-                if log_key not in _FOUND_OUTPUT_LOGS:
-                    _FOUND_OUTPUT_LOGS.add(log_key)
-                    try:
-                        with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                            logf.write(f"Found expected output: {png_path}\n")
-                    except OSError:
-                        pass
+        target = session_dir / name
+
+        def _log_hit(hit: Path) -> None:
+            if log_path is None:
+                return
+            log_key = f"{log_path.resolve()}::{hit.resolve()}"
+            if log_key in _FOUND_OUTPUT_LOGS:
+                return
+            _FOUND_OUTPUT_LOGS.add(log_key)
+            try:
+                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                    logf.write(f"Found expected output: {hit}\n")
+            except OSError:
+                pass
+
+        if target.exists():
+            _log_hit(target)
             return True
+
+        # On some platforms the filesystem can surface unexpected casing; fall back to a
+        # case-insensitive search so detected files always advance progress.
+        lowered = name.lower()
+        for candidate in session_dir.glob("*"):
+            if candidate.name.lower() == lowered:
+                _log_hit(candidate)
+                return True
         return False
 
     ready = 0
