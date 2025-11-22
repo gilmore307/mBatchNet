@@ -592,6 +592,7 @@ def register_pre_post_callbacks(app):
                 Output(f"{sid}-run-state", "data", allow_duplicate=True),
             ]
         )
+        outputs.append(Output(run_id, "disabled", allow_duplicate=True))
 
         # Parameter States by group
         states: list = [State("session-id", "data")]
@@ -699,6 +700,7 @@ def register_pre_post_callbacks(app):
                 poll_disabled=True,
                 poll_count=dash.no_update,
                 run_state_value=dash.no_update,
+                run_button_disabled=dash.no_update,
             ):
                 return (
                     content,
@@ -711,19 +713,24 @@ def register_pre_post_callbacks(app):
                     poll_disabled,
                     poll_count,
                     run_state_value,
+                    run_button_disabled,
                 )
             if not session_id:
                 message = html.Div("Session not initialised.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True)
-                return _output(message, dash.no_update, poll_disabled=True)
+                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                return _output(
+                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                )
 
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True)
-                return _output(message, dash.no_update, poll_disabled=True)
+                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                return _output(
+                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                )
 
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
@@ -817,6 +824,7 @@ def register_pre_post_callbacks(app):
                     poll_disabled=False,
                     poll_count=0,
                     run_state_value=run_state_payload,
+                    run_button_disabled=True,
                 )
 
             # Polling branch
@@ -851,6 +859,7 @@ def register_pre_post_callbacks(app):
                         poll_disabled=True,
                         poll_count=poll_ticks,
                         run_state_value=run_state_payload,
+                        run_button_disabled=False,
                     )
 
                 placeholder = html.Div("Click Run to generate results.")
@@ -861,6 +870,7 @@ def register_pre_post_callbacks(app):
                     poll_disabled=True,
                     poll_count=poll_ticks,
                     run_state_value=None,
+                    run_button_disabled=False,
                 )
 
             if not files_ready:
@@ -883,6 +893,7 @@ def register_pre_post_callbacks(app):
                     poll_disabled=False,
                     poll_count=poll_ticks,
                     run_state_value=run_state,
+                    run_button_disabled=True,
                 )
 
             content = render_group_tabset(session_dir, _stage, _key)
@@ -902,6 +913,7 @@ def register_pre_post_callbacks(app):
                 poll_disabled=True,
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
+                run_button_disabled=False,
             )
 
         if state_ids_tuple:
