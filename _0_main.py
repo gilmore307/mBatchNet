@@ -4,7 +4,6 @@
 from pathlib import Path
 import os
 import uuid
-import copy
 import shutil
 import zipfile
 import tempfile
@@ -26,59 +25,6 @@ from _4_upload import upload_layout, register_upload_callbacks
 from _5_assessment import assessment_layout, register_pre_post_callbacks
 from _6_correction import correction_layout, register_correction_callbacks
 from _7_description import HELP_MODAL_SECTIONS
-
-
-# Keep a single, canonical definition of all assessment subtabs so we can
-# reuse deep-copied placeholders in both the served and validation layouts.
-ALL_ASSESSMENT_GROUPS = [
-    # Shared pre/post assessments
-    ("pca", "pre"),
-    ("pca", "post"),
-    ("pcoa", "pre"),
-    ("pcoa", "post"),
-    ("nmds", "pre"),
-    ("nmds", "post"),
-    ("dissimilarity", "pre"),
-    ("dissimilarity", "post"),
-    ("permanova", "pre"),
-    ("permanova", "post"),
-    ("r2", "pre"),
-    ("r2", "post"),
-    ("prda", "pre"),
-    ("prda", "post"),
-    ("pvca", "pre"),
-    ("pvca", "post"),
-    # Post-only extras
-    ("alignment", "post"),
-    ("ebm", "post"),
-    ("silhouette", "post"),
-]
-
-
-def _build_subtab_validation_placeholders():
-    hidden_children = []
-    for key, stage in ALL_ASSESSMENT_GROUPS:
-        sid = f"{stage}-{key}"
-        hidden_children.append(
-            html.Div(
-                [
-                    dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
-                    html.Div(id=f"{sid}-subtab-content"),
-                ]
-            )
-        )
-
-    return html.Div(hidden_children, style={"display": "none"})
-
-
-# Cache a template and deep copy it where needed so every layout tree gets the
-# full set of pre/post subtab IDs (avoids occasional omission in Dash's
-# validation when components are rebuilt dynamically).
-_SUBTAB_PLACEHOLDER_TEMPLATE = _build_subtab_validation_placeholders()
-
-
-def subtab_validation_placeholders():
-    return copy.deepcopy(_SUBTAB_PLACEHOLDER_TEMPLATE)
 
 
 app: Dash = dash.Dash(
@@ -201,9 +147,6 @@ def serve_layout() -> html.Div:
                 scrollable=True,
             ),
 
-            # Hidden subtab placeholders so callback outputs always target existing IDs
-            subtab_validation_placeholders(),
-
         ]
     )
 
@@ -218,7 +161,6 @@ app.validation_layout = html.Div(
         assessment_layout("/pre", stage="pre"),
         correction_layout("/correction"),
         assessment_layout("/post", stage="post"),
-        subtab_validation_placeholders(),
     ]
 )
 
