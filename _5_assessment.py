@@ -890,6 +890,7 @@ def register_pre_post_callbacks(app):
             # If a previous poll already marked completion for this session, avoid further
             # file checks or log writes—just keep the interval disabled and show results.
             if run_state_valid and run_state.get("complete"):
+                run_state["complete"] = True
                 content = render_group_tabset(session_dir, _stage, _key)
                 stage_flag = True if _stage == "pre" else dash.no_update
                 return _output(
@@ -928,11 +929,14 @@ def register_pre_post_callbacks(app):
                         "key": _key,
                         "complete": True,
                     }
-                    append_run_log(
-                        log_path,
-                        f"All expected outputs found for {_title}.",
-                        icon="✅",
-                    )
+                    complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
+                    if complete_key not in _FOUND_OUTPUT_LOGS:
+                        _FOUND_OUTPUT_LOGS.add(complete_key)
+                        append_run_log(
+                            log_path,
+                            f"All expected outputs found for {_title}.",
+                            icon="✅",
+                        )
                     stage_flag = True if _stage == "pre" else dash.no_update
                     return _output(
                         content,
@@ -987,7 +991,9 @@ def register_pre_post_callbacks(app):
             run_state_payload.setdefault("expected", expected)
             run_state_payload.setdefault("stage", _stage)
             run_state_payload.setdefault("key", _key)
-            if not run_state_payload.get("complete"):
+            complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
+            if not run_state_payload.get("complete") and complete_key not in _FOUND_OUTPUT_LOGS:
+                _FOUND_OUTPUT_LOGS.add(complete_key)
                 append_run_log(
                     log_path,
                     f"All expected outputs found for {_title}.",
