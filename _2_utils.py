@@ -162,7 +162,19 @@ def _generate_png_preview(
     if reuse_existing and preview_path is not None:
         try:
             if preview_path.exists() and preview_path.stat().st_mtime >= source_path.stat().st_mtime:
-                return preview_path.read_bytes()
+                if source_path.suffix.lower() == ".png":
+                    try:
+                        from PIL import Image
+
+                        with Image.open(preview_path) as existing:
+                            if max(existing.size) <= max_side:
+                                return preview_path.read_bytes()
+                    except Exception:
+                        # Fall through to regeneration if the existing PNG is unreadable
+                        # or exceeds the allowed dimensions.
+                        pass
+                else:
+                    return preview_path.read_bytes()
         except OSError:
             pass
 
@@ -224,7 +236,7 @@ def _encode_image_source(path: Path, *, max_png_side: int = PNG_MAX_DISPLAY_SIDE
             path,
             max_side=max_png_side,
             preview_path=path,
-            reuse_existing=False,
+            reuse_existing=True,
             write_back=True,
         )
     elif ext in {".tif", ".tiff"}:
