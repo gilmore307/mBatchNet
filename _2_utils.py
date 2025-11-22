@@ -55,26 +55,23 @@ def build_rscript_command(script_path: Path, *args: object) -> Tuple[str, ...]:
     return RSCRIPT_BASE_COMMAND + (str(script_path),) + tail
 
 
-def format_log_line(message: str, icon: str = "ℹ️", *, timestamp: Optional[datetime] = None) -> str:
-    """Return a run.log-friendly line with a timestamp and optional icon."""
-
-    stamp = timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    icon_part = f"{icon} " if icon else ""
-    clean_msg = str(message).rstrip("\n")
-    return f"[{stamp}] {icon_part}{clean_msg}\n"
-
-
-def append_run_log(log_path: Path, message: str, icon: str = "ℹ️") -> None:
+def append_run_log(log_path: Path, message: str, icon: str = "ℹ️") -> str:
     """Append a timestamped, icon-prefixed line to the run log."""
 
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    icon_part = f"{icon} " if icon else ""
+    clean_msg = str(message).rstrip("\n")
+    line = f"[{stamp}] {icon_part}{clean_msg}\n"
+
     if not log_path:
-        return
+        return line
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-            logf.write(format_log_line(message, icon=icon))
+            logf.write(line)
     except OSError:
         pass
+    return line
 
 
 # ---- Dataclasses & config ----
@@ -652,7 +649,13 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
     log_path.parent.mkdir(parents=True, exist_ok=True)
     combined: List[str] = []
     env = _build_subprocess_env(command)
-    header = format_log_line("$ " + " ".join(command), icon="▶️")
+    def _stamp(message: str, icon: str) -> str:
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        icon_part = f"{icon} " if icon else ""
+        clean_msg = str(message).rstrip("\n")
+        return f"[{stamp}] {icon_part}{clean_msg}\n"
+
+    header = _stamp("$ " + " ".join(command), icon="▶️")
     proc: Optional[subprocess.Popen] = None
     try:
         with log_path.open("a", encoding="utf-8", errors="replace") as logf:
@@ -671,7 +674,7 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
             assert proc.stdout is not None
             try:
                 for line in proc.stdout:
-                    formatted = format_log_line(line, icon="📝")
+                    formatted = _stamp(line, icon="📝")
                     logf.write(formatted)
                     logf.flush()
                     combined.append(formatted)
