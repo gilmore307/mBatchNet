@@ -129,10 +129,8 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
 # --------- Compute PERMANOVA per method (both geometries) ---------
 only_baseline <- (length(method_levels) == 1L && identical(method_levels, "Before correction"))
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("permanova_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(
@@ -212,7 +210,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
   create_png_thumbnail(tif_path)
 }
 
-# --------- Save combined table ---------
+# --------- Save per-geometry tables only ---------
 summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
   mutate(
     Method = factor(Method, levels = method_levels),

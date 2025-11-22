@@ -664,10 +664,8 @@ all_methods <- union(methods_clr, methods_tss)
 
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("nmds_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(

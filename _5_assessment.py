@@ -81,13 +81,17 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
             add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_batch"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_target"), spec.filename)
-            add_assessment_tables("pcoa", multi_geometry=True)
+            add_assessment_tables(
+                "pcoa", multi_geometry=True, include_combined=False
+            )
         elif key == "nmds":
             add_if(low.startswith("nmds_aitchison_batch"), spec.filename)
             add_if(low.startswith("nmds_aitchison_target"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_batch"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_target"), spec.filename)
-            add_assessment_tables("nmds", multi_geometry=True)
+            add_assessment_tables(
+                "nmds", multi_geometry=True, include_combined=False
+            )
         elif key == "dissimilarity":
             add_if(low.startswith("dissimilarity_heatmaps_aitchison"), spec.filename)
             add_if(low.startswith("dissimilarity_heatmaps_braycurtis"), spec.filename)
@@ -98,7 +102,9 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
             add_if(low.startswith("permanova_aitchison"), spec.filename)
             add_if(low.startswith("permanova_braycurtis"), spec.filename)
             add_if(low.startswith("permanova"), spec.filename)
-            add_assessment_tables("permanova", multi_geometry=True)
+            add_assessment_tables(
+                "permanova", multi_geometry=True, include_combined=False
+            )
         elif key == "r2":
             add_if(low.startswith("anova_aitchison"), spec.filename)
             add_if(low.startswith("anova_braycurtis"), spec.filename)
@@ -145,6 +151,7 @@ def _assessment_outputs_status(
     def _exists(name: str) -> bool:
         png_path = session_dir / name
         if png_path.exists():
+            print(f"Found expected output: {png_path}")
             return True
         return False
 
