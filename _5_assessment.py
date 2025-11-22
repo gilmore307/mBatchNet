@@ -811,7 +811,6 @@ def register_pre_post_callbacks(app):
             files_ready, ready_count, total_expected = _assessment_outputs_status(
                 session_dir, expected or expected_files
             )
-            almost_ready = total_expected > 0 and ready_count >= max(total_expected - 1, 0)
 
             if not run_state_valid:
                 if files_ready:
@@ -853,7 +852,6 @@ def register_pre_post_callbacks(app):
                     if total_expected
                     else "Waiting for output files..."
                 )
-
                 placeholder = dbc.Spinner(
                     html.Div(progress),
                     color="primary",
