@@ -49,9 +49,8 @@ FIGURE_DEFAULTS = {
 
 
 _FOUND_OUTPUT_LOGS: Set[str] = set()
-# Keep polling briefly after all expected files are detected so the UI has
-# enough time to render loaded images before disabling the interval.
-_READY_POLL_GRACE_TICKS = 5
+# Try rendering multiple times after readiness so thumbnails have time to display.
+_READY_RENDER_ATTEMPTS = 3
 
 
 def _reset_found_logs(log_path: Optional[Path]) -> None:
@@ -529,7 +528,7 @@ def assessment_layout(active_path: str, stage: str):
                                     id=run_id,
                                     size="sm",
                                     color="success",
-                                    className="mb-2",
+                                    className="mb-2 be-run-button",
                                     style={"width": "250px", "marginLeft": "5px"},
                                 ),
                                 html.Div(
@@ -943,57 +942,27 @@ def register_pre_post_callbacks(app):
             run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
             run_state_payload.setdefault("session", session_id)
             run_state_payload.setdefault("expected", expected)
-            ready_tick = run_state_payload.get("ready_at")
-
-            # First time we see all expected files: render content but keep polling
-            # for a few more ticks so thumbnails have time to load.
-            if ready_tick is None:
-                run_state_payload["ready_at"] = poll_ticks
-                content = render_group_tabset(session_dir, _stage, _key)
-                stage_flag = True if _stage == "pre" else dash.no_update
-                return _output(
-                    content,
-                    stage_flag,
-                    log_path_value=str(log_path),
-                    log_meta=None,
-                    modal_open=dash.no_update,
-                    log_interval_disabled=dash.no_update,
-                    param_store=persisted_payload,
-                    poll_disabled=False,
-                    poll_count=poll_ticks,
-                    run_state_value=run_state_payload,
-                    run_button_disabled=True,
-                )
-
-            if poll_ticks - ready_tick < _READY_POLL_GRACE_TICKS:
-                return _output(
-                    dash.no_update,
-                    dash.no_update,
-                    log_path_value=str(log_path),
-                    log_meta=None,
-                    modal_open=dash.no_update,
-                    log_interval_disabled=dash.no_update,
-                    param_store=persisted_payload,
-                    poll_disabled=False,
-                    poll_count=poll_ticks,
-                    run_state_value=run_state_payload,
-                    run_button_disabled=True,
-                )
-
-            run_state_payload["complete"] = True
+            render_attempts = run_state_payload.get("render_attempts", 0) + 1
+            run_state_payload["render_attempts"] = render_attempts
+            content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
+
+            is_final_attempt = render_attempts >= _READY_RENDER_ATTEMPTS
+            if is_final_attempt:
+                run_state_payload["complete"] = True
+
             return _output(
-                dash.no_update,
+                content,
                 stage_flag,
                 log_path_value=str(log_path),
                 log_meta=None,
                 modal_open=dash.no_update,
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=True,
+                poll_disabled=is_final_attempt,
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
-                run_button_disabled=False,
+                run_button_disabled=not is_final_attempt,
             )
 
         if state_ids_tuple:
