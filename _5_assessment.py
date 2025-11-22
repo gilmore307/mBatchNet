@@ -30,6 +30,7 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
+    append_run_log,
 )
 
 
@@ -185,11 +186,7 @@ def _assessment_outputs_status(
             if log_key in _FOUND_OUTPUT_LOGS:
                 return
             _FOUND_OUTPUT_LOGS.add(log_key)
-            try:
-                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                    logf.write(f"Found expected output: {hit}\n")
-            except OSError:
-                pass
+            append_run_log(log_path, f"Found expected output: {hit}", icon="📄")
 
         if target.exists():
             _log_hit(target)
@@ -214,11 +211,7 @@ def _assessment_outputs_status(
         all_key = f"{log_path.resolve()}::ALL_READY"
         if all_key not in _FOUND_OUTPUT_LOGS:
             _FOUND_OUTPUT_LOGS.add(all_key)
-            try:
-                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                    logf.write("All expected outputs found.\n")
-            except OSError:
-                pass
+            append_run_log(log_path, "All expected outputs found.", icon="✅")
 
     return ready == total, ready, total
 
@@ -626,7 +619,7 @@ def register_pre_post_callbacks(app):
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
 
-    def _register_group(stage: str, key: str, script_name: str):
+    def _register_group(stage: str, key: str, script_name: str, title: str):
         sid = f"{stage}-{key}"
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
@@ -652,8 +645,6 @@ def register_pre_post_callbacks(app):
             ]
         )
         outputs.append(Output(run_id, "disabled", allow_duplicate=True))
-        outputs.append(Output(f"{sid}-subtabs", "value", allow_duplicate=True))
-
         # Parameter States by group
         states: list = [State("session-id", "data")]
         param_state_ids: List[str] = []
@@ -715,7 +706,6 @@ def register_pre_post_callbacks(app):
                 has_ncol_param = True
 
         state_ids_tuple = tuple(param_state_ids)
-        states.append(State(f"{sid}-subtabs", "value"))
 
         @app.callback(
             *outputs,
@@ -732,6 +722,7 @@ def register_pre_post_callbacks(app):
             _stage=stage,
             _key=key,
             _script=script_name,
+            _title=title,
             _has_ncol=has_ncol_param,
             _state_ids=state_ids_tuple,
         ):
@@ -744,8 +735,7 @@ def register_pre_post_callbacks(app):
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
-            param_vals = list(values[1:-2])
-            current_subtab = values[-2] if len(values) >= 2 else None
+            param_vals = list(values[1:-1])
             run_state = values[-1] if values else None
             persisted_payload = dash.no_update
             if _state_ids:
@@ -763,7 +753,6 @@ def register_pre_post_callbacks(app):
                 poll_count=dash.no_update,
                 run_state_value=dash.no_update,
                 run_button_disabled=dash.no_update,
-                subtab_value=dash.no_update,
             ):
                 return (
                     content,
@@ -777,7 +766,6 @@ def register_pre_post_callbacks(app):
                     poll_count,
                     run_state_value,
                     run_button_disabled,
-                    subtab_value,
                 )
             if not session_id:
                 message = html.Div("Session not initialised.")
@@ -914,6 +902,11 @@ def register_pre_post_callbacks(app):
                         "key": _key,
                         "complete": True,
                     }
+                    append_run_log(
+                        log_path,
+                        f"All expected outputs found for {_title}.",
+                        icon="✅",
+                    )
                     stage_flag = True if _stage == "pre" else dash.no_update
                     return _output(
                         content,
@@ -968,37 +961,17 @@ def register_pre_post_callbacks(app):
             run_state_payload.setdefault("expected", expected)
             run_state_payload.setdefault("stage", _stage)
             run_state_payload.setdefault("key", _key)
+            if not run_state_payload.get("complete"):
+                append_run_log(
+                    log_path,
+                    f"All expected outputs found for {_title}.",
+                    icon="✅",
+                )
             content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
-            sub_defs = build_group_subtab_definitions(session_dir, _stage, _key)
-            subtab_values = [val for (_lbl, val, _child) in sub_defs]
-
-            original_tab = (
-                current_subtab
-                if current_subtab is not None
-                else (subtab_values[0] if subtab_values else None)
-            )
-            toggle_phase = run_state_payload.get("tab_toggle_phase", 0)
-            subtab_update = dash.no_update
+            run_state_payload["complete"] = True
             poll_disabled = True
             run_button_disabled = False
-
-            if subtab_values and len(subtab_values) > 1 and original_tab:
-                if toggle_phase == 0:
-                    target = subtab_values[1] if original_tab == subtab_values[0] else subtab_values[0]
-                    run_state_payload["original_tab"] = original_tab
-                    run_state_payload["tab_toggle_phase"] = 1
-                    subtab_update = target
-                    poll_disabled = False
-                    run_button_disabled = True
-                elif toggle_phase == 1:
-                    run_state_payload["tab_toggle_phase"] = 2
-                    subtab_update = run_state_payload.get("original_tab", subtab_values[0])
-                    run_state_payload["complete"] = True
-                else:
-                    run_state_payload["complete"] = True
-            else:
-                run_state_payload["complete"] = True
 
             return _output(
                 content,
@@ -1012,8 +985,7 @@ def register_pre_post_callbacks(app):
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
                 run_button_disabled=run_button_disabled,
-                subtab_value=subtab_update,
-            )
+                )
 
         if state_ids_tuple:
 
@@ -1047,9 +1019,9 @@ def register_pre_post_callbacks(app):
             return build_group_subtab_content(session_dir, _stage, _key, selected_value)
 
     # Register all group callbacks
-    for key, _, script in pre_groups:
-        _register_group("pre", key, script)
+    for key, title, script in pre_groups:
+        _register_group("pre", key, script, title)
     # Register post-stage groups (baseline pre groups plus post-only extras)
-    for key, _, script in pre_groups + post_extra:
-        _register_group("post", key, script)
+    for key, title, script in pre_groups + post_extra:
+        _register_group("post", key, script, title)
 
