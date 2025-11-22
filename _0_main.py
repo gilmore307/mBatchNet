@@ -27,6 +27,47 @@ from _6_correction import correction_layout, register_correction_callbacks
 from _7_description import HELP_MODAL_SECTIONS
 
 
+ALL_ASSESSMENT_GROUPS = [
+    # Shared pre/post assessments
+    ("pca", "pre"),
+    ("pca", "post"),
+    ("pcoa", "pre"),
+    ("pcoa", "post"),
+    ("nmds", "pre"),
+    ("nmds", "post"),
+    ("dissimilarity", "pre"),
+    ("dissimilarity", "post"),
+    ("permanova", "pre"),
+    ("permanova", "post"),
+    ("r2", "pre"),
+    ("r2", "post"),
+    ("prda", "pre"),
+    ("prda", "post"),
+    ("pvca", "pre"),
+    ("pvca", "post"),
+    # Post-only extras
+    ("alignment", "post"),
+    ("ebm", "post"),
+    ("silhouette", "post"),
+]
+
+
+def _subtab_validation_placeholders():
+    hidden_children = []
+    for key, stage in ALL_ASSESSMENT_GROUPS:
+        sid = f"{stage}-{key}"
+        hidden_children.append(
+            html.Div(
+                [
+                    dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
+                    html.Div(id=f"{sid}-subtab-content"),
+                ]
+            )
+        )
+
+    return html.Div(hidden_children, style={"display": "none"})
+
+
 app: Dash = dash.Dash(
     __name__,
     external_stylesheets=[dbc.themes.FLATLY],
@@ -155,49 +196,6 @@ def serve_layout() -> html.Div:
 
 
 app.layout = serve_layout
-
-# Provide Dash with a superset layout that enumerates all components referenced by
-# callbacks (across every page) so it won't complain when a callback output is
-# temporarily absent from the active layout (e.g., the Upload-only mosaic preview).
-ALL_ASSESSMENT_GROUPS = [
-    # Shared pre/post assessments
-    ("pca", "pre"),
-    ("pca", "post"),
-    ("pcoa", "pre"),
-    ("pcoa", "post"),
-    ("nmds", "pre"),
-    ("nmds", "post"),
-    ("dissimilarity", "pre"),
-    ("dissimilarity", "post"),
-    ("permanova", "pre"),
-    ("permanova", "post"),
-    ("r2", "pre"),
-    ("r2", "post"),
-    ("prda", "pre"),
-    ("prda", "post"),
-    ("pvca", "pre"),
-    ("pvca", "post"),
-    # Post-only extras
-    ("alignment", "post"),
-    ("ebm", "post"),
-    ("silhouette", "post"),
-]
-
-
-def _subtab_validation_placeholders():
-    hidden_children = []
-    for key, stage in ALL_ASSESSMENT_GROUPS:
-        sid = f"{stage}-{key}"
-        hidden_children.append(
-            html.Div(
-                [
-                    dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
-                    html.Div(id=f"{sid}-subtab-content"),
-                ]
-            )
-        )
-
-    return html.Div(hidden_children, style={"display": "none"})
 
 
 app.validation_layout = html.Div(
