@@ -894,7 +894,17 @@ def register_pre_post_callbacks(app):
 
             if not run_state_valid:
                 if files_ready:
-                    content = render_group_tabset(session_dir, _stage, _key)
+                    loading = dbc.Spinner(
+                        html.Div("Loading results..."),
+                        color="primary",
+                        type="border",
+                        size="md",
+                        fullscreen=False,
+                    )
+                    content = html.Div([
+                        loading,
+                        render_group_tabset(session_dir, _stage, _key),
+                    ])
                     run_state_payload = {
                         "session": session_id,
                         "expected": expected or expected_files,
@@ -917,7 +927,7 @@ def register_pre_post_callbacks(app):
                         log_interval_disabled=dash.no_update,
                         param_store=persisted_payload,
                         poll_disabled=True,
-                        poll_count=poll_ticks,
+                        poll_count=0,
                         run_state_value=run_state_payload,
                         run_button_disabled=False,
                     )
@@ -967,7 +977,17 @@ def register_pre_post_callbacks(app):
                     f"All expected outputs found for {_title}.",
                     icon="✅",
                 )
-            content = render_group_tabset(session_dir, _stage, _key)
+            loading = dbc.Spinner(
+                html.Div("Loading results..."),
+                color="primary",
+                type="border",
+                size="md",
+                fullscreen=False,
+            )
+            content = html.Div([
+                loading,
+                render_group_tabset(session_dir, _stage, _key),
+            ])
             stage_flag = True if _stage == "pre" else dash.no_update
             run_state_payload["complete"] = True
             poll_disabled = True
@@ -982,7 +1002,7 @@ def register_pre_post_callbacks(app):
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
                 poll_disabled=poll_disabled,
-                poll_count=poll_ticks,
+                poll_count=0,
                 run_state_value=run_state_payload,
                 run_button_disabled=run_button_disabled,
                 )
