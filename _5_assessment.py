@@ -973,7 +973,20 @@ def register_pre_post_callbacks(app):
             run_state_payload.setdefault("key", _key)
             refresh_remaining = int(run_state_payload.get("refresh_remaining", 0) or 0)
             notice = None
-            if refresh_remaining > 0:
+            if refresh_remaining <= 0:
+                refresh_remaining = TAB_REFRESH_CYCLES
+                run_state_payload["refresh_remaining"] = refresh_remaining
+                append_run_log(
+                    log_path,
+                    f"All expected outputs found for {_title}. Auto-refreshing tab every 2 seconds ({refresh_remaining} cycles).",
+                    icon="✅",
+                )
+                notice = dbc.Alert(
+                    f"Reloading {_title} tab every 2 seconds to display new results (remaining: {refresh_remaining}).",
+                    color="info",
+                    className="py-2 mb-2",
+                )
+            else:
                 append_run_log(
                     log_path,
                     f"Refreshing {_title} tab content ({refresh_remaining} remaining).",
