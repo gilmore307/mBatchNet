@@ -8,7 +8,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 
 from _7_description import (
     ASSESSMENT_PARAM_TOOLTIPS,
@@ -30,16 +30,15 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
-    _materialize_png_sidecar,
 )
 
 
 FIGURE_DEFAULTS = {
     "alignment": {"width": 2800, "height": 1800, "dpi": 300},
-    "pca": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "pcoa": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "nmds": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "dissimilarity": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
+    "pca": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "pcoa": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "nmds": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "dissimilarity": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "permanova": {"width": 2800, "height": 1800, "dpi": 300},
     "r2": {"width": 4800, "height": 1200, "dpi": 300},
     "prda": {"width": 3000, "height": 1500, "dpi": 300},
@@ -47,6 +46,33 @@ FIGURE_DEFAULTS = {
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
 }
+
+
+_FOUND_OUTPUT_LOGS: Set[str] = set()
+
+
+def _reset_found_logs(log_path: Optional[Path]) -> None:
+    """Drop cached discovery entries for the given run log so re-runs re-log finds."""
+
+    if not log_path:
+        return
+    prefix = f"{log_path.resolve()}::"
+    stale = {entry for entry in _FOUND_OUTPUT_LOGS if entry.startswith(prefix)}
+    if stale:
+        _FOUND_OUTPUT_LOGS.difference_update(stale)
+
+
+def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
+    """Remove prior output files (figures and tables) before starting a run."""
+
+    for fname in expected_files:
+        path = session_dir / fname
+        stem = path.with_suffix("")
+        for target in (path, stem.with_suffix(".png"), stem.with_suffix(".tif"), stem.with_suffix(".tiff")):
+            try:
+                target.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _expected_figure_files(stage: str, key: str) -> List[str]:
@@ -60,11 +86,16 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
         if condition and filename:
             expected.append(filename)
 
-    def add_assessment_tables(base_name: Optional[str], multi_geometry: bool = False):
+    def add_assessment_tables(
+        base_name: Optional[str],
+        multi_geometry: bool = False,
+        include_combined: bool = True,
+    ):
         if not base_name:
             return
         suffix = "pre" if stage == "pre" else "post"
-        expected.append(f"{base_name}_raw_assessment_{suffix}.csv")
+        if include_combined:
+            expected.append(f"{base_name}_raw_assessment_{suffix}.csv")
         if multi_geometry:
             expected.append(f"{base_name}_aitchison_raw_assessment_{suffix}.csv")
             expected.append(f"{base_name}_braycurtis_raw_assessment_{suffix}.csv")
@@ -77,22 +108,30 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
             add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_batch"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_target"), spec.filename)
-            add_assessment_tables("pcoa", multi_geometry=True)
+            add_assessment_tables(
+                "pcoa", multi_geometry=True, include_combined=False
+            )
         elif key == "nmds":
             add_if(low.startswith("nmds_aitchison_batch"), spec.filename)
             add_if(low.startswith("nmds_aitchison_target"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_batch"), spec.filename)
             add_if(low.startswith("nmds_braycurtis_target"), spec.filename)
-            add_assessment_tables("nmds", multi_geometry=True)
+            add_assessment_tables(
+                "nmds", multi_geometry=True, include_combined=False
+            )
         elif key == "dissimilarity":
             add_if(low.startswith("dissimilarity_heatmaps_aitchison"), spec.filename)
             add_if(low.startswith("dissimilarity_heatmaps_braycurtis"), spec.filename)
-            add_assessment_tables("dissimilarity", multi_geometry=True)
+            add_assessment_tables(
+                "dissimilarity", multi_geometry=True, include_combined=False
+            )
         elif key == "permanova":
             add_if(low.startswith("permanova_aitchison"), spec.filename)
             add_if(low.startswith("permanova_braycurtis"), spec.filename)
             add_if(low.startswith("permanova"), spec.filename)
-            add_assessment_tables("permanova", multi_geometry=True)
+            add_assessment_tables(
+                "permanova", multi_geometry=True, include_combined=False
+            )
         elif key == "r2":
             add_if(low.startswith("anova_aitchison"), spec.filename)
             add_if(low.startswith("anova_braycurtis"), spec.filename)
@@ -129,32 +168,58 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
 
 
 def _assessment_outputs_status(
-    session_dir: Path, expected_files: Sequence[str]
+    session_dir: Path, expected_files: Sequence[str], log_path: Optional[Path] = None
 ) -> Tuple[bool, int, int]:
     """Return readiness plus how many expected files are available."""
 
     if not expected_files:
         return False, 0, 0
 
-    def _exists_with_fallback(name: str) -> bool:
-        png_path = session_dir / name
-        if png_path.exists():
+    def _exists(name: str) -> bool:
+        target = session_dir / name
+
+        def _log_hit(hit: Path) -> None:
+            if log_path is None:
+                return
+            log_key = f"{log_path.resolve()}::{hit.resolve()}"
+            if log_key in _FOUND_OUTPUT_LOGS:
+                return
+            _FOUND_OUTPUT_LOGS.add(log_key)
+            try:
+                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                    logf.write(f"Found expected output: {hit}\n")
+            except OSError:
+                pass
+
+        if target.exists():
+            _log_hit(target)
             return True
 
-        for alt_ext in (".tif", ".tiff"):
-            alt = png_path.with_suffix(alt_ext)
-            if alt.exists():
-                _materialize_png_sidecar(alt)
-                return png_path.exists()
-
+        # On some platforms the filesystem can surface unexpected casing; fall back to a
+        # case-insensitive search so detected files always advance progress.
+        lowered = name.lower()
+        for candidate in session_dir.glob("*"):
+            if candidate.name.lower() == lowered:
+                _log_hit(candidate)
+                return True
         return False
 
     ready = 0
     for fname in expected_files:
-        if _exists_with_fallback(fname):
+        if _exists(fname):
             ready += 1
 
     total = len(expected_files)
+    if ready == total and log_path is not None:
+        all_key = f"{log_path.resolve()}::ALL_READY"
+        if all_key not in _FOUND_OUTPUT_LOGS:
+            _FOUND_OUTPUT_LOGS.add(all_key)
+            try:
+                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                    logf.write("All expected outputs found.\n")
+            except OSError:
+                pass
+
     return ready == total, ready, total
 
 
@@ -442,7 +507,18 @@ def assessment_layout(active_path: str, stage: str):
     for key, title, _ in groups:
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
-        placeholder = html.Div("Click Run to generate results.")
+        placeholder = html.Div(
+            [
+                html.Div("Click Run to generate results."),
+                html.Div(
+                    [
+                        dcc.Tabs(id=f"{stage}-{key}-subtabs", value=None, children=[]),
+                        html.Div(id=f"{stage}-{key}-subtab-content"),
+                    ],
+                    style={"display": "none"},
+                ),
+            ]
+        )
         controls = _param_controls(stage, key)
         tab_items.append(
             dcc.Tab(
@@ -471,7 +547,7 @@ def assessment_layout(active_path: str, stage: str):
                                     id=run_id,
                                     size="sm",
                                     color="success",
-                                    className="mb-2",
+                                    className="mb-2 be-run-button",
                                     style={"width": "250px", "marginLeft": "5px"},
                                 ),
                                 html.Div(
@@ -575,6 +651,8 @@ def register_pre_post_callbacks(app):
                 Output(f"{sid}-run-state", "data", allow_duplicate=True),
             ]
         )
+        outputs.append(Output(run_id, "disabled", allow_duplicate=True))
+        outputs.append(Output(f"{sid}-subtabs", "value", allow_duplicate=True))
 
         # Parameter States by group
         states: list = [State("session-id", "data")]
@@ -637,6 +715,7 @@ def register_pre_post_callbacks(app):
                 has_ncol_param = True
 
         state_ids_tuple = tuple(param_state_ids)
+        states.append(State(f"{sid}-subtabs", "value"))
 
         @app.callback(
             *outputs,
@@ -665,7 +744,8 @@ def register_pre_post_callbacks(app):
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
-            param_vals = list(values[1:-1])
+            param_vals = list(values[1:-2])
+            current_subtab = values[-2] if len(values) >= 2 else None
             run_state = values[-1] if values else None
             persisted_payload = dash.no_update
             if _state_ids:
@@ -682,6 +762,8 @@ def register_pre_post_callbacks(app):
                 poll_disabled=True,
                 poll_count=dash.no_update,
                 run_state_value=dash.no_update,
+                run_button_disabled=dash.no_update,
+                subtab_value=dash.no_update,
             ):
                 return (
                     content,
@@ -694,19 +776,25 @@ def register_pre_post_callbacks(app):
                     poll_disabled,
                     poll_count,
                     run_state_value,
+                    run_button_disabled,
+                    subtab_value,
                 )
             if not session_id:
                 message = html.Div("Session not initialised.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True)
-                return _output(message, dash.no_update, poll_disabled=True)
+                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                return _output(
+                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                )
 
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True)
-                return _output(message, dash.no_update, poll_disabled=True)
+                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                return _output(
+                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                )
 
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
@@ -714,6 +802,9 @@ def register_pre_post_callbacks(app):
             if trigger_id == run_id:
                 # Build CLI flags from parameters
                 flags = []
+
+                _reset_found_logs(log_path)
+                _clear_outputs(session_dir, expected_files)
 
                 def _add(flag, val, cast=str):
                     if val is None or val == "":
@@ -800,6 +891,7 @@ def register_pre_post_callbacks(app):
                     poll_disabled=False,
                     poll_count=0,
                     run_state_value=run_state_payload,
+                    run_button_disabled=True,
                 )
 
             # Polling branch
@@ -809,7 +901,7 @@ def register_pre_post_callbacks(app):
 
             expected = run_state.get("expected") if run_state_valid else expected_files
             files_ready, ready_count, total_expected = _assessment_outputs_status(
-                session_dir, expected or expected_files
+                session_dir, expected or expected_files, log_path=log_path
             )
 
             if not run_state_valid:
@@ -834,6 +926,7 @@ def register_pre_post_callbacks(app):
                         poll_disabled=True,
                         poll_count=poll_ticks,
                         run_state_value=run_state_payload,
+                        run_button_disabled=False,
                     )
 
                 placeholder = html.Div("Click Run to generate results.")
@@ -844,6 +937,7 @@ def register_pre_post_callbacks(app):
                     poll_disabled=True,
                     poll_count=poll_ticks,
                     run_state_value=None,
+                    run_button_disabled=False,
                 )
 
             if not files_ready:
@@ -866,14 +960,46 @@ def register_pre_post_callbacks(app):
                     poll_disabled=False,
                     poll_count=poll_ticks,
                     run_state_value=run_state,
+                    run_button_disabled=True,
                 )
 
-            content = render_group_tabset(session_dir, _stage, _key)
             run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
             run_state_payload.setdefault("session", session_id)
             run_state_payload.setdefault("expected", expected)
-            run_state_payload["complete"] = True
+            run_state_payload.setdefault("stage", _stage)
+            run_state_payload.setdefault("key", _key)
+            content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
+            sub_defs = build_group_subtab_definitions(session_dir, _stage, _key)
+            subtab_values = [val for (_lbl, val, _child) in sub_defs]
+
+            original_tab = (
+                current_subtab
+                if current_subtab is not None
+                else (subtab_values[0] if subtab_values else None)
+            )
+            toggle_phase = run_state_payload.get("tab_toggle_phase", 0)
+            subtab_update = dash.no_update
+            poll_disabled = True
+            run_button_disabled = False
+
+            if subtab_values and len(subtab_values) > 1 and original_tab:
+                if toggle_phase == 0:
+                    target = subtab_values[1] if original_tab == subtab_values[0] else subtab_values[0]
+                    run_state_payload["original_tab"] = original_tab
+                    run_state_payload["tab_toggle_phase"] = 1
+                    subtab_update = target
+                    poll_disabled = False
+                    run_button_disabled = True
+                elif toggle_phase == 1:
+                    run_state_payload["tab_toggle_phase"] = 2
+                    subtab_update = run_state_payload.get("original_tab", subtab_values[0])
+                    run_state_payload["complete"] = True
+                else:
+                    run_state_payload["complete"] = True
+            else:
+                run_state_payload["complete"] = True
+
             return _output(
                 content,
                 stage_flag,
@@ -882,9 +1008,11 @@ def register_pre_post_callbacks(app):
                 modal_open=dash.no_update,
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=True,
+                poll_disabled=poll_disabled,
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
+                run_button_disabled=run_button_disabled,
+                subtab_value=subtab_update,
             )
 
         if state_ids_tuple:

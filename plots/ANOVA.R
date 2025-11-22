@@ -6,20 +6,12 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(forcats)
   library(jsonlite)
+  library(magick)
 })
 
-# ----------------- Args / IO -----------------
+source("plots/helper.R")
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v }, USE.NAMES = FALSE)
-}
+# ----------------- Args / IO -----------------
 
 format_method_label <- function(label) {
   if (identical(label, "Before correction")) {
@@ -118,14 +110,6 @@ clr_paths <- list.files(output_folder, pattern = "^normalized_.*_clr\\.csv$", fu
 # Fallback: if no suffix-specific outputs, use any normalized_*.csv as CLR
 if (!length(clr_paths)) {
   clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
-}
-
-name_from <- function(paths, suffix) {
-  base <- basename(paths)
-  base <- sub("^normalized_", "", base)
-  base <- sub(paste0("_", suffix, "\\.csv$"), "", base)  # handle ..._clr.csv
-  base <- sub("\\.csv$", "", base)                       # handle ... .csv
-  base
 }
 
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
@@ -314,19 +298,6 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
   p
 }
 
-p_clr <- make_boxplot(
-  r2_long_clr, method_levels_clr,
-  expression("Feature-wise ANOVA " * R^2 )
-)
-if (!is.null(p_clr)) {
-  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
-  ggsave(file.path(output_folder, "anova_aitchison.tif"), p_clr,
-         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-  message("Saved figure: anova_aitchison.tif")
-} else {
-  message("No data to plot; skip figure export.")
-}
-
 # ----------------- Unified assessment table -----------------
 median_r2_by_method <- r2_long_clr %>%
   group_by(Method, Effect) %>%
@@ -387,3 +358,19 @@ readr::write_excel_csv(pre_out,  file.path(output_folder, "anova_raw_assessment_
 readr::write_excel_csv(post_out, file.path(output_folder, "anova_raw_assessment_post_excel.csv"))
 
 message("Saved CSV: anova_raw_assessment_pre.csv / anova_raw_assessment_post.csv (+ *_excel.csv)")
+
+# ----------------- Plot after CSVs are written -----------------
+p_clr <- make_boxplot(
+  r2_long_clr, method_levels_clr,
+  expression("Feature-wise ANOVA " * R^2 )
+)
+if (!is.null(p_clr)) {
+  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
+  tif_path <- file.path(output_folder, "anova_aitchison.tif")
+  ggsave(tif_path, p_clr,
+         width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
+  message("Saved figure: anova_aitchison.tif")
+} else {
+  message("No data to plot; skip figure export.")
+}

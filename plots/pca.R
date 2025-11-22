@@ -6,31 +6,13 @@ suppressPackageStartupMessages({
   library(patchwork)  # legend collecting & layout
   library(rlang)
   library(jsonlite)
+  library(magick)
 })
+
+source("plots/helper.R")
 
 # ---- helpers ----
 mbecUpperCase <- function(x) paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x)))
-
-# Map method codes from filenames to short display labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization",
-    bmc = "BMC",
-    limma = "Limma",
-    conqur = "ConQuR",
-    plsda = "PLSDA-batch",
-    combat = "ComBat",
-    fsqn = "FSQN",
-    mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB",
-    metadict = "MetaDICT",
-    pn = "Percentile Normalization",
-    fabatch = "FAbatch",
-    combatseq = "ComBat-seq",
-    debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
 
 guess_shape_var <- function(meta, batch_col = "batch") {
   cand <- c("group","phenotype","condition","status","case_control","class","disease","label")
@@ -476,8 +458,8 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
   n_panels <- length(plot_list)
   panel_cols <- 1L
   panel_rows <- 1L
-  base_fig_width_in  <- 2800 / 300
-  base_fig_height_in <- 1800 / 300
+  base_fig_width_in  <- 1800 / 300
+  base_fig_height_in <- 1200 / 300
   base_col_width_in  <- base_fig_width_in / 3
   base_row_height_in <- base_fig_height_in
   if (n_panels == 1L) {
@@ -504,16 +486,13 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+  tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
+  ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   rm(combined, plot_list)
   gc()
 }
-
-batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
-save_pca_plot_set(batch_plots, "pca_batch")
-target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
-save_pca_plot_set(target_plots, "pca_target")
 
 # =========================
 # PCA assessment summaries
@@ -709,3 +688,12 @@ if (only_baseline) {
   print(assessment_tbl, n = nrow(assessment_tbl))
   readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
 }
+
+# =========================
+# Plot rendering (after CSVs are written)
+# =========================
+
+batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
+save_pca_plot_set(batch_plots, "pca_batch")
+target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
+save_pca_plot_set(target_plots, "pca_target")

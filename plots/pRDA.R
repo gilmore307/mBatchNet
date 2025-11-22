@@ -9,20 +9,11 @@ suppressPackageStartupMessages({
   library(grid)        # grobs
   library(jsonlite)
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
-
   library(gtable)      # table tweaks
   library(vegan)       # rda, capscale, RsquareAdj
 })
+
+source("plots/helper.R")
 
 # --------- Args / IO ---------
 args <- commandArgs(trailingOnly = TRUE)
@@ -113,7 +104,6 @@ if (!length(clr_paths)) {
   clr_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
 }
 
-name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, method_short_label(name_from(clr_paths, "clr")))
 
 # Include raw_clr.csv as "Before correction" if present
@@ -349,12 +339,6 @@ if (length(file_list_clr)) {
     v  <- compute_prda_parts_aitch(df, metadata, batch_col, treat_col)
     tibble::tibble(Method = nm, Fraction = as.numeric(v))
   }) |> bind_rows()
-  
-  plot_prda_with_table(
-    parts_df_aitch, file_list_clr,
-    title_prefix  = "Partial Redundant Analysis: Variance Partition",
-    outfile_prefix = "pRDA_aitchison"
-  )
 }
 
 # ==== pRDA scoring (Aitchison) =========================
@@ -424,4 +408,15 @@ if (only_baseline) {
 
   print(unified, n = nrow(unified))
   readr::write_csv(unified, file.path(output_folder, output_name))
+}
+
+# ========= Plot after CSVs are written =========
+if (exists("parts_df_aitch") && nrow(parts_df_aitch)) {
+  plot_prda_with_table(
+    parts_df_aitch, file_list_clr,
+    title_prefix  = "Partial Redundant Analysis: Variance Partition",
+    outfile_prefix = "pRDA_aitchison"
+  )
+} else {
+  message("No pRDA components available for plotting.")
 }

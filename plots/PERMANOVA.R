@@ -4,20 +4,12 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(ggplot2)
   library(vegan)   # adonis2 / betadisper
+  library(magick)
 })
 
-# --------- Args / config ---------
+source("plots/helper.R")
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
+# --------- Args / config ---------
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -74,7 +66,6 @@ raw_clr_fp <- file.path(output_folder, "raw_clr.csv")
 if (file.exists(raw_clr_fp)) clr_paths <- c(raw_clr_fp, clr_paths)
 if (!length(clr_paths)) stop("No CLR matrices found (expected 'raw_clr.csv' or 'normalized_*_clr.csv').")
 
-name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 method_names <- ifelse(basename(clr_paths) == "raw_clr.csv",
                        "Before correction",
                        method_short_label(name_from(clr_paths, "clr")))
@@ -138,10 +129,8 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
 # --------- Compute PERMANOVA per method (both geometries) ---------
 only_baseline <- (length(method_levels) == 1L && identical(method_levels, "Before correction"))
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("permanova_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(
@@ -194,6 +183,24 @@ for (idx in seq_len(nrow(geometry_specs))) {
     arrange(Method)
 
   results_by_geom[[geom_key]] <- geom_tbl
+}
+
+# --------- Save per-geometry tables only ---------
+summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
+  mutate(
+    Method = factor(Method, levels = method_levels),
+    Geometry = factor(Geometry, levels = geometry_specs$geometry_label)
+  ) %>%
+  arrange(Geometry, Method)
+
+write_assessment_outputs(summary_tbl)
+print(summary_tbl, n = nrow(summary_tbl))
+
+# --------- Plot after CSVs are written ---------
+for (idx in seq_len(nrow(geometry_specs))) {
+  geom_key <- geometry_specs$geometry_key[[idx]]
+  geom_tbl <- results_by_geom[[geom_key]]
+  if (is.null(geom_tbl) || !nrow(geom_tbl)) next
 
   plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
   y_max <- max(plot_df$`R²`, na.rm = TRUE)
@@ -215,17 +222,8 @@ for (idx in seq_len(nrow(geometry_specs))) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-ggsave(file.path(output_folder, sprintf("permanova_%s.tif", geom_key)), p,
-       width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  tif_path <- file.path(output_folder, sprintf("permanova_%s.tif", geom_key))
+  ggsave(tif_path, p,
+         width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
 }
-
-# --------- Save combined table ---------
-summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
-  mutate(
-    Method = factor(Method, levels = method_levels),
-    Geometry = factor(Geometry, levels = geometry_specs$geometry_label)
-  ) %>%
-  arrange(Geometry, Method)
-
-write_assessment_outputs(summary_tbl)
-print(summary_tbl, n = nrow(summary_tbl))

@@ -8,18 +8,10 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(patchwork)
   library(vegan)  # Bray-Curtis
-  
-  # Map method codes to short labels for figures
-  method_short_label <- function(x) {
-    map <- c(
-      qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-      fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-    )
-    sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-  }
+  library(magick)
 })
+
+source("plots/helper.R")
 
 # ==== IO ====
 args <- commandArgs(trailingOnly = TRUE)
@@ -124,7 +116,6 @@ if (!length(clr_paths) && !length(tss_paths)) {
   tss_paths <- any_paths
 }
 
-name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, if (length(clr_paths)) name_from(clr_paths, "clr") else character())
 file_list_tss <- setNames(tss_paths, if (length(tss_paths)) name_from(tss_paths, "tss") else character())
 
@@ -378,33 +369,6 @@ for (nm in names(mat_list_ait)) {
 }
 
 
-# ---- Combine & save (Aitchison) ----
-n_panels_ait <- length(plots_ait)
-panel_cols_ait <- 1L
-panel_rows_ait <- 1L
-base_fig_width_in  <- 2800 / 300
-base_fig_height_in <- 1800 / 300
-base_col_width_in  <- base_fig_width_in / 3
-base_row_height_in <- base_fig_height_in
-if (n_panels_ait == 1L) {
-  combined_ait <- plots_ait[[1]] +
-    theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_ait <- base_fig_width_in; h_ait <- base_fig_height_in
-} else {
-  panel_cols_ait <- min(ncol_grid, n_panels_ait)
-  panel_rows_ait <- ceiling(n_panels_ait / ncol_grid)
-  combined_ait <- wrap_plots(plots_ait, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_ait <- base_col_width_in * panel_cols_ait
-  h_ait <- base_row_height_in * panel_rows_ait
-}
-fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
-ggsave(file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif"),
-       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
-rm(combined_ait, plots_ait)
-gc()
-
 # ==== B) Bray-Curtis heatmaps ====
 mat_list_bc <- list()
 ord_list_bc <- list()
@@ -441,29 +405,6 @@ for (nm in names(mat_list_bc)) {
   )
 }
 
-# ---- Combine & save (Bray-Curtis) ----
-n_panels_bc <- length(plots_bc)
-panel_cols_bc <- 1L
-panel_rows_bc <- 1L
-if (n_panels_bc == 1L) {
-  combined_bc <- plots_bc[[1]] +
-    theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_bc <- base_fig_width_in; h_bc <- base_fig_height_in
-} else {
-  panel_cols_bc <- min(ncol_grid, n_panels_bc)
-  panel_rows_bc <- ceiling(n_panels_bc / ncol_grid)
-  combined_bc <- wrap_plots(plots_bc, ncol = ncol_grid) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
-  w_bc <- base_col_width_in * panel_cols_bc
-  h_bc <- base_row_height_in * panel_rows_bc
-}
-fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
-ggsave(file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif"),
-       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
-rm(combined_bc, plots_bc)
-gc()
-
 # ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
 mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
 mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else numeric()
@@ -471,10 +412,8 @@ mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else nume
 all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("dissimilarity_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(
@@ -579,3 +518,57 @@ if (only_baseline) {
   print(assessment_tbl, n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
 }
+
+# ---- Combine & save (Aitchison) ----
+n_panels_ait <- length(plots_ait)
+panel_cols_ait <- 1L
+panel_rows_ait <- 1L
+base_fig_width_in  <- 1800 / 300
+base_fig_height_in <- 1200 / 300
+base_col_width_in  <- base_fig_width_in / 3
+base_row_height_in <- base_fig_height_in
+if (n_panels_ait == 1L) {
+  combined_ait <- plots_ait[[1]] +
+    theme(legend.position = "bottom", legend.direction = "horizontal")
+  w_ait <- base_fig_width_in; h_ait <- base_fig_height_in
+} else {
+  panel_cols_ait <- min(ncol_grid, n_panels_ait)
+  panel_rows_ait <- ceiling(n_panels_ait / ncol_grid)
+  combined_ait <- wrap_plots(plots_ait, ncol = ncol_grid) +
+    plot_layout(guides = "collect") &
+    theme(legend.position = "bottom", legend.direction = "horizontal")
+  w_ait <- base_col_width_in * panel_cols_ait
+  h_ait <- base_row_height_in * panel_rows_ait
+}
+fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
+tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
+ggsave(tif_path_ait,
+       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
+create_png_thumbnail(tif_path_ait)
+rm(combined_ait, plots_ait)
+gc()
+
+# ---- Combine & save (Bray-Curtis) ----
+n_panels_bc <- length(plots_bc)
+panel_cols_bc <- 1L
+panel_rows_bc <- 1L
+if (n_panels_bc == 1L) {
+  combined_bc <- plots_bc[[1]] +
+    theme(legend.position = "bottom", legend.direction = "horizontal")
+  w_bc <- base_fig_width_in; h_bc <- base_fig_height_in
+} else {
+  panel_cols_bc <- min(ncol_grid, n_panels_bc)
+  panel_rows_bc <- ceiling(n_panels_bc / ncol_grid)
+  combined_bc <- wrap_plots(plots_bc, ncol = ncol_grid) +
+    plot_layout(guides = "collect") &
+    theme(legend.position = "bottom", legend.direction = "horizontal")
+  w_bc <- base_col_width_in * panel_cols_bc
+  h_bc <- base_row_height_in * panel_rows_bc
+}
+fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
+tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
+ggsave(tif_path_bc,
+       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
+create_png_thumbnail(tif_path_bc)
+rm(combined_bc, plots_bc)
+gc()

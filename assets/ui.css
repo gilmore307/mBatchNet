@@ -85,6 +85,13 @@ body {
   width: 100%;
 }
 
+.be-run-button:disabled,
+.be-run-button.disabled {
+  background-color: var(--bs-secondary);
+  border-color: var(--bs-secondary);
+  color: #fff;
+}
+
 /* Subtab card styling to keep tabs and visuals together */
 .be-subtab-card {
   width: 83vw;

@@ -10,18 +10,9 @@ suppressPackageStartupMessages({
   library(gtable)     # add borders/lines to table grob
   library(jsonlite)
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
-
 })
+
+source("plots/helper.R")
 
 if (!requireNamespace("lme4", quietly = TRUE)) {
   stop("Package 'lme4' is required. install.packages('lme4')")
@@ -431,9 +422,6 @@ final_width  <- max(hist_dims$width, table_width_in)
 final_height <- hist_dims$height + table_height_in +
   grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 
-ggsave(file.path(output_folder, "PVCA.tif"),
-       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")
-
 # --------- Summaries for PVCA components ----------
 summarise_pvca_methods <- function(df_long) {
   summary_tbl <- df_long %>%
@@ -464,3 +452,7 @@ if (only_baseline) {
   print(summary_tbl)
   readr::write_csv(summary_tbl, file.path(output_folder, output_name))
 }
+
+# --------- Save figure after CSVs are written ----------
+ggsave(file.path(output_folder, "PVCA.tif"),
+       plot = combined, width = final_width, height = final_height, dpi = hist_dims$dpi, compression = "lzw")

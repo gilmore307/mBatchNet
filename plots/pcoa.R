@@ -7,17 +7,10 @@ suppressPackageStartupMessages({
   library(rlang)
   library(vegan)      # Bray-Curtis
   library(jsonlite)
+  library(magick)
 })
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
+
+source("plots/helper.R")
 
 # ==== Helpers (robust ranges/padding) ====
 safe_range <- function(v) {
@@ -224,7 +217,6 @@ if (!length(clr_paths) && !length(tss_paths)) {
   tss_paths <- any_paths
 }
 
-name_from <- function(paths, suffix) gsub(paste0("^normalized_|_", suffix, "\\.csv$"), "", basename(paths))
 file_list_clr <- setNames(clr_paths, if (length(clr_paths)) method_short_label(name_from(clr_paths, "clr")) else character())
 file_list_tss <- setNames(tss_paths, if (length(tss_paths)) method_short_label(name_from(tss_paths, "tss")) else character())
 
@@ -564,8 +556,8 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
   n_panels <- length(plot_list)
   panel_cols <- 1L
   panel_rows <- 1L
-  base_fig_width_in  <- 2800 / 300
-  base_fig_height_in <- 1800 / 300
+  base_fig_width_in  <- 1800 / 300
+  base_fig_height_in <- 1200 / 300
   base_col_width_in  <- base_fig_width_in / 3
   base_row_height_in <- base_fig_height_in
   if (n_panels == 1L) {
@@ -592,29 +584,13 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  ggsave(file.path(output_folder, paste0(filename_stub, ".tif")),
+  tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
+  ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   rm(combined, plot_list)
   gc()
 }
-
-if (length(frames_cache_clr)) {
-  batch_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", batch_var, "Batch")
-  save_pcoa_plot_set(batch_plots, "pcoa_aitchison_batch")
-  target_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", target_var, "Target")
-  save_pcoa_plot_set(target_plots, "pcoa_aitchison_target")
-}
-
-if (length(frames_cache_tss)) {
-  batch_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", batch_var, "Batch")
-  save_pcoa_plot_set(batch_plots_bc, "pcoa_braycurtis_batch")
-  target_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", target_var, "Target")
-  save_pcoa_plot_set(target_plots_bc, "pcoa_braycurtis_target")
-}
-
-# =========================
-# Unified PCoA summaries (Aitchison + Bray combined)
-# =========================
 
 compute_centroids_pcoa <- function(scores, batch_var = "batch") {
   scores %>%
@@ -785,10 +761,8 @@ all_methods <- union(methods_clr, methods_tss)
 
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("pcoa_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(
@@ -865,4 +839,26 @@ if (only_baseline) {
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
+}
+
+# =========================
+# Plot rendering (after CSVs are written)
+# =========================
+
+if (length(frames_cache_clr)) {
+  batch_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots, "pcoa_aitchison_batch")
+  target_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", target_var, "Target")
+  save_pcoa_plot_set(target_plots, "pcoa_aitchison_target")
+}
+
+if (length(frames_cache_tss)) {
+  batch_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots_bc, "pcoa_braycurtis_batch")
+  target_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", target_var, "Target")
+  save_pcoa_plot_set(target_plots_bc, "pcoa_braycurtis_target")
+}
+
+if (!length(frames_cache_clr) && !length(frames_cache_tss)) {
+  message("No PCoA frames available for plotting.")
 }

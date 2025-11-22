@@ -5,20 +5,12 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(uwot)     # UMAP
   library(FNN)      # kNN
+  library(magick)
 })
 
-# --------- Args / config ---------
+source("plots/helper.R")
 
-# Map method codes to short labels for figures
-method_short_label <- function(x) {
-  map <- c(
-    qn = "Quantile Normalization", bmc = "BMC", limma = "Limma", conqur = "ConQuR",
-    plsda = "PLSDA-batch", combat = "ComBat", fsqn = "FSQN", mmuphin = "MMUPHin",
-    ruv = "RUV-III-NB", metadict = "MetaDICT", pn = "Percentile Normalization",
-    fabatch = "FAbatch", combatseq = "ComBat-seq", debias = "DEBIAS-M"
-  )
-  sapply(x, function(v){ lv <- tolower(v); if (lv %in% names(map)) map[[lv]] else v })
-}
+# --------- Args / config ---------
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
@@ -318,8 +310,10 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
+  tif_path <- file.path(output_folder, "ebm.tif")
+  ggsave(tif_path, p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
   
   # No correction recommendation messages
   
@@ -350,6 +344,8 @@ if (only_baseline) {
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)
-  ggsave(file.path(output_folder, "ebm.tif"), p_ebm,
+  tif_path <- file.path(output_folder, "ebm.tif")
+  ggsave(tif_path, p_ebm,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+  create_png_thumbnail(tif_path)
 }
