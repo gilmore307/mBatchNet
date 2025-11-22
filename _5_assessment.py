@@ -30,6 +30,7 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
+    append_run_log,
 )
 
 
@@ -46,6 +47,8 @@ FIGURE_DEFAULTS = {
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
     "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
 }
+
+TAB_REFRESH_CYCLES = 3
 
 
 _FOUND_OUTPUT_LOGS: Set[str] = set()
@@ -185,11 +188,7 @@ def _assessment_outputs_status(
             if log_key in _FOUND_OUTPUT_LOGS:
                 return
             _FOUND_OUTPUT_LOGS.add(log_key)
-            try:
-                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                    logf.write(f"Found expected output: {hit}\n")
-            except OSError:
-                pass
+            append_run_log(log_path, f"Found expected output: {hit}", icon="📄")
 
         if target.exists():
             _log_hit(target)
@@ -214,11 +213,7 @@ def _assessment_outputs_status(
         all_key = f"{log_path.resolve()}::ALL_READY"
         if all_key not in _FOUND_OUTPUT_LOGS:
             _FOUND_OUTPUT_LOGS.add(all_key)
-            try:
-                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
-                    logf.write("All expected outputs found.\n")
-            except OSError:
-                pass
+            append_run_log(log_path, "All expected outputs found.", icon="✅")
 
     return ready == total, ready, total
 
@@ -626,7 +621,7 @@ def register_pre_post_callbacks(app):
         ("silhouette", "Silhouette score", "Silhouette.R"),
     ]
 
-    def _register_group(stage: str, key: str, script_name: str):
+    def _register_group(stage: str, key: str, script_name: str, title: str):
         sid = f"{stage}-{key}"
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
@@ -729,6 +724,7 @@ def register_pre_post_callbacks(app):
             _stage=stage,
             _key=key,
             _script=script_name,
+            _title=title,
             _has_ncol=has_ncol_param,
             _state_ids=state_ids_tuple,
         ):
@@ -900,14 +896,27 @@ def register_pre_post_callbacks(app):
 
             if not run_state_valid:
                 if files_ready:
-                    content = render_group_tabset(session_dir, _stage, _key)
+                    refresh_remaining = TAB_REFRESH_CYCLES
+                    base_content = render_group_tabset(session_dir, _stage, _key)
+                    notice = dbc.Alert(
+                        f"Reloading {_title} tab every 2 seconds to display new results (remaining: {refresh_remaining}).",
+                        color="info",
+                        className="py-2 mb-2",
+                    )
+                    content = html.Div([notice, base_content]) if refresh_remaining else base_content
                     run_state_payload = {
                         "session": session_id,
                         "expected": expected or expected_files,
                         "stage": _stage,
                         "key": _key,
                         "complete": True,
+                        "refresh_remaining": refresh_remaining,
                     }
+                    append_run_log(
+                        log_path,
+                        f"All expected outputs found for {_title}. Auto-refreshing tab every 2 seconds ({refresh_remaining} cycles).",
+                        icon="✅",
+                    )
                     stage_flag = True if _stage == "pre" else dash.no_update
                     return _output(
                         content,
@@ -917,7 +926,7 @@ def register_pre_post_callbacks(app):
                         modal_open=dash.no_update,
                         log_interval_disabled=dash.no_update,
                         param_store=persisted_payload,
-                        poll_disabled=True,
+                        poll_disabled=False,
                         poll_count=poll_ticks,
                         run_state_value=run_state_payload,
                         run_button_disabled=False,
@@ -962,10 +971,27 @@ def register_pre_post_callbacks(app):
             run_state_payload.setdefault("expected", expected)
             run_state_payload.setdefault("stage", _stage)
             run_state_payload.setdefault("key", _key)
+            refresh_remaining = int(run_state_payload.get("refresh_remaining", 0) or 0)
+            notice = None
+            if refresh_remaining > 0:
+                append_run_log(
+                    log_path,
+                    f"Refreshing {_title} tab content ({refresh_remaining} remaining).",
+                    icon="🔄",
+                )
+                notice = dbc.Alert(
+                    f"Reloading {_title} tab to show updated figures (remaining: {refresh_remaining - 1}).",
+                    color="info",
+                    className="py-2 mb-2",
+                )
+                refresh_remaining -= 1
+            run_state_payload["refresh_remaining"] = refresh_remaining
             content = render_group_tabset(session_dir, _stage, _key)
+            if notice:
+                content = html.Div([notice, content])
             stage_flag = True if _stage == "pre" else dash.no_update
             run_state_payload["complete"] = True
-            poll_disabled = True
+            poll_disabled = refresh_remaining <= 0
             run_button_disabled = False
 
             return _output(
@@ -1014,9 +1040,9 @@ def register_pre_post_callbacks(app):
             return build_group_subtab_content(session_dir, _stage, _key, selected_value)
 
     # Register all group callbacks
-    for key, _, script in pre_groups:
-        _register_group("pre", key, script)
+    for key, title, script in pre_groups:
+        _register_group("pre", key, script, title)
     # Register post-stage groups (baseline pre groups plus post-only extras)
-    for key, _, script in pre_groups + post_extra:
-        _register_group("post", key, script)
+    for key, title, script in pre_groups + post_extra:
+        _register_group("post", key, script, title)
 
