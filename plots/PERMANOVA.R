@@ -183,6 +183,24 @@ for (idx in seq_len(nrow(geometry_specs))) {
     arrange(Method)
 
   results_by_geom[[geom_key]] <- geom_tbl
+}
+
+# --------- Save per-geometry tables only ---------
+summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
+  mutate(
+    Method = factor(Method, levels = method_levels),
+    Geometry = factor(Geometry, levels = geometry_specs$geometry_label)
+  ) %>%
+  arrange(Geometry, Method)
+
+write_assessment_outputs(summary_tbl)
+print(summary_tbl, n = nrow(summary_tbl))
+
+# --------- Plot after CSVs are written ---------
+for (idx in seq_len(nrow(geometry_specs))) {
+  geom_key <- geometry_specs$geometry_key[[idx]]
+  geom_tbl <- results_by_geom[[geom_key]]
+  if (is.null(geom_tbl) || !nrow(geom_tbl)) next
 
   plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
   y_max <- max(plot_df$`R²`, na.rm = TRUE)
@@ -209,14 +227,3 @@ for (idx in seq_len(nrow(geometry_specs))) {
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
   create_png_thumbnail(tif_path)
 }
-
-# --------- Save per-geometry tables only ---------
-summary_tbl <- dplyr::bind_rows(results_by_geom) %>%
-  mutate(
-    Method = factor(Method, levels = method_levels),
-    Geometry = factor(Geometry, levels = geometry_specs$geometry_label)
-  ) %>%
-  arrange(Geometry, Method)
-
-write_assessment_outputs(summary_tbl)
-print(summary_tbl, n = nrow(summary_tbl))

@@ -493,13 +493,6 @@ render_geometry_plots <- function(frames_cache, geometry_label, filename_prefix)
   save_nmds_plot_set(target_plots, paste0("nmds_", filename_prefix, "_target"))
 }
 
-render_geometry_plots(frames_cache_clr, "Aitchison", "aitchison")
-render_geometry_plots(frames_cache_tss, "Bray-Curtis", "braycurtis")
-
-if (!length(frames_cache_clr) && !length(frames_cache_tss)) {
-  message("No NMDS frames available for plotting.")
-}
-
 # =========================
 # NMDS assessment (with baseline-only option)
 # =========================
@@ -741,4 +734,15 @@ if (only_baseline) {
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
+}
+
+# =========================
+# Plot rendering (after CSVs are written)
+# =========================
+
+render_geometry_plots(frames_cache_clr, "Aitchison", "aitchison")
+render_geometry_plots(frames_cache_tss, "Bray-Curtis", "braycurtis")
+
+if (!length(frames_cache_clr) && !length(frames_cache_tss)) {
+  message("No NMDS frames available for plotting.")
 }

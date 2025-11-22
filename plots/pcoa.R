@@ -592,24 +592,6 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
   gc()
 }
 
-if (length(frames_cache_clr)) {
-  batch_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", batch_var, "Batch")
-  save_pcoa_plot_set(batch_plots, "pcoa_aitchison_batch")
-  target_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", target_var, "Target")
-  save_pcoa_plot_set(target_plots, "pcoa_aitchison_target")
-}
-
-if (length(frames_cache_tss)) {
-  batch_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", batch_var, "Batch")
-  save_pcoa_plot_set(batch_plots_bc, "pcoa_braycurtis_batch")
-  target_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", target_var, "Target")
-  save_pcoa_plot_set(target_plots_bc, "pcoa_braycurtis_target")
-}
-
-# =========================
-# Unified PCoA summaries (Aitchison + Bray combined)
-# =========================
-
 compute_centroids_pcoa <- function(scores, batch_var = "batch") {
   scores %>%
     dplyr::group_by(!!rlang::sym(batch_var)) %>%
@@ -857,4 +839,26 @@ if (only_baseline) {
 
   print(assessment_tbl, n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
+}
+
+# =========================
+# Plot rendering (after CSVs are written)
+# =========================
+
+if (length(frames_cache_clr)) {
+  batch_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots, "pcoa_aitchison_batch")
+  target_plots <- build_pcoa_plot_list(frames_cache_clr, "Aitchison", target_var, "Target")
+  save_pcoa_plot_set(target_plots, "pcoa_aitchison_target")
+}
+
+if (length(frames_cache_tss)) {
+  batch_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", batch_var, "Batch")
+  save_pcoa_plot_set(batch_plots_bc, "pcoa_braycurtis_batch")
+  target_plots_bc <- build_pcoa_plot_list(frames_cache_tss, "Bray-Curtis", target_var, "Target")
+  save_pcoa_plot_set(target_plots_bc, "pcoa_braycurtis_target")
+}
+
+if (!length(frames_cache_clr) && !length(frames_cache_tss)) {
+  message("No PCoA frames available for plotting.")
 }
