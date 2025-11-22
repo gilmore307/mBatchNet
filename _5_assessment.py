@@ -49,6 +49,9 @@ FIGURE_DEFAULTS = {
 
 
 _FOUND_OUTPUT_LOGS: Set[str] = set()
+# Keep polling briefly after all expected files are detected so the UI has
+# enough time to render loaded images before disabling the interval.
+_READY_POLL_GRACE_TICKS = 5
 
 
 def _reset_found_logs(log_path: Optional[Path]) -> None:
@@ -923,14 +926,50 @@ def register_pre_post_callbacks(app):
                     run_button_disabled=True,
                 )
 
-            content = render_group_tabset(session_dir, _stage, _key)
             run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
             run_state_payload.setdefault("session", session_id)
             run_state_payload.setdefault("expected", expected)
+            ready_tick = run_state_payload.get("ready_at")
+
+            # First time we see all expected files: render content but keep polling
+            # for a few more ticks so thumbnails have time to load.
+            if ready_tick is None:
+                run_state_payload["ready_at"] = poll_ticks
+                content = render_group_tabset(session_dir, _stage, _key)
+                stage_flag = True if _stage == "pre" else dash.no_update
+                return _output(
+                    content,
+                    stage_flag,
+                    log_path_value=str(log_path),
+                    log_meta=None,
+                    modal_open=dash.no_update,
+                    log_interval_disabled=dash.no_update,
+                    param_store=persisted_payload,
+                    poll_disabled=False,
+                    poll_count=poll_ticks,
+                    run_state_value=run_state_payload,
+                    run_button_disabled=True,
+                )
+
+            if poll_ticks - ready_tick < _READY_POLL_GRACE_TICKS:
+                return _output(
+                    dash.no_update,
+                    dash.no_update,
+                    log_path_value=str(log_path),
+                    log_meta=None,
+                    modal_open=dash.no_update,
+                    log_interval_disabled=dash.no_update,
+                    param_store=persisted_payload,
+                    poll_disabled=False,
+                    poll_count=poll_ticks,
+                    run_state_value=run_state_payload,
+                    run_button_disabled=True,
+                )
+
             run_state_payload["complete"] = True
             stage_flag = True if _stage == "pre" else dash.no_update
             return _output(
-                content,
+                dash.no_update,
                 stage_flag,
                 log_path_value=str(log_path),
                 log_meta=None,
