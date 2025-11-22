@@ -49,8 +49,6 @@ FIGURE_DEFAULTS = {
 
 
 _FOUND_OUTPUT_LOGS: Set[str] = set()
-# Try rendering multiple times after readiness so thumbnails have time to display.
-_READY_RENDER_ATTEMPTS = 3
 
 
 def _reset_found_logs(log_path: Optional[Path]) -> None:
@@ -212,6 +210,16 @@ def _assessment_outputs_status(
             ready += 1
 
     total = len(expected_files)
+    if ready == total and log_path is not None:
+        all_key = f"{log_path.resolve()}::ALL_READY"
+        if all_key not in _FOUND_OUTPUT_LOGS:
+            _FOUND_OUTPUT_LOGS.add(all_key)
+            try:
+                with log_path.open("a", encoding="utf-8", errors="replace") as logf:
+                    logf.write("All expected outputs found.\n")
+            except OSError:
+                pass
+
     return ready == total, ready, total
 
 
@@ -633,6 +641,7 @@ def register_pre_post_callbacks(app):
             ]
         )
         outputs.append(Output(run_id, "disabled", allow_duplicate=True))
+        outputs.append(Output(f"{sid}-subtabs", "value", allow_duplicate=True))
 
         # Parameter States by group
         states: list = [State("session-id", "data")]
@@ -695,6 +704,7 @@ def register_pre_post_callbacks(app):
                 has_ncol_param = True
 
         state_ids_tuple = tuple(param_state_ids)
+        states.append(State(f"{sid}-subtabs", "value"))
 
         @app.callback(
             *outputs,
@@ -723,7 +733,8 @@ def register_pre_post_callbacks(app):
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
-            param_vals = list(values[1:-1])
+            param_vals = list(values[1:-2])
+            current_subtab = values[-2] if len(values) >= 2 else None
             run_state = values[-1] if values else None
             persisted_payload = dash.no_update
             if _state_ids:
@@ -741,6 +752,7 @@ def register_pre_post_callbacks(app):
                 poll_count=dash.no_update,
                 run_state_value=dash.no_update,
                 run_button_disabled=dash.no_update,
+                subtab_value=dash.no_update,
             ):
                 return (
                     content,
@@ -754,6 +766,7 @@ def register_pre_post_callbacks(app):
                     poll_count,
                     run_state_value,
                     run_button_disabled,
+                    subtab_value,
                 )
             if not session_id:
                 message = html.Div("Session not initialised.")
@@ -942,13 +955,38 @@ def register_pre_post_callbacks(app):
             run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
             run_state_payload.setdefault("session", session_id)
             run_state_payload.setdefault("expected", expected)
-            render_attempts = run_state_payload.get("render_attempts", 0) + 1
-            run_state_payload["render_attempts"] = render_attempts
+            run_state_payload.setdefault("stage", _stage)
+            run_state_payload.setdefault("key", _key)
             content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
+            sub_defs = build_group_subtab_definitions(session_dir, _stage, _key)
+            subtab_values = [val for (_lbl, val, _child) in sub_defs]
 
-            is_final_attempt = render_attempts >= _READY_RENDER_ATTEMPTS
-            if is_final_attempt:
+            original_tab = (
+                current_subtab
+                if current_subtab is not None
+                else (subtab_values[0] if subtab_values else None)
+            )
+            toggle_phase = run_state_payload.get("tab_toggle_phase", 0)
+            subtab_update = dash.no_update
+            poll_disabled = True
+            run_button_disabled = False
+
+            if subtab_values and len(subtab_values) > 1 and original_tab:
+                if toggle_phase == 0:
+                    target = subtab_values[1] if original_tab == subtab_values[0] else subtab_values[0]
+                    run_state_payload["original_tab"] = original_tab
+                    run_state_payload["tab_toggle_phase"] = 1
+                    subtab_update = target
+                    poll_disabled = False
+                    run_button_disabled = True
+                elif toggle_phase == 1:
+                    run_state_payload["tab_toggle_phase"] = 2
+                    subtab_update = run_state_payload.get("original_tab", subtab_values[0])
+                    run_state_payload["complete"] = True
+                else:
+                    run_state_payload["complete"] = True
+            else:
                 run_state_payload["complete"] = True
 
             return _output(
@@ -959,10 +997,11 @@ def register_pre_post_callbacks(app):
                 modal_open=dash.no_update,
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=is_final_attempt,
+                poll_disabled=poll_disabled,
                 poll_count=poll_ticks,
                 run_state_value=run_state_payload,
-                run_button_disabled=not is_final_attempt,
+                run_button_disabled=run_button_disabled,
+                subtab_value=subtab_update,
             )
 
         if state_ids_tuple:
