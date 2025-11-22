@@ -512,8 +512,8 @@ def assessment_layout(active_path: str, stage: str):
                 html.Div("Click Run to generate results."),
                 html.Div(
                     [
-                        dcc.Tabs(id=f"{sid}-subtabs", value=None, children=[]),
-                        html.Div(id=f"{sid}-subtab-content"),
+                        dcc.Tabs(id=f"{stage}-{key}-subtabs", value=None, children=[]),
+                        html.Div(id=f"{stage}-{key}-subtab-content"),
                     ],
                     style={"display": "none"},
                 ),
