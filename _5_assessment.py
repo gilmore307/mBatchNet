@@ -30,16 +30,15 @@ from _2_utils import (
     build_group_subtab_content,
     build_ranking_tab,
     build_raw_assessments_tab,
-    _materialize_png_sidecar,
 )
 
 
 FIGURE_DEFAULTS = {
     "alignment": {"width": 2800, "height": 1800, "dpi": 300},
-    "pca": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "pcoa": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "nmds": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
-    "dissimilarity": {"width": 2800, "height": 1800, "dpi": 300, "ncol": 3},
+    "pca": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "pcoa": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "nmds": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
+    "dissimilarity": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "permanova": {"width": 2800, "height": 1800, "dpi": 300},
     "r2": {"width": 4800, "height": 1200, "dpi": 300},
     "prda": {"width": 3000, "height": 1500, "dpi": 300},
@@ -60,11 +59,16 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
         if condition and filename:
             expected.append(filename)
 
-    def add_assessment_tables(base_name: Optional[str], multi_geometry: bool = False):
+    def add_assessment_tables(
+        base_name: Optional[str],
+        multi_geometry: bool = False,
+        include_combined: bool = True,
+    ):
         if not base_name:
             return
         suffix = "pre" if stage == "pre" else "post"
-        expected.append(f"{base_name}_raw_assessment_{suffix}.csv")
+        if include_combined:
+            expected.append(f"{base_name}_raw_assessment_{suffix}.csv")
         if multi_geometry:
             expected.append(f"{base_name}_aitchison_raw_assessment_{suffix}.csv")
             expected.append(f"{base_name}_braycurtis_raw_assessment_{suffix}.csv")
@@ -87,7 +91,9 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
         elif key == "dissimilarity":
             add_if(low.startswith("dissimilarity_heatmaps_aitchison"), spec.filename)
             add_if(low.startswith("dissimilarity_heatmaps_braycurtis"), spec.filename)
-            add_assessment_tables("dissimilarity", multi_geometry=True)
+            add_assessment_tables(
+                "dissimilarity", multi_geometry=True, include_combined=False
+            )
         elif key == "permanova":
             add_if(low.startswith("permanova_aitchison"), spec.filename)
             add_if(low.startswith("permanova_braycurtis"), spec.filename)
@@ -136,22 +142,15 @@ def _assessment_outputs_status(
     if not expected_files:
         return False, 0, 0
 
-    def _exists_with_fallback(name: str) -> bool:
+    def _exists(name: str) -> bool:
         png_path = session_dir / name
         if png_path.exists():
             return True
-
-        for alt_ext in (".tif", ".tiff"):
-            alt = png_path.with_suffix(alt_ext)
-            if alt.exists():
-                _materialize_png_sidecar(alt)
-                return png_path.exists()
-
         return False
 
     ready = 0
     for fname in expected_files:
-        if _exists_with_fallback(fname):
+        if _exists(fname):
             ready += 1
 
     total = len(expected_files)

@@ -382,8 +382,8 @@ for (nm in names(mat_list_ait)) {
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
 panel_rows_ait <- 1L
-base_fig_width_in  <- 2800 / 300
-base_fig_height_in <- 1800 / 300
+base_fig_width_in  <- 1800 / 300
+base_fig_height_in <- 1200 / 300
 base_col_width_in  <- base_fig_width_in / 3
 base_row_height_in <- base_fig_height_in
 if (n_panels_ait == 1L) {
@@ -471,10 +471,8 @@ mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else nume
 all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
 only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
 stage_suffix <- if (only_baseline) "pre" else "post"
-output_name <- sprintf("dissimilarity_raw_assessment_%s.csv", stage_suffix)
 
 write_assessment_outputs <- function(df) {
-  readr::write_csv(df, file.path(output_folder, output_name))
   if (!nrow(df)) return(invisible(NULL))
 
   geom_map <- c(
