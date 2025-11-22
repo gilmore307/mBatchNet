@@ -736,7 +736,6 @@ def register_pre_post_callbacks(app):
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
             param_vals = list(values[1:-1])
-            run_state = values[-1] if values else None
             persisted_payload = dash.no_update
             if _state_ids:
                 persisted_payload = {"values": {pid: val for pid, val in zip(_state_ids, param_vals)}}
@@ -855,12 +854,6 @@ def register_pre_post_callbacks(app):
                     run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
 
                 threading.Thread(target=_worker, daemon=True).start()
-                run_state_payload = {
-                    "session": session_id,
-                    "expected": expected_files,
-                    "stage": _stage,
-                    "key": _key,
-                }
                 stage_flag = True if _stage == "pre" else dash.no_update
                 spinner = dbc.Spinner(
                     html.Div("Running..."),
@@ -878,90 +871,14 @@ def register_pre_post_callbacks(app):
                     log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value=run_state_payload,
+                    run_state_value=None,
                     run_button_disabled=True,
                 )
 
             # Polling branch
-            run_state_valid = isinstance(run_state, dict) and run_state.get("session") == session_id
-            if isinstance(run_state, dict) and not run_state_valid:
-                raise dash.exceptions.PreventUpdate
-
-            # If a previous poll already marked completion for this session, avoid further
-            # file checks or log writes—just keep the interval disabled and show results.
-            if run_state_valid and run_state.get("complete"):
-                run_state["complete"] = True
-                content = render_group_tabset(session_dir, _stage, _key)
-                stage_flag = True if _stage == "pre" else dash.no_update
-                return _output(
-                    content,
-                    stage_flag,
-                    log_path_value=str(log_path),
-                    param_store=persisted_payload,
-                    poll_disabled=True,
-                    poll_count=dash.no_update,
-                    run_state_value=run_state,
-                    run_button_disabled=False,
-                )
-
-            expected = run_state.get("expected") if run_state_valid else expected_files
             files_ready, ready_count, total_expected = _assessment_outputs_status(
-                session_dir, expected or expected_files, log_path=log_path
+                session_dir, expected_files, log_path=log_path
             )
-
-            if not run_state_valid:
-                if files_ready:
-                    loading = dbc.Spinner(
-                        html.Div("Loading results..."),
-                        color="primary",
-                        type="border",
-                        size="md",
-                        fullscreen=False,
-                    )
-                    content = html.Div([
-                        loading,
-                        render_group_tabset(session_dir, _stage, _key),
-                    ])
-                    run_state_payload = {
-                        "session": session_id,
-                        "expected": expected or expected_files,
-                        "stage": _stage,
-                        "key": _key,
-                        "complete": True,
-                    }
-                    complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
-                    if complete_key not in _FOUND_OUTPUT_LOGS:
-                        _FOUND_OUTPUT_LOGS.add(complete_key)
-                        append_run_log(
-                            log_path,
-                            f"All expected outputs found for {_title}.",
-                            icon="✅",
-                        )
-                    stage_flag = True if _stage == "pre" else dash.no_update
-                    return _output(
-                        content,
-                        stage_flag,
-                        log_path_value=str(log_path),
-                        log_meta=None,
-                        modal_open=dash.no_update,
-                        log_interval_disabled=dash.no_update,
-                        param_store=persisted_payload,
-                        poll_disabled=True,
-                        poll_count=0,
-                        run_state_value=run_state_payload,
-                        run_button_disabled=False,
-                    )
-
-                placeholder = html.Div("Click Run to generate results.")
-                return _output(
-                    placeholder,
-                    dash.no_update,
-                    param_store=persisted_payload,
-                    poll_disabled=True,
-                    poll_count=poll_ticks,
-                    run_state_value=None,
-                    run_button_disabled=False,
-                )
 
             if not files_ready:
                 progress = (
@@ -982,38 +899,21 @@ def register_pre_post_callbacks(app):
                     param_store=persisted_payload,
                     poll_disabled=False,
                     poll_count=poll_ticks,
-                    run_state_value=run_state,
+                    run_state_value=None,
                     run_button_disabled=True,
                 )
 
-            run_state_payload = dict(run_state) if isinstance(run_state, dict) else {}
-            run_state_payload.setdefault("session", session_id)
-            run_state_payload.setdefault("expected", expected)
-            run_state_payload.setdefault("stage", _stage)
-            run_state_payload.setdefault("key", _key)
             complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
-            if not run_state_payload.get("complete") and complete_key not in _FOUND_OUTPUT_LOGS:
+            if complete_key not in _FOUND_OUTPUT_LOGS:
                 _FOUND_OUTPUT_LOGS.add(complete_key)
                 append_run_log(
                     log_path,
                     f"All expected outputs found for {_title}.",
                     icon="✅",
                 )
-            loading = dbc.Spinner(
-                html.Div("Loading results..."),
-                color="primary",
-                type="border",
-                size="md",
-                fullscreen=False,
-            )
-            content = html.Div([
-                loading,
-                render_group_tabset(session_dir, _stage, _key),
-            ])
+
+            content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
-            run_state_payload["complete"] = True
-            poll_disabled = True
-            run_button_disabled = False
 
             return _output(
                 content,
@@ -1023,11 +923,11 @@ def register_pre_post_callbacks(app):
                 modal_open=dash.no_update,
                 log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=poll_disabled,
+                poll_disabled=True,
                 poll_count=0,
-                run_state_value=run_state_payload,
-                run_button_disabled=run_button_disabled,
-                )
+                run_state_value=None,
+                run_button_disabled=False,
+            )
 
         if state_ids_tuple:
 
