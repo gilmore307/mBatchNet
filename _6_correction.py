@@ -114,11 +114,23 @@ def _build_parameter_layout(code: str) -> object | None:
             cols = []
     if cols:
         rows.append(dbc.Row(cols, className="px-3 pt-3"))
+    header = html.Div(
+        [
+            html.H6("Correction Parameters", className="mb-0"),
+            dbc.Button(
+                "Reset to defaults",
+                id={"type": "method-config-reset", "code": code},
+                color="secondary",
+                size="sm",
+                className="ms-2",
+                outline=False,
+            ),
+        ],
+        className="d-flex align-items-center justify-content-between p-3 bg-light border-bottom gap-2",
+    )
     content = html.Div(
         [
-            html.Div(
-                [html.H6("Correction Parameters", className="mb-0 p-3 bg-light border-bottom")]
-            ),
+            header,
             html.Div(rows, className="method-config-body"),
         ],
         className="method-config-wrapper border-top",
@@ -571,6 +583,29 @@ def register_correction_callbacks(app):
             raise dash.exceptions.PreventUpdate
         next_state = not bool(is_open)
         return next_state, ("Hide" if next_state else "Show")
+
+    @app.callback(
+        Output({"type": "method-config-input", "code": MATCH, "param": ALL}, "value"),
+        Input({"type": "method-config-reset", "code": MATCH}, "n_clicks"),
+        State({"type": "method-config-input", "code": MATCH, "param": ALL}, "id"),
+        prevent_initial_call=True,
+    )
+    def reset_method_config(n_clicks: int | None, ids: List[Dict[str, object]] | None):
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        if not ids:
+            raise dash.exceptions.PreventUpdate
+        method_code = None
+        first_id = ids[0]
+        if isinstance(first_id, dict):
+            method_code = first_id.get("code")
+        specs = _PARAMETER_CONFIG.get(method_code) if method_code else None
+        default_lookup = {spec.get("name"): spec.get("default") for spec in specs or []}
+        defaults: List[object] = []
+        for control_id in ids:
+            param_name = control_id.get("param") if isinstance(control_id, dict) else None
+            defaults.append(default_lookup.get(param_name, dash.no_update))
+        return defaults
 
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
