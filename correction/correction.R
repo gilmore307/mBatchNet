@@ -21,6 +21,34 @@ if (length(args) < 1) {
 output_folder <- args[[1]]
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
+parse_param_value <- function(val) {
+  if (identical(val, "")) return("")
+  converted <- utils::type.convert(val, as.is = TRUE)
+  if (is.character(converted)) return(val)
+  converted
+}
+
+METHOD_PARAMS <- list()
+if (length(args) > 1) {
+  for (arg in args[-1]) {
+    if (!startsWith(arg, "--")) next
+    eq_pos <- regexpr("=", arg, fixed = TRUE)
+    if (eq_pos < 0) next
+    key <- substr(arg, 3, eq_pos - 1L)
+    if (!nzchar(key)) next
+    val <- substr(arg, eq_pos + 1L, nchar(arg))
+    METHOD_PARAMS[[key]] <- parse_param_value(val)
+  }
+}
+
+get_param <- function(name, default = NULL) {
+  if (!nzchar(name)) return(default)
+  if (name %in% names(METHOD_PARAMS)) {
+    return(METHOD_PARAMS[[name]])
+  }
+  default
+}
+
 # ---------------------------
 # Session summary helpers
 # ---------------------------

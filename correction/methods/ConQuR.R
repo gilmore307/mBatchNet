@@ -94,6 +94,18 @@ run_method("ConQuR", {
     )
   }
 
+  logistic_lasso <- isTRUE(get_param("logistic_lasso", FALSE))
+  quantile_type <- as.character(get_param("quantile_type", "standard"))
+  lambda_quantile <- get_param("lambda_quantile", "2p/n")
+  interplt <- isTRUE(get_param("interplt", FALSE))
+  delta <- suppressWarnings(as.numeric(get_param("delta", 0.4999)))
+  if (!is.finite(delta)) delta <- 0.4999
+  taus <- get_param("taus", "seq(0.05,0.95,0.05)")
+  if (is.character(taus) && length(taus) == 1L) {
+    parsed_taus <- try(eval(parse(text = taus)), silent = TRUE)
+    if (!inherits(parsed_taus, "try-error")) taus <- parsed_taus
+  }
+
   res_pos <- suppressWarnings(
     tryCatch(
       ConQuR(
@@ -101,9 +113,9 @@ run_method("ConQuR", {
         batchid = batch,
         covariates = covariates,
         batch_ref = as.character(reference_batch),
-        logistic_lasso = FALSE, quantile_type = "standard", simple_match = FALSE,
-        lambda_quantile = "2p/n", interplt = FALSE, delta = 0.4999,
-        taus = seq(0.05, 0.95, by = 0.05), num_core = num_cores
+        logistic_lasso = logistic_lasso, quantile_type = quantile_type, simple_match = FALSE,
+        lambda_quantile = lambda_quantile, interplt = interplt, delta = delta,
+        taus = taus, num_core = num_cores
       ),
       error = function(e) {
         if (grepl("contrasts can be applied only to factors with 2 or more levels", e$message, fixed = TRUE)) {

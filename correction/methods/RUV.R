@@ -97,16 +97,31 @@ run_method("RUV-III-NB", {
   ctl_names <- rownames(Y)
   say("RUV: design ready (ruvIII.nb)")
 
+  k_val <- suppressWarnings(as.integer(get_param("k", 2)))
+  if (!is.finite(k_val) || k_val < 1L) k_val <- 2L
+  use_pseudo <- isTRUE(get_param("use.pseudosample", FALSE))
+  batch_disp <- isTRUE(get_param("batch.disp", FALSE))
+  zeroinf_param <- get_param("zeroinf", FALSE)
+  if (is.logical(zeroinf_param) && length(zeroinf_param) == 1L) {
+    zeroinf_vec <- rep(zeroinf_param, ncol(Y))
+  } else if (is.numeric(zeroinf_param) || is.logical(zeroinf_param)) {
+    zeroinf_vec <- as.logical(zeroinf_param)
+    if (!length(zeroinf_vec)) zeroinf_vec <- rep(FALSE, ncol(Y))
+    if (length(zeroinf_vec) != ncol(Y)) zeroinf_vec <- rep(zeroinf_vec, length.out = ncol(Y))
+  } else {
+    zeroinf_vec <- rep(FALSE, ncol(Y))
+  }
+
   fit <- ruvIIInb::ruvIII.nb(
     Y = as.matrix(Y),
     M = as.matrix(M),
     ctl = ctl_names,
-    k = 2,
+    k = k_val,
     batch = as.numeric(batch_factor),
     ncores = 1L,
-    use.pseudosample = FALSE,
-    batch.disp = FALSE,
-    zeroinf = rep(FALSE, ncol(Y))
+    use.pseudosample = use_pseudo,
+    batch.disp = batch_disp,
+    zeroinf = zeroinf_vec
   )
   say("RUV: fit complete (ruvIII.nb)")
 
