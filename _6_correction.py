@@ -299,7 +299,7 @@ def register_correction_callbacks(app):
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
-        new_refresh = refresh_value + 1
+        new_refresh = refresh_value + 1 if success else refresh_value
         if success:
             status_text = "Selected"
             run_disabled = True
@@ -307,7 +307,7 @@ def register_correction_callbacks(app):
             message = f"{display_name} correction complete."
         else:
             _remove_method_from_summary(session_dir, method_code)
-            status_text = "Not selected"
+            status_text = "Failed"
             run_disabled = False
             delete_disabled = True
             message = f"{display_name} correction failed. Check logs."
