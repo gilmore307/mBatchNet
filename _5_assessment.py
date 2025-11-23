@@ -735,6 +735,7 @@ def register_pre_post_callbacks(app):
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
+            run_state_value = values[-1]
             param_vals = list(values[1:-1])
             persisted_payload = dash.no_update
             if _state_ids:
@@ -785,6 +786,10 @@ def register_pre_post_callbacks(app):
 
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
+
+            if trigger_id == f"{sid}-poll-interval" and not run_state_value:
+                # Ignore background polling if we never initiated a run for this tab.
+                raise dash.exceptions.PreventUpdate
 
             if trigger_id == run_id:
                 # Build CLI flags from parameters
@@ -871,7 +876,7 @@ def register_pre_post_callbacks(app):
                     log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value=None,
+                    run_state_value={"status": "running"},
                     run_button_disabled=True,
                 )
 
@@ -899,7 +904,7 @@ def register_pre_post_callbacks(app):
                     param_store=persisted_payload,
                     poll_disabled=False,
                     poll_count=poll_ticks,
-                    run_state_value=None,
+                    run_state_value=dash.no_update,
                     run_button_disabled=True,
                 )
 
