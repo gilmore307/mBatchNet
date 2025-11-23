@@ -650,7 +650,6 @@ def register_pre_post_callbacks(app):
             Output("runlog-path", "data", allow_duplicate=True),
             Output("runlog-file-meta", "data", allow_duplicate=True),
             Output("runlog-modal", "is_open", allow_duplicate=True),
-            Output("runlog-interval", "disabled", allow_duplicate=True),
         ])
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
         outputs.extend(
@@ -791,7 +790,6 @@ def register_pre_post_callbacks(app):
                 log_path_value=dash.no_update,
                 log_meta=dash.no_update,
                 modal_open=dash.no_update,
-                log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
                 poll_disabled=True,
                 poll_count=dash.no_update,
@@ -805,7 +803,6 @@ def register_pre_post_callbacks(app):
                     log_path_value,
                     log_meta,
                     modal_open,
-                    log_interval_disabled,
                     param_store,
                     poll_disabled,
                     poll_count,
@@ -939,7 +936,6 @@ def register_pre_post_callbacks(app):
                     log_path_value=str(log_path),
                     log_meta=None,
                     modal_open=dash.no_update,
-                    log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
                     run_state_value={"status": "running", "latest_poll": 0},
@@ -1028,7 +1024,6 @@ def register_pre_post_callbacks(app):
                 log_path_value=str(log_path),
                 log_meta=None,
                 modal_open=dash.no_update,
-                log_interval_disabled=dash.no_update,
                 param_store=persisted_payload,
                 poll_disabled=True,
                 poll_count=0,
