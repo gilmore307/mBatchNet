@@ -4,7 +4,6 @@ suppressPackageStartupMessages({
   library(readr)
   library(dplyr)
   library(ggplot2)
-  library(magick)
 })
 
 source("plots/helper.R")
@@ -204,7 +203,6 @@ if (only_baseline) {
   tif_path <- file.path(output_folder, "alignment_score.tif")
   ggsave(tif_path, p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
   
   # No correction recommendation messages
   
@@ -238,5 +236,4 @@ if (only_baseline) {
   tif_path <- file.path(output_folder, "alignment_score.tif")
   ggsave(tif_path, p_as,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
 }

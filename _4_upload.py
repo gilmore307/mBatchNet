@@ -17,6 +17,7 @@ from _2_utils import (
     human_size,
     run_preprocess,
     run_r_scripts,
+    ensure_preview_images,
     BASE_DIR,
     _make_ag_grid,
     _encode_image_source,
@@ -94,7 +95,12 @@ def _example_mapping_for(key: Optional[str]) -> Optional[Dict[str, str]]:
 
 def _render_mosaic_card(session_dir: Path) -> html.Div:
     """Return a card displaying the mosaic plot if it exists."""
-    img_path = session_dir / "mosaic_plot.tif"
+    preview_dir = session_preview_dir(session_dir)
+    img_path = preview_dir / "mosaic_plot.png"
+    if not img_path.exists():
+        img_path = session_results_dir(session_dir) / "mosaic_plot.tif"
+    if not img_path.exists():
+        img_path = session_dir / "mosaic_plot.tif"
     if not img_path.exists():
         return html.Div("Mosaic plot not generated yet.", className="text-muted")
     try:
@@ -175,7 +181,6 @@ def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
     log_path = session_dir / "run.log"
     data_dir = session_data_dir(session_dir)
     results_dir = session_results_dir(session_dir)
-    preview_dir = session_preview_dir(session_dir)
 
     for src in data_dir.glob("*.csv"):
         dest = results_dir / src.name
@@ -201,8 +206,9 @@ def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
             except OSError:
                 pass
 
-    ok, log = run_r_scripts(("Mosaic.R",), results_dir, log_path=log_path, preview_dir=preview_dir)
+    ok, log = run_r_scripts(("Mosaic.R",), results_dir, log_path=log_path)
     reorganize_session_outputs(session_dir)
+    ensure_preview_images(session_dir, ("mosaic_plot.tif",), log_path=log_path)
     if not ok:
         return False, log
     return True, None

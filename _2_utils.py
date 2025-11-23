@@ -85,29 +85,29 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("PCA (Batch grouping)", "pca_batch.png"),
-    FigureSpec("PCA (Target grouping)", "pca_target.png"),
-    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.png"),
-    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.png"),
-    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.png"),
-    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.png"),
-    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.png"),
-    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.png"),
-    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.png"),
-    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.png"),
-    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
-    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
-    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.png"),
-    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.png"),
-    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("PVCA", "PVCA.png"),
+    FigureSpec("PCA (Batch grouping)", "pca_batch.tif"),
+    FigureSpec("PCA (Target grouping)", "pca_target.tif"),
+    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.tif"),
+    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.tif"),
+    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.tif"),
+    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.tif"),
+    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.tif"),
+    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.tif"),
+    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.tif"),
+    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.tif"),
+    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.tif"),
+    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.tif"),
+    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.tif"),
+    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.tif"),
+    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.tif"),
+    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.tif"),
+    FigureSpec("PVCA", "PVCA.tif"),
 )
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("Entropy score", "ebm.png"),
-    FigureSpec("Silhouette score", "silhouette.png"),
+    FigureSpec("Alignment score", "alignment_score.tif"),
+    FigureSpec("Entropy score", "ebm.tif"),
+    FigureSpec("Silhouette score", "silhouette.tif"),
 )
 
 POST_FIGURES: Sequence[FigureSpec] = PRE_FIGURES + POST_EXTRA_FIGURES
@@ -773,7 +773,6 @@ def run_r_scripts(
     output_dir: Path,
     log_path: Optional[Path] = None,
     extra_args: Optional[Sequence[str]] = None,
-    preview_dir: Optional[Path] = None,
 ) -> Tuple[bool, str]:
     """Run one or more R scripts with the output directory and optional flags.
 
@@ -791,11 +790,53 @@ def run_r_scripts(
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
             success, log = run_command(cmd, cwd=BASE_DIR)
-        _ensure_png_previews(output_dir, preview_dir or output_dir)
         logs.append(log)
         if not success:
             return False, "\n\n".join(logs)
     return True, "\n\n".join(logs)
+
+
+def ensure_preview_images(
+    session_dir: Path, figure_files: Sequence[str], log_path: Optional[Path] = None
+) -> None:
+    """Run preview.R to refresh PNG previews for any TIFF figures that need them."""
+
+    if not figure_files:
+        return
+
+    results_dir = session_results_dir(session_dir)
+    preview_dir = session_preview_dir(session_dir)
+
+    image_files = [Path(f) for f in figure_files if Path(f).suffix.lower() in {".tif", ".tiff"}]
+    if not image_files:
+        return
+
+    needs_preview = False
+    for img in image_files:
+        tif_path = results_dir / img.name
+        if not tif_path.exists():
+            continue
+        png_path = preview_dir / (tif_path.stem + ".png")
+        if not png_path.exists():
+            needs_preview = True
+            break
+        try:
+            if png_path.stat().st_mtime < tif_path.stat().st_mtime:
+                needs_preview = True
+                break
+        except OSError:
+            needs_preview = True
+            break
+
+    if not needs_preview:
+        return
+
+    append_run_log(log_path, "Generating PNG previews...", icon="🖼️")
+    success, _log = run_r_scripts(
+        ("preview.R",), results_dir, log_path=log_path, extra_args=(preview_dir,)
+    )
+    if not success:
+        append_run_log(log_path, "Failed to build PNG previews.", icon="❌")
 
 
 def _normalize_method_name(method: str) -> Tuple[Optional[str], Optional[Path]]:
@@ -1456,13 +1497,11 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     }
 
     def content_for_image(filename: str) -> html.Div:
-        img_path = session_preview_dir(session_dir) / filename
+        preview_dir = session_preview_dir(session_dir)
+        png_path = preview_dir / (Path(filename).stem + ".png")
+        img_path = png_path if png_path.exists() else preview_dir / filename
         if not img_path.exists():
             img_path = session_results_dir(session_dir) / filename
-        if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
-            png_path = session_preview_dir(session_dir) / (img_path.stem + ".png")
-            if png_path.exists():
-                img_path = png_path
         if not img_path.exists():
             alt_tif = session_results_dir(session_dir) / (Path(filename).with_suffix(".tif").name)
             if alt_tif.exists():
@@ -1611,13 +1650,11 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     figures = PRE_FIGURES if stage == "pre" else POST_FIGURES
 
     def content_for_image(filename: str) -> html.Div:
-        img_path = session_preview_dir(session_dir) / filename
+        preview_dir = session_preview_dir(session_dir)
+        png_path = preview_dir / (Path(filename).stem + ".png")
+        img_path = png_path if png_path.exists() else preview_dir / filename
         if not img_path.exists():
             img_path = session_results_dir(session_dir) / filename
-        if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
-            png_path = session_preview_dir(session_dir) / (img_path.stem + ".png")
-            if png_path.exists():
-                img_path = png_path
         if not img_path.exists():
             alt_tif = session_results_dir(session_dir) / (Path(filename).with_suffix(".tif").name)
             if alt_tif.exists():
@@ -1813,7 +1850,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         third_content = _load_info_table_for_key(session_dir, stage, key, rep)
 
     if third_content is None and key_lower == "r2":
-        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
+        third_content = _load_info_table_for_key(session_dir, stage, key, "anova_aitchison.tif")
 
     if third_content is not None:
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))

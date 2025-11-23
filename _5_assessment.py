@@ -36,6 +36,7 @@ from _2_utils import (
     build_ranking_tab,
     build_raw_assessments_tab,
     append_run_log,
+    ensure_preview_images,
     any_method_outputs,
 )
 
@@ -846,7 +847,6 @@ def register_pre_post_callbacks(app):
             session_dir = get_session_dir(session_id)
             data_dir = session_data_dir(session_dir)
             results_dir = session_results_dir(session_dir)
-            preview_dir = session_preview_dir(session_dir)
             if not (data_dir / "raw.csv").exists() or not (data_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
@@ -939,7 +939,6 @@ def register_pre_post_callbacks(app):
                         results_dir,
                         log_path=log_path,
                         extra_args=flags,
-                        preview_dir=preview_dir,
                     )
                     reorganize_session_outputs(session_dir)
 
@@ -1004,6 +1003,8 @@ def register_pre_post_callbacks(app):
                     f"All expected outputs found for {_title}.",
                     icon="✅",
                 )
+
+            ensure_preview_images(session_dir, expected_files, log_path=log_path)
 
             content = render_group_tabset(session_dir, _stage, _key)
             stage_flag = True if _stage == "pre" else dash.no_update
