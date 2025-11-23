@@ -25,6 +25,8 @@ from _2_utils import (
     POST_SCRIPTS,
     PRE_FIGURES,
     POST_FIGURES,
+    PREVIEW_SENTINEL,
+    ensure_png_previews,
     render_assessment_tabs,
     render_group_tabset,
     build_group_subtab_content,
@@ -74,6 +76,10 @@ def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
                 target.unlink(missing_ok=True)
             except OSError:
                 pass
+    try:
+        (session_dir / PREVIEW_SENTINEL).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _expected_figure_files(stage: str, key: str) -> List[str]:
@@ -980,6 +986,8 @@ def register_pre_post_callbacks(app):
                     f"All expected outputs found for {_title}.",
                     icon="✅",
                 )
+
+            ensure_png_previews(session_dir, log_path=log_path)
 
             try:
                 content = render_group_tabset(session_dir, _stage, _key)

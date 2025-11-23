@@ -6,7 +6,6 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(forcats)
   library(jsonlite)
-  library(magick)
 })
 
 source("plots/helper.R")
@@ -369,7 +368,6 @@ if (!is.null(p_clr)) {
   tif_path <- file.path(output_folder, "anova_aitchison.tif")
   ggsave(tif_path, p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
   message("Saved figure: anova_aitchison.tif")
 } else {
   message("No data to plot; skip figure export.")

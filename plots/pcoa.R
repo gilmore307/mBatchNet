@@ -7,7 +7,6 @@ suppressPackageStartupMessages({
   library(rlang)
   library(vegan)      # Bray-Curtis
   library(jsonlite)
-  library(magick)
 })
 
 source("plots/helper.R")
@@ -587,7 +586,6 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
   rm(combined, plot_list)
   gc()
 }
