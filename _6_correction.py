@@ -63,7 +63,6 @@ def correction_layout(active_path: str):
             build_navbar(active_path),
             dcc.Store(id="method-summary-store", data=None),
             dcc.Store(id="method-operation-trigger", data=0),
-            dcc.Store(id="method-busy-store", data=False),
             dbc.Container(
                 [
                     html.H2("Batch Effect Correction"),
@@ -103,12 +102,9 @@ def register_correction_callbacks(app):
         Input("method-summary-store", "data"),
         Input("session-id", "data"),
         Input("method-operation-trigger", "data"),
-        Input("method-busy-store", "data"),
         prevent_initial_call=False,
     )
-    def render_method_table(
-        summary: Dict[str, object] | None, session_id: str | None, _: int, is_busy: bool
-    ):
+    def render_method_table(summary: Dict[str, object] | None, session_id: str | None, _: int):
         summary_lookup: Dict[str, Dict[str, object]] = {}
         if summary and isinstance(summary, dict):
             methods_block = summary.get("methods")
@@ -151,8 +147,8 @@ def register_correction_callbacks(app):
             avg_display = "-" if avg_elapsed in (None, "") else f"{float(avg_elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
             status_text = "Selected" if outputs_present else "Not selected"
-            run_disabled = bool(is_busy) or not session_ready or outputs_present
-            delete_disabled = bool(is_busy) or not outputs_present
+            run_disabled = not session_ready or outputs_present
+            delete_disabled = not outputs_present
             status_cell = html.Td(
                 dcc.Loading(
                     html.Span(status_text, id={"type": "method-status-label", "code": code}),
@@ -173,7 +169,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             run_cell = html.Td(
-                html.Div(run_button, className="d-flex justify-content-center"),
+                dcc.Loading(
+                    html.Div(run_button, className="d-flex justify-content-center"),
+                    type="default",
+                    parent_className="be-cell-loading",
+                    className="be-cell-loading",
+                ),
                 className="text-center be-run-cell",
                 style=_ACTION_COLUMN_WIDTH,
             )
@@ -187,7 +188,12 @@ def register_correction_callbacks(app):
                 n_clicks=0,
             )
             delete_cell = html.Td(
-                html.Div(delete_button, className="d-flex justify-content-center"),
+                dcc.Loading(
+                    html.Div(delete_button, className="d-flex justify-content-center"),
+                    type="default",
+                    parent_className="be-cell-loading",
+                    className="be-cell-loading",
+                ),
                 className="text-center be-delete-cell",
                 style=_ACTION_COLUMN_WIDTH,
             )
@@ -247,25 +253,6 @@ def register_correction_callbacks(app):
         table_wrapper = html.Div(children, className="be-method-table-wrapper")
         return table_wrapper
 
-    app.clientside_callback(
-        """
-        function(nClicks) {
-            const ctx = dash_clientside.callback_context;
-            if (!ctx || !ctx.triggered.length) {
-                return dash_clientside.no_update;
-            }
-            const latest = ctx.triggered[0].value;
-            if (latest === undefined || latest === null) {
-                return dash_clientside.no_update;
-            }
-            return true;
-        }
-        """,
-        Output("method-busy-store", "data", allow_duplicate=True),
-        Input({"type": "method-run-button", "code": ALL}, "n_clicks"),
-        prevent_initial_call=True,
-    )
-
     @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
         Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
@@ -273,27 +260,17 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
-        Output("method-busy-store", "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
         State("method-operation-trigger", "data"),
-        State("method-busy-store", "data"),
         prevent_initial_call=True,
     )
-    def run_correction_method(
-        n_clicks: int,
-        component_id: Dict[str, str],
-        session_id: str | None,
-        refresh_token: int | None,
-        busy: bool | None,
-    ):
+    def run_correction_method(n_clicks: int, component_id: Dict[str, str], session_id: str | None, refresh_token: int | None):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         method_code = component_id.get("code") if isinstance(component_id, dict) else None
         if not method_code:
-            raise dash.exceptions.PreventUpdate
-        if busy:
             raise dash.exceptions.PreventUpdate
         refresh_value = int(refresh_token or 0)
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
@@ -307,7 +284,6 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
-                False,
             )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
@@ -320,7 +296,6 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
-                False,
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
@@ -332,7 +307,7 @@ def register_correction_callbacks(app):
             message = f"{display_name} correction complete."
         else:
             _remove_method_from_summary(session_dir, method_code)
-            status_text = "Failed"
+            status_text = "Not selected"
             run_disabled = False
             delete_disabled = True
             message = f"{display_name} correction failed. Check logs."
@@ -353,14 +328,12 @@ def register_correction_callbacks(app):
             delete_disabled,
             delete_color,
             payload,
-            False,
         )
 
     @app.callback(
         Output("correction-status", "children"),
         Output("correction-complete", "data"),
         Output("method-operation-trigger", "data"),
-        Output("method-busy-store", "data", allow_duplicate=True),
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
@@ -402,7 +375,6 @@ def register_correction_callbacks(app):
             status_message,
             complete_flag,
             refresh,
-            False,
             log_path,
             log_meta,
             open_log,
@@ -419,7 +391,6 @@ def register_correction_callbacks(app):
         State({"type": "method-delete-button", "code": MATCH}, "id"),
         State("session-id", "data"),
         State("method-operation-trigger", "data"),
-        State("method-busy-store", "data"),
         prevent_initial_call=True,
     )
     def delete_correction_outputs(
@@ -427,14 +398,11 @@ def register_correction_callbacks(app):
         component_id: Dict[str, str],
         session_id: str | None,
         refresh_token: int | None,
-        busy: bool | None,
     ):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         method_code = component_id.get("code") if isinstance(component_id, dict) else None
         if not method_code:
-            raise dash.exceptions.PreventUpdate
-        if busy:
             raise dash.exceptions.PreventUpdate
         refresh_value = int(refresh_token or 0)
         display_name = CODE_TO_DISPLAY.get(method_code, method_code)
