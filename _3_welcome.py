@@ -85,7 +85,7 @@ def welcome_layout(active_path: str):
                                                     html.Li("No installation required; everything runs in the browser."),
                                                     html.Li("Interactive figures with shareable links for collaboration."),
                                                     html.Li("Multiple correction methods with transparent defaults."),
-                                                    html.Li("Session privacy: uploads stay within your session unless you opt in."),
+                                                    html.Li("Session privacy: uploads stay within your session and are cleared when you finish."),
                                                 ]
                                             )
                                         ),
@@ -107,8 +107,8 @@ def welcome_layout(active_path: str):
                                                     "and rich outputs at every step."
                                                 ),
                                                 html.P(
-                                                    "You can optionally allow anonymised results to be retained for service "
-                                                    "improvement; declining keeps all data ephemeral."
+                                                    "We keep sessions self-contained: data, figures, and logs live only "
+                                                    "while you are working and are discarded when the session ends."
                                                 ),
                                             ],
                                         ),
@@ -212,8 +212,8 @@ def welcome_layout(active_path: str):
                                         dbc.CardBody(
                                             [
                                                 html.P(
-                                                    "All uploads remain private within your browser session. "
-                                                    "Opt-in sharing is requested explicitly and is never required."
+                                                    "All uploads remain private within your browser session and are not "
+                                                    "shared or retained once your work is complete."
                                                 ),
                                                 html.P(
                                                     "When you finish, use the Download results button in the navigation bar "
