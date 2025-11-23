@@ -73,6 +73,8 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-file-meta", storage_type="memory", data=None),
             dcc.Store(id="runlog-scroll-trigger", storage_type="memory", data=None),
             dcc.Store(id="runlog-ws-status", storage_type="memory", data=None),
+            dcc.Store(id="runlog-unread", storage_type="session", data=False),
+            dcc.Store(id="runlog-last-seen", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -474,6 +476,40 @@ def toggle_runlog_modal(open_clicks, close_clicks, is_open):
     if trig == "runlog-close" and close_clicks:
         return False, dash.no_update
     return is_open, dash.no_update
+
+
+@app.callback(
+    Output("runlog-unread", "data"),
+    Output("runlog-last-seen", "data"),
+    Input("runlog-file-meta", "data"),
+    Input("runlog-modal", "is_open"),
+    State("runlog-last-seen", "data"),
+    State("runlog-unread", "data"),
+)
+def sync_runlog_unread_state(log_meta, modal_open, last_seen, unread):
+    meta = log_meta if isinstance(log_meta, dict) else None
+    last_seen_meta = last_seen if isinstance(last_seen, dict) else None
+    unread_flag = bool(unread)
+
+    if modal_open:
+        # Mark everything as read when the modal is opened.
+        return False, meta or last_seen_meta
+
+    if meta and meta != last_seen_meta:
+        return True, last_seen_meta
+
+    return unread_flag, last_seen_meta
+
+
+@app.callback(
+    Output("log-open", "color"),
+    Output("log-open", "outline"),
+    Input("runlog-unread", "data"),
+)
+def style_log_button(unread):
+    if unread:
+        return "warning", False
+    return "light", True
 
 
 def _resolve_log_path(raw_path: str | None) -> Path | None:

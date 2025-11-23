@@ -33,6 +33,7 @@ from _2_utils import (
     build_ranking_tab,
     build_raw_assessments_tab,
     append_run_log,
+    log_file_meta,
 )
 
 
@@ -934,7 +935,7 @@ def register_pre_post_callbacks(app):
                     dash.no_update,
                     stage_flag,
                     log_path_value=str(log_path),
-                    log_meta=None,
+                    log_meta=log_file_meta(log_path),
                     modal_open=dash.no_update,
                     poll_disabled=False,
                     poll_count=0,
@@ -1007,6 +1008,7 @@ def register_pre_post_callbacks(app):
                     (refresh_token or 0) + 1,
                     True if _stage == "pre" else dash.no_update,
                     log_path_value=str(log_path),
+                    log_meta=log_file_meta(log_path),
                     poll_disabled=True,
                     poll_count=0,
                     run_state_value={
@@ -1022,7 +1024,7 @@ def register_pre_post_callbacks(app):
                 (refresh_token or 0) + 1,
                 stage_flag,
                 log_path_value=str(log_path),
-                log_meta=None,
+                log_meta=log_file_meta(log_path),
                 modal_open=dash.no_update,
                 param_store=persisted_payload,
                 poll_disabled=True,

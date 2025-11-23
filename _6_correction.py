@@ -20,6 +20,7 @@ from _2_utils import (
     load_integrated_summary,
     method_output_exists,
     _remove_method_from_summary,
+    log_file_meta,
     run_single_method,
 )
 
@@ -299,7 +300,7 @@ def register_correction_callbacks(app):
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
-        new_refresh = refresh_value + 1
+        new_refresh = refresh_value + 1 if success else refresh_value
         if success:
             status_text = "Selected"
             run_disabled = True
@@ -307,7 +308,7 @@ def register_correction_callbacks(app):
             message = f"{display_name} correction complete."
         else:
             _remove_method_from_summary(session_dir, method_code)
-            status_text = "Not selected"
+            status_text = "Failed"
             run_disabled = False
             delete_disabled = True
             message = f"{display_name} correction failed. Check logs."
@@ -317,7 +318,7 @@ def register_correction_callbacks(app):
             "complete": bool(complete_flag),
             "refresh": new_refresh,
             "log_path": str(log_path),
-            "log_meta": None,
+            "log_meta": log_file_meta(log_path),
         }
         run_color = "secondary" if run_disabled else "success"
         delete_color = "secondary" if delete_disabled else "success"
