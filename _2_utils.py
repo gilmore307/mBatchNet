@@ -13,6 +13,7 @@ import subprocess
 import textwrap
 import time
 import hashlib
+import threading
 from io import BytesIO
 from datetime import datetime
 from statistics import mean
@@ -38,6 +39,7 @@ PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 COMPLETED_METHODS_FILENAME = "completed_methods.json"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
+PREVIEW_SENTINEL = ".previews_generated"
 
 
 RSCRIPT_BASE_COMMAND: Tuple[str, ...] = (
@@ -82,29 +84,29 @@ class FigureSpec:
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("PCA (Batch grouping)", "pca_batch.png"),
-    FigureSpec("PCA (Target grouping)", "pca_target.png"),
-    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.png"),
-    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.png"),
-    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.png"),
-    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.png"),
-    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.png"),
-    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.png"),
-    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.png"),
-    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.png"),
-    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.png"),
-    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.png"),
-    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.png"),
-    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.png"),
-    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.png"),
-    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.png"),
-    FigureSpec("PVCA", "PVCA.png"),
+    FigureSpec("PCA (Batch grouping)", "pca_batch.tif"),
+    FigureSpec("PCA (Target grouping)", "pca_target.tif"),
+    FigureSpec("PCoA (Aitchison · batch)", "pcoa_aitchison_batch.tif"),
+    FigureSpec("PCoA (Aitchison · target)", "pcoa_aitchison_target.tif"),
+    FigureSpec("PCoA (Bray-Curtis · batch)", "pcoa_braycurtis_batch.tif"),
+    FigureSpec("PCoA (Bray-Curtis · target)", "pcoa_braycurtis_target.tif"),
+    FigureSpec("NMDS (Aitchison · batch)", "nmds_aitchison_batch.tif"),
+    FigureSpec("NMDS (Aitchison · target)", "nmds_aitchison_target.tif"),
+    FigureSpec("NMDS (Bray-Curtis · batch)", "nmds_braycurtis_batch.tif"),
+    FigureSpec("NMDS (Bray-Curtis · target)", "nmds_braycurtis_target.tif"),
+    FigureSpec("Dissimilarity heatmaps (Aitchison)", "dissimilarity_heatmaps_aitchison.tif"),
+    FigureSpec("Dissimilarity heatmaps (Bray-Curtis)", "dissimilarity_heatmaps_braycurtis.tif"),
+    FigureSpec("PERMANOVA R² (Aitchison)", "permanova_aitchison.tif"),
+    FigureSpec("PERMANOVA R² (Bray-Curtis)", "permanova_braycurtis.tif"),
+    FigureSpec("Feature-wise ANOVA R² (Aitchison)", "anova_aitchison.tif"),
+    FigureSpec("pRDA (Aitchison)", "pRDA_aitchison.tif"),
+    FigureSpec("PVCA", "PVCA.tif"),
 )
 
 POST_EXTRA_FIGURES: Sequence[FigureSpec] = (
-    FigureSpec("Alignment score", "alignment_score.png"),
-    FigureSpec("Entropy score", "ebm.png"),
-    FigureSpec("Silhouette score", "silhouette.png"),
+    FigureSpec("Alignment score", "alignment_score.tif"),
+    FigureSpec("Entropy score", "ebm.tif"),
+    FigureSpec("Silhouette score", "silhouette.tif"),
 )
 
 POST_FIGURES: Sequence[FigureSpec] = PRE_FIGURES + POST_EXTRA_FIGURES
@@ -298,6 +300,47 @@ def _ensure_png_previews(directory: Path, *, max_side: int = PNG_MAX_DISPLAY_SID
                 _materialize_png_sidecar(path, max_side=max_side)
     except OSError:
         return
+
+
+_PREVIEW_ATTEMPTED: Set[Path] = set()
+_PREVIEW_LOCK = threading.Lock()
+
+
+def ensure_png_previews(session_dir: Path, log_path: Optional[Path] = None) -> bool:
+    """Run the preview R script once to generate PNG sidecars for TIFF figures."""
+
+    marker = session_dir / PREVIEW_SENTINEL
+    if marker.exists():
+        return True
+
+    resolved = session_dir.resolve()
+    with _PREVIEW_LOCK:
+        if resolved in _PREVIEW_ATTEMPTED:
+            return marker.exists()
+        _PREVIEW_ATTEMPTED.add(resolved)
+
+    script_path = PLOTS_DIR / "preview.R"
+    if not script_path.exists():
+        append_run_log(log_path, f"Preview script missing: {script_path}", icon="⚠️")
+        return False
+
+    append_run_log(log_path, "Generating PNG previews from TIFF figures...", icon="🖼️")
+    command = build_rscript_command(script_path, session_dir)
+    if log_path is not None:
+        success, _ = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
+    else:
+        success, _ = run_command(command, cwd=BASE_DIR)
+
+    if success:
+        try:
+            marker.touch()
+        except OSError:
+            pass
+        append_run_log(log_path, "Preview generation complete.", icon="✅")
+        return True
+
+    append_run_log(log_path, "Preview generation failed; proceeding with TIFF files.", icon="⚠️")
+    return False
 
 
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {
@@ -721,7 +764,6 @@ def run_r_scripts(
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
             success, log = run_command(cmd, cwd=BASE_DIR)
-        _ensure_png_previews(output_dir)
         logs.append(log)
         if not success:
             return False, "\n\n".join(logs)
@@ -1721,7 +1763,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
         third_content = _load_info_table_for_key(session_dir, stage, key, rep)
 
     if third_content is None and key_lower == "r2":
-        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.png")
+        third_content = _load_info_table_for_key(session_dir, stage, key, "anova.tif")
 
     if third_content is not None:
         sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))

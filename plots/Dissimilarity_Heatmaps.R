@@ -8,7 +8,6 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(patchwork)
   library(vegan)  # Bray-Curtis
-  library(magick)
 })
 
 source("plots/helper.R")
@@ -544,7 +543,6 @@ fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_row
 tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
 ggsave(tif_path_ait,
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
-create_png_thumbnail(tif_path_ait)
 rm(combined_ait, plots_ait)
 gc()
 
@@ -569,6 +567,5 @@ fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc
 tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
 ggsave(tif_path_bc,
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
-create_png_thumbnail(tif_path_bc)
 rm(combined_bc, plots_bc)
 gc()

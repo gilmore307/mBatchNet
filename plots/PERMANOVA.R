@@ -4,7 +4,6 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(ggplot2)
   library(vegan)   # adonis2 / betadisper
-  library(magick)
 })
 
 source("plots/helper.R")
@@ -225,5 +224,4 @@ for (idx in seq_len(nrow(geometry_specs))) {
   tif_path <- file.path(output_folder, sprintf("permanova_%s.tif", geom_key))
   ggsave(tif_path, p,
          width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
-  create_png_thumbnail(tif_path)
 }
