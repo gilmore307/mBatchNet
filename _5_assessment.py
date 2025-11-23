@@ -754,6 +754,7 @@ def register_pre_post_callbacks(app):
             if not values:
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
+            run_state_value = values[-1] if len(values) > 1 else None
             param_vals = list(values[1:-1])
             persisted_payload = dash.no_update
             if _state_ids:
@@ -788,18 +789,38 @@ def register_pre_post_callbacks(app):
             if not session_id:
                 message = html.Div("Session not initialised.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                    return _output(
+                        message,
+                        True,
+                        poll_disabled=True,
+                        run_state_value="idle",
+                        run_button_disabled=False,
+                    )
                 return _output(
-                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                    message,
+                    dash.no_update,
+                    poll_disabled=True,
+                    run_state_value="idle",
+                    run_button_disabled=False,
                 )
 
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                    return _output(
+                        message,
+                        True,
+                        poll_disabled=True,
+                        run_state_value="idle",
+                        run_button_disabled=False,
+                    )
                 return _output(
-                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                    message,
+                    dash.no_update,
+                    poll_disabled=True,
+                    run_state_value="idle",
+                    run_button_disabled=False,
                 )
 
             expected_files = _expected_figure_files(_stage, _key)
@@ -890,11 +911,14 @@ def register_pre_post_callbacks(app):
                     log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value=None,
+                    run_state_value="running",
                     run_button_disabled=True,
                 )
 
             # Polling branch
+            if run_state_value != "running":
+                raise dash.exceptions.PreventUpdate
+
             files_ready, ready_count, total_expected = _assessment_outputs_status(
                 session_dir, expected_files, log_path=log_path
             )
@@ -918,7 +942,7 @@ def register_pre_post_callbacks(app):
                     param_store=persisted_payload,
                     poll_disabled=False,
                     poll_count=poll_ticks,
-                    run_state_value=None,
+                    run_state_value="running",
                     run_button_disabled=True,
                 )
 
@@ -944,7 +968,7 @@ def register_pre_post_callbacks(app):
                 param_store=persisted_payload,
                 poll_disabled=True,
                 poll_count=0,
-                run_state_value=None,
+                run_state_value="idle",
                 run_button_disabled=False,
             )
 
