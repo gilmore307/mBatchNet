@@ -74,13 +74,19 @@ run_method("MetaDICT", {
   }
   if (!dropped_any) say("No samples/features dropped.")
   
+  alpha <- suppressWarnings(as.numeric(get_param("alpha", 0.05)))
+  if (!is.finite(alpha)) alpha <- 0.05
+  beta <- suppressWarnings(as.numeric(get_param("beta", 0.20)))
+  if (!is.finite(beta)) beta <- 0.20
+  normalization <- as.character(get_param("normalization", "uq"))
+
   res <- MetaDICT(
     count = O,
     meta  = meta,
     distance_matrix = D,
     customize_parameter = TRUE,
-    alpha = 0.05, beta = 0.20,
-    normalization = "uq",
+    alpha = alpha, beta = beta,
+    normalization = normalization,
     max_iter = 2000,
     verbose = TRUE
   )

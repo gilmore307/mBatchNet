@@ -28,10 +28,15 @@ run_method("FAbatch", {
   sel <- ord[seq_len(K)]
   Xk  <- Xv[, sel, drop = FALSE]
   Xz <- scale(Xk, center = TRUE, scale = TRUE)
+  minerr <- suppressWarnings(as.numeric(get_param("minerr", 1e-6)))
+  if (!is.finite(minerr)) minerr <- 1e-6
+  probcrossbatch <- isTRUE(get_param("probcrossbatch", FALSE))
+  maxnbf <- suppressWarnings(as.integer(get_param("maxnbf", 8)))
+  if (!is.finite(maxnbf) || maxnbf < 1L) maxnbf <- 8L
   fa_out <- tryCatch(
     fabatch(
       x = Xz, y = y, batch = batch,
-      nbf = NULL, minerr = 1e-6, probcrossbatch = FALSE, maxiter = 100, maxnbf = 8
+      nbf = NULL, minerr = minerr, probcrossbatch = probcrossbatch, maxiter = 100, maxnbf = maxnbf
     ),
     error = function(e) e
   )
@@ -40,7 +45,7 @@ run_method("FAbatch", {
     Xz <- Xz + matrix(rnorm(length(Xz), 0, 1e-8), nrow(Xz))
     fa_out <- fabatch(
       x = Xz, y = y, batch = batch,
-      nbf = NULL, minerr = 1e-6, probcrossbatch = FALSE, maxiter = 100, maxnbf = 8
+      nbf = NULL, minerr = minerr, probcrossbatch = probcrossbatch, maxiter = 100, maxnbf = maxnbf
     )
   }
   Xadj <- X_log
