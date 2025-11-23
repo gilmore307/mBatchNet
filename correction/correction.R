@@ -128,16 +128,20 @@ save_summary <- function(){
 # ---------------------------
 CONTROL_LABEL <- NA_character_
 REFERENCE_BATCH <- NA_character_
+METADATA_MAPPINGS <- NULL
 try({
   if (.can_json) {
     cfg_path <- file.path(output_folder, "session_config.json")
     if (file.exists(cfg_path)) {
-      cfg <- jsonlite::fromJSON(cfg_path)
+      cfg <- jsonlite::fromJSON(cfg_path, simplifyVector = FALSE)
       if (!is.null(cfg$control_label) && nzchar(as.character(cfg$control_label))) {
         CONTROL_LABEL <- as.character(cfg$control_label)
       }
       if (!is.null(cfg$reference_batch) && nzchar(as.character(cfg$reference_batch))) {
         REFERENCE_BATCH <- as.character(cfg$reference_batch)
+      }
+      if (!is.null(cfg$metadata_mappings)) {
+        METADATA_MAPPINGS <- cfg$metadata_mappings
       }
     }
   }
@@ -252,7 +256,6 @@ get_input_for <- function(method, base_M, base_form) {
 custom_matrix_path      <- file.path(output_folder, "raw.csv")
 custom_metadata_path    <- file.path(output_folder, "metadata.csv")
 fallback_metadata_path  <- file.path(output_folder, "metadata_origin.csv")
-mapping_path            <- file.path(output_folder, "metadata_mappings.json")
 default_matrix_path     <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path   <- file.path("assets", "example", "metadata_1.csv")
 
@@ -271,12 +274,9 @@ if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
 }
 
 target_mapping <- NULL
-map_config <- NULL
-if (file.exists(mapping_path) && .can_json) {
-  map_config <- tryCatch(jsonlite::fromJSON(mapping_path), error = function(e) NULL)
-  if (!is.null(map_config$target_binary$mapping)) {
-    target_mapping <- map_config$target_binary$mapping
-  }
+map_config <- METADATA_MAPPINGS
+if (!is.null(map_config$target_binary$mapping)) {
+  target_mapping <- map_config$target_binary$mapping
 }
 
 label_col <- if (!is.null(map_config$label_column)) map_config$label_column else resolve_label_column(metadata, output_folder)
