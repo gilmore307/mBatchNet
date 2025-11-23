@@ -234,5 +234,32 @@ def welcome_layout(active_path: str):
                 fluid=True,
                 className="pb-4",
             ),
+            html.Footer(
+                dbc.Container(
+                    [
+                        html.P(
+                            "Batch-Effect Explorer is an open-source tool designed to help researchers "
+                            "assess, correct, and interpret batch effects across omics datasets. All "
+                            "resources and tools on this website are freely accessible to the public.",
+                            className="mb-1",
+                        ),
+                        html.P(
+                            [
+                                "For questions, please contact us at ",
+                                html.A(
+                                    "yuxuan.du@utsa.edu",
+                                    href="mailto:yuxuan.du@utsa.edu",
+                                    className="text-decoration-none",
+                                ),
+                                ".",
+                            ],
+                            className="mb-0",
+                        ),
+                    ],
+                    className="text-center text-muted small py-3",
+                    fluid=True,
+                ),
+                className="mt-4 border-top",
+            ),
         ]
     )
