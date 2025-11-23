@@ -500,6 +500,7 @@ def assessment_layout(active_path: str, stage: str):
     for key, title, _ in groups:
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
+        refresh_token_id = f"{stage}-{key}-subtab-refresh-token"
         placeholder = html.Div(
             [
                 html.Div("Click Run to generate results."),
@@ -523,6 +524,11 @@ def assessment_layout(active_path: str, stage: str):
                     [
                         dcc.Store(
                             id=f"{stage}-{key}-param-store",
+                            storage_type="session",
+                        ),
+                        dcc.Store(
+                            id=refresh_token_id,
+                            data=0,
                             storage_type="session",
                         ),
                         dcc.Store(id=f"{stage}-{key}-run-state", storage_type="session"),
@@ -623,8 +629,12 @@ def register_pre_post_callbacks(app):
         sid = f"{stage}-{key}"
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
+        refresh_token_id = f"{stage}-{key}-subtab-refresh-token"
 
-        outputs = [Output(content_id, "children")]
+        outputs = [
+            Output(content_id, "children", allow_duplicate=True),
+            Output(refresh_token_id, "data", allow_duplicate=True),
+        ]
         if stage == "pre":
             outputs.append(Output("pre-started", "data", allow_duplicate=True))
         if stage == "post":
@@ -700,18 +710,44 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-fig-height", "value"),
                 State(f"{sid}-param-fig-dpi", "value"),
             ]
-            if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
-                param_state_ids.append(f"{sid}-param-fig-ncol")
-                states.append(State(f"{sid}-param-fig-ncol", "value"))
-                has_ncol_param = True
+        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+            param_state_ids.append(f"{sid}-param-fig-ncol")
+            states.append(State(f"{sid}-param-fig-ncol", "value"))
+            has_ncol_param = True
 
         state_ids_tuple = tuple(param_state_ids)
+
+        @app.callback(
+            Output(content_id, "children", allow_duplicate=True),
+            Input(refresh_token_id, "data"),
+            State("session-id", "data"),
+            prevent_initial_call="initial_duplicate",
+        )
+        def _refresh_group_tabset(refresh_token, session_id, _stage=stage, _key=key):
+            if not refresh_token:
+                raise dash.exceptions.PreventUpdate
+            if not session_id:
+                return html.Div("Session not initialised.")
+            session_dir = get_session_dir(session_id)
+            try:
+                return render_group_tabset(session_dir, _stage, _key)
+            except Exception as exc:
+                return html.Div(
+                    [
+                        html.P("All outputs are generated, but rendering failed:"),
+                        html.Pre(str(exc)),
+                        html.P(
+                            "Try refreshing the page or contact the developer for help."
+                        ),
+                    ]
+                )
 
         @app.callback(
             *outputs,
             Input(run_id, "n_clicks"),
             Input(f"{sid}-poll-interval", "n_intervals"),
             *states,
+            State(refresh_token_id, "data"),
             State(f"{sid}-run-state", "data"),
             prevent_initial_call=True,
         )
@@ -736,13 +772,15 @@ def register_pre_post_callbacks(app):
                 raise dash.exceptions.PreventUpdate
             session_id = values[0]
             run_state_value = values[-1]
-            param_vals = list(values[1:-1])
+            refresh_token = values[-2]
+            param_vals = list(values[1:-2])
             persisted_payload = dash.no_update
             if _state_ids:
                 persisted_payload = {"values": {pid: val for pid, val in zip(_state_ids, param_vals)}}
 
             def _output(
                 content,
+                refresh_token_value,
                 stage_flag,
                 log_path_value=dash.no_update,
                 log_meta=dash.no_update,
@@ -756,6 +794,7 @@ def register_pre_post_callbacks(app):
             ):
                 return (
                     content,
+                    refresh_token_value,
                     stage_flag,
                     log_path_value,
                     log_meta,
@@ -770,26 +809,46 @@ def register_pre_post_callbacks(app):
             if not session_id:
                 message = html.Div("Session not initialised.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                    return _output(
+                        message, dash.no_update, True, poll_disabled=True, run_button_disabled=False
+                    )
                 return _output(
-                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                    message,
+                    dash.no_update,
+                    dash.no_update,
+                    poll_disabled=True,
+                    run_button_disabled=False,
                 )
 
             session_dir = get_session_dir(session_id)
             if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
-                    return _output(message, True, poll_disabled=True, run_button_disabled=False)
+                    return _output(
+                        message, dash.no_update, True, poll_disabled=True, run_button_disabled=False
+                    )
                 return _output(
-                    message, dash.no_update, poll_disabled=True, run_button_disabled=False
+                    message,
+                    dash.no_update,
+                    dash.no_update,
+                    poll_disabled=True,
+                    run_button_disabled=False,
                 )
 
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
 
-            if trigger_id == f"{sid}-poll-interval" and not run_state_value:
-                # Ignore background polling if we never initiated a run for this tab.
-                raise dash.exceptions.PreventUpdate
+            if trigger_id == f"{sid}-poll-interval":
+                # Ignore background polling if we never initiated a run for this tab or if
+                # this response is older than a later poll we've already handled.
+                if not run_state_value:
+                    raise dash.exceptions.PreventUpdate
+                if isinstance(run_state_value, dict):
+                    latest_poll = run_state_value.get("latest_poll")
+                    if latest_poll is not None and poll_ticks < latest_poll:
+                        raise dash.exceptions.PreventUpdate
+                    if run_state_value.get("status") == "complete":
+                        raise dash.exceptions.PreventUpdate
 
             if trigger_id == run_id:
                 # Build CLI flags from parameters
@@ -869,6 +928,7 @@ def register_pre_post_callbacks(app):
                 )
                 return _output(
                     spinner,
+                    dash.no_update,
                     stage_flag,
                     log_path_value=str(log_path),
                     log_meta=None,
@@ -876,7 +936,7 @@ def register_pre_post_callbacks(app):
                     log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value={"status": "running"},
+                    run_state_value={"status": "running", "latest_poll": 0},
                     run_button_disabled=True,
                 )
 
@@ -891,21 +951,30 @@ def register_pre_post_callbacks(app):
                     if total_expected
                     else "Waiting for output files..."
                 )
-                placeholder = dbc.Spinner(
-                    html.Div(progress),
-                    color="primary",
-                    type="border",
-                    size="md",
-                    fullscreen=False,
-                )
+
+                prev_ready = None
+                prev_total = None
+                if isinstance(run_state_value, dict):
+                    prev_ready = run_state_value.get("ready_count")
+                    prev_total = run_state_value.get("total_expected")
+
+                if ready_count != prev_ready or total_expected != prev_total:
+                    append_run_log(log_path, progress, icon="⏱️")
+
                 return _output(
-                    placeholder,
+                    dash.no_update,
+                    dash.no_update,
                     dash.no_update,
                     param_store=persisted_payload,
-                    poll_disabled=False,
-                    poll_count=poll_ticks,
-                    run_state_value=dash.no_update,
-                    run_button_disabled=True,
+                    poll_disabled=dash.no_update,
+                    poll_count=dash.no_update,
+                    run_state_value={
+                        "status": "running",
+                        "latest_poll": poll_ticks,
+                        "ready_count": ready_count,
+                        "total_expected": total_expected,
+                    },
+                    run_button_disabled=dash.no_update,
                 )
 
             complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
@@ -917,11 +986,41 @@ def register_pre_post_callbacks(app):
                     icon="✅",
                 )
 
-            content = render_group_tabset(session_dir, _stage, _key)
+            try:
+                content = render_group_tabset(session_dir, _stage, _key)
+            except Exception as exc:  # pragma: no cover - defensive guard for runtime rendering
+                append_run_log(
+                    log_path,
+                    f"Error while rendering outputs for {_title}: {exc}",
+                    icon="❌",
+                )
+                error_msg = html.Div(
+                    [
+                        html.P("All outputs are generated, but rendering failed:"),
+                        html.Pre(str(exc)),
+                        html.P(
+                            "Try refreshing the page or contact the developer for help."
+                        ),
+                    ]
+                )
+                return _output(
+                    error_msg,
+                    (refresh_token or 0) + 1,
+                    True if _stage == "pre" else dash.no_update,
+                    log_path_value=str(log_path),
+                    poll_disabled=True,
+                    poll_count=0,
+                    run_state_value={
+                        "status": "complete",
+                        "latest_poll": poll_ticks,
+                    },
+                    run_button_disabled=False,
+                )
             stage_flag = True if _stage == "pre" else dash.no_update
 
             return _output(
-                content,
+                dash.no_update,
+                (refresh_token or 0) + 1,
                 stage_flag,
                 log_path_value=str(log_path),
                 log_meta=None,
@@ -930,7 +1029,10 @@ def register_pre_post_callbacks(app):
                 param_store=persisted_payload,
                 poll_disabled=True,
                 poll_count=0,
-                run_state_value=None,
+                run_state_value={
+                    "status": "complete",
+                    "latest_poll": poll_ticks,
+                },
                 run_button_disabled=False,
             )
 
