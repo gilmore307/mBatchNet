@@ -17,6 +17,7 @@ from _2_utils import (
     human_size,
     run_preprocess,
     run_r_scripts,
+    log_file_meta,
     BASE_DIR,
     _make_ag_grid,
     _encode_image_source,
@@ -860,7 +861,7 @@ def register_upload_callbacks(app):
         log_path = session_dir / "run.log"
         ok, log = run_preprocess(session_dir, log_path=log_path)
         # Do not auto-open logs modal; user can open manually
-        return bool(ok), str(log_path), None, dash.no_update
+        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update
 
     # Auto-preprocess when example data is loaded (no button press needed)
     @app.callback(
@@ -963,7 +964,7 @@ def register_upload_callbacks(app):
                 mosaic_ok, _ = _generate_mosaic(session_dir)
                 if mosaic_ok:
                     mosaic_children = _render_mosaic_card(session_dir)
-        return bool(ok), str(log_path), None, dash.no_update, mosaic_children
+        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update, mosaic_children
 
     # Hide the manual Process button when example data is used
     @app.callback(

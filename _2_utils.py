@@ -20,7 +20,7 @@ from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set
+from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set, Any
 
 from dash import html, dcc
 import dash_ag_grid as dag
@@ -73,6 +73,22 @@ def append_run_log(log_path: Path, message: str, icon: str = "ℹ️") -> str:
     except OSError:
         pass
     return line
+
+
+def log_file_meta(log_path: Path | None) -> Optional[Dict[str, Any]]:
+    """Return basic metadata for a log file if it exists."""
+
+    if not log_path:
+        return None
+    try:
+        stat = Path(log_path).stat()
+    except OSError:
+        return None
+    return {
+        "path": str(Path(log_path)),
+        "size": stat.st_size,
+        "mtime": stat.st_mtime,
+    }
 
 
 # ---- Dataclasses & config ----

@@ -20,6 +20,7 @@ from _2_utils import (
     load_integrated_summary,
     method_output_exists,
     _remove_method_from_summary,
+    log_file_meta,
     run_single_method,
 )
 
@@ -317,7 +318,7 @@ def register_correction_callbacks(app):
             "complete": bool(complete_flag),
             "refresh": new_refresh,
             "log_path": str(log_path),
-            "log_meta": None,
+            "log_meta": log_file_meta(log_path),
         }
         run_color = "secondary" if run_disabled else "success"
         delete_color = "secondary" if delete_disabled else "success"
