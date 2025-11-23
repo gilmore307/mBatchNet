@@ -714,11 +714,11 @@ def register_pre_post_callbacks(app):
                 f"{sid}-param-fig-height",
                 f"{sid}-param-fig-dpi",
             ])
-        states += [
-            State(f"{sid}-param-fig-width", "value"),
-            State(f"{sid}-param-fig-height", "value"),
-            State(f"{sid}-param-fig-dpi", "value"),
-        ]
+            states += [
+                State(f"{sid}-param-fig-width", "value"),
+                State(f"{sid}-param-fig-height", "value"),
+                State(f"{sid}-param-fig-dpi", "value"),
+            ]
             if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
                 param_state_ids.append(f"{sid}-param-fig-ncol")
                 states.append(State(f"{sid}-param-fig-ncol", "value"))
