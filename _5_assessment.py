@@ -787,9 +787,17 @@ def register_pre_post_callbacks(app):
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
 
-            if trigger_id == f"{sid}-poll-interval" and not run_state_value:
-                # Ignore background polling if we never initiated a run for this tab.
-                raise dash.exceptions.PreventUpdate
+            if trigger_id == f"{sid}-poll-interval":
+                # Ignore background polling if we never initiated a run for this tab or if
+                # this response is older than a later poll we've already handled.
+                if not run_state_value:
+                    raise dash.exceptions.PreventUpdate
+                if isinstance(run_state_value, dict):
+                    latest_poll = run_state_value.get("latest_poll")
+                    if latest_poll is not None and poll_ticks < latest_poll:
+                        raise dash.exceptions.PreventUpdate
+                    if run_state_value.get("status") == "complete":
+                        raise dash.exceptions.PreventUpdate
 
             if trigger_id == run_id:
                 # Build CLI flags from parameters
@@ -876,7 +884,7 @@ def register_pre_post_callbacks(app):
                     log_interval_disabled=False,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value={"status": "running"},
+                    run_state_value={"status": "running", "latest_poll": 0},
                     run_button_disabled=True,
                 )
 
@@ -902,10 +910,13 @@ def register_pre_post_callbacks(app):
                     placeholder,
                     dash.no_update,
                     param_store=persisted_payload,
-                    poll_disabled=False,
-                    poll_count=poll_ticks,
-                    run_state_value=dash.no_update,
-                    run_button_disabled=True,
+                    poll_disabled=dash.no_update,
+                    poll_count=dash.no_update,
+                    run_state_value={
+                        "status": "running",
+                        "latest_poll": poll_ticks,
+                    },
+                    run_button_disabled=dash.no_update,
                 )
 
             complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
@@ -917,7 +928,35 @@ def register_pre_post_callbacks(app):
                     icon="✅",
                 )
 
-            content = render_group_tabset(session_dir, _stage, _key)
+            try:
+                content = render_group_tabset(session_dir, _stage, _key)
+            except Exception as exc:  # pragma: no cover - defensive guard for runtime rendering
+                append_run_log(
+                    log_path,
+                    f"Error while rendering outputs for {_title}: {exc}",
+                    icon="❌",
+                )
+                error_msg = html.Div(
+                    [
+                        html.P("All outputs are generated, but rendering failed:"),
+                        html.Pre(str(exc)),
+                        html.P(
+                            "Try refreshing the page or contact the developer for help."
+                        ),
+                    ]
+                )
+                return _output(
+                    error_msg,
+                    True if _stage == "pre" else dash.no_update,
+                    log_path_value=str(log_path),
+                    poll_disabled=True,
+                    poll_count=0,
+                    run_state_value={
+                        "status": "complete",
+                        "latest_poll": poll_ticks,
+                    },
+                    run_button_disabled=False,
+                )
             stage_flag = True if _stage == "pre" else dash.no_update
 
             return _output(
@@ -930,7 +969,10 @@ def register_pre_post_callbacks(app):
                 param_store=persisted_payload,
                 poll_disabled=True,
                 poll_count=0,
-                run_state_value=None,
+                run_state_value={
+                    "status": "complete",
+                    "latest_poll": poll_ticks,
+                },
                 run_button_disabled=False,
             )
 
