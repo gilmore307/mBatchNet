@@ -12,15 +12,16 @@ import shutil
 import subprocess
 import textwrap
 import time
-import hashlib
+import queue
 import threading
+import hashlib
 from io import BytesIO
 from datetime import datetime
 from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set
+from typing import Dict, Iterable, List, Sequence, Tuple, Optional, Set, Callable
 
 from dash import html, dcc
 import dash_ag_grid as dag
@@ -74,6 +75,176 @@ def append_run_log(log_path: Path, message: str, icon: str = "ℹ️") -> str:
     except OSError:
         pass
     return line
+
+
+# ---- WebSocket broadcasting helpers ----
+_WS_SUBSCRIBERS: Dict[str, Set[queue.Queue]] = defaultdict(set)
+_WS_LOCK = threading.Lock()
+_LOG_STREAMERS: Dict[str, threading.Thread] = {}
+_OUTPUT_WATCHERS: Dict[str, threading.Thread] = {}
+
+
+def register_ws_subscriber(session_id: str) -> queue.Queue:
+    """Register a queue that will receive messages for ``session_id``."""
+
+    q: queue.Queue = queue.Queue()
+    with _WS_LOCK:
+        _WS_SUBSCRIBERS[session_id].add(q)
+    return q
+
+
+def unregister_ws_subscriber(session_id: str, subscriber: queue.Queue) -> None:
+    """Remove a queue from the subscriber list for ``session_id``."""
+
+    with _WS_LOCK:
+        subscribers = _WS_SUBSCRIBERS.get(session_id)
+        if not subscribers:
+            return
+        subscribers.discard(subscriber)
+        if not subscribers:
+            _WS_SUBSCRIBERS.pop(session_id, None)
+
+
+def broadcast_ws_message(session_id: str, payload: Dict[str, object]) -> None:
+    """Send ``payload`` to all WebSocket subscribers for ``session_id``."""
+
+    with _WS_LOCK:
+        subscribers = list(_WS_SUBSCRIBERS.get(session_id, ()))
+    for subscriber in subscribers:
+        try:
+            subscriber.put(payload, block=False)
+        except Exception:
+            # Drop messages if a subscriber is no longer available.
+            continue
+
+
+def start_runlog_stream(session_id: str, log_path: Path, *, interval: float = 0.6) -> None:
+    """Stream the full log file to WebSocket subscribers when it changes."""
+
+    resolved = str(log_path.resolve())
+    stream_key = f"{session_id}::{resolved}"
+    with _WS_LOCK:
+        if stream_key in _LOG_STREAMERS:
+            return
+
+    def _worker() -> None:
+        last_meta: Optional[Dict[str, object]] = None
+        last_text: Optional[str] = None
+        while True:
+            try:
+                if not log_path.exists():
+                    time.sleep(interval)
+                    continue
+                stat = log_path.stat()
+                current_meta = {
+                    "path": resolved,
+                    "mtime": stat.st_mtime,
+                    "size": stat.st_size,
+                    "session": session_id,
+                }
+                text = log_path.read_text(encoding="utf-8", errors="replace")
+                if current_meta != last_meta or text != last_text:
+                    broadcast_ws_message(
+                        session_id,
+                        {
+                            "kind": "runlog",
+                            "text": text,
+                            "meta": current_meta,
+                            "session": session_id,
+                        },
+                    )
+                    last_meta = current_meta
+                    last_text = text
+            except Exception:
+                # Keep the watcher alive on transient read errors.
+                pass
+            time.sleep(interval)
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    with _WS_LOCK:
+        _LOG_STREAMERS[stream_key] = thread
+
+
+def start_output_watch(
+    session_id: str,
+    job_key: str,
+    session_dir: Path,
+    expected_files: Sequence[str],
+    status_fn: Callable[[Path, Sequence[str], Optional[Path]], Tuple[bool, int, int]],
+    *,
+    log_path: Optional[Path] = None,
+    interval: float = 0.75,
+) -> None:
+    """Watch ``expected_files`` and notify WebSocket subscribers when ready."""
+
+    watch_key = f"{session_id}::{job_key}"
+    with _WS_LOCK:
+        if watch_key in _OUTPUT_WATCHERS:
+            return
+
+    def _worker() -> None:
+        last_ready = -1
+        last_total = -1
+        while True:
+            try:
+                ready, ready_count, total_expected = status_fn(
+                    session_dir, expected_files, log_path
+                )
+                if not expected_files and total_expected == 0:
+                    broadcast_ws_message(
+                        session_id,
+                        {
+                            "kind": "outputs",
+                            "job": job_key,
+                            "ready": True,
+                            "readyCount": 0,
+                            "total": 0,
+                            "session": session_id,
+                        },
+                    )
+                    break
+                if ready_count != last_ready or total_expected != last_total:
+                    broadcast_ws_message(
+                        session_id,
+                        {
+                            "kind": "outputs",
+                            "job": job_key,
+                            "ready": bool(ready),
+                            "readyCount": int(ready_count),
+                            "total": int(total_expected),
+                            "session": session_id,
+                        },
+                    )
+                    last_ready = ready_count
+                    last_total = total_expected
+                if ready:
+                    break
+            except Exception:
+                # Keep watching despite transient filesystem errors.
+                pass
+            time.sleep(interval)
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    with _WS_LOCK:
+        _OUTPUT_WATCHERS[watch_key] = thread
+
+
+def parse_ws_payload(message: object) -> Optional[Dict[str, object]]:
+    """Normalise ``dash_extensions.WebSocket`` messages to a dictionary payload."""
+
+    data: object = None
+    if isinstance(message, dict):
+        data = message.get("data")
+    if isinstance(data, str):
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    if isinstance(data, dict):
+        return data  # type: ignore[return-value]
+    return None
 
 
 # ---- Dataclasses & config ----

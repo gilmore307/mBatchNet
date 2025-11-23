@@ -3,11 +3,14 @@
 dash>=2.14.0
 # Bootstrap styling + layout helpers
 dash-bootstrap-components>=1.6.0
+# WebSocket component for realtime updates
+dash-extensions>=1.0.0
 # Enterprise-ready hosting entrypoint
 # (gunicorn optional on Windows; retained for Heroku/Render compatibility)
 gunicorn>=21.2.0
 # Rich grid used on the correction results page
 dash-ag-grid>=2.4.0
+flask-sock>=0.7.0
 
 # Python helpers required by R (reticulate) integration
 numpy>=1.23

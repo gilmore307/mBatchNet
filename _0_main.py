@@ -7,11 +7,14 @@ import uuid
 import shutil
 import zipfile
 import tempfile
+import json
 
 import dash
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
+from dash_extensions import WebSocket
+from flask_sock import Sock
 
 # Local modules
 from _1_components import build_navbar, NAV_LINKS, NAV_ID_MAP
@@ -19,6 +22,10 @@ from _2_utils import (
     cleanup_old_sessions,
     get_session_dir,
     OUTPUT_ROOT,
+    register_ws_subscriber,
+    unregister_ws_subscriber,
+    start_runlog_stream,
+    parse_ws_payload,
 )
 from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
@@ -33,6 +40,7 @@ app: Dash = dash.Dash(
     suppress_callback_exceptions=True,
 )
 server = app.server
+sock = Sock(server)
 
 
 # ---- Layout factory ----
@@ -68,6 +76,7 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-path", storage_type="session", data=""),
             dcc.Store(id="runlog-file-meta", storage_type="memory", data=None),
             dcc.Store(id="runlog-scroll-trigger", storage_type="memory", data=None),
+            dcc.Store(id="runlog-stream-init", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -79,6 +88,7 @@ def serve_layout() -> html.Div:
 
             # Background log poller
             dcc.Interval(id="runlog-interval", interval=800, n_intervals=0, disabled=True),
+            WebSocket(id="session-websocket", url=""),
 
             # Confirm restart modal (shown when clicking Upload from other pages)
             dbc.Modal(
@@ -165,11 +175,31 @@ app.validation_layout = html.Div(
 )
 
 
+@sock.route("/ws/<session_id>")
+def session_stream(ws, session_id: str):
+    subscriber = register_ws_subscriber(session_id)
+    try:
+        while True:
+            payload = subscriber.get()
+            ws.send(json.dumps(payload))
+    except Exception:
+        pass
+    finally:
+        unregister_ws_subscriber(session_id, subscriber)
+
+
 # ---- Page routing ----
 @app.callback(Output("page-content", "children"), Input("page-url", "pathname"))
 def render_page(pathname: str):
     layout_factory = PAGE_FACTORY.get(pathname, welcome_layout)
     return layout_factory(pathname)
+
+
+@app.callback(Output("session-websocket", "url"), Input("session-id", "data"))
+def set_ws_url(session_id: str):
+    if not session_id:
+        raise dash.exceptions.PreventUpdate
+    return f"/ws/{session_id}"
 
 
 # ---- Enable/disable navigation buttons based on stage completion ----
@@ -452,6 +482,19 @@ def highlight_next(
     )
 
 
+@app.callback(
+    Output("runlog-stream-init", "data", allow_duplicate=True),
+    Input("runlog-path", "data"),
+    State("session-id", "data"),
+    prevent_initial_call=True,
+)
+def start_log_stream(log_path, session_id):
+    if not log_path or not session_id:
+        raise dash.exceptions.PreventUpdate
+    start_runlog_stream(session_id, Path(log_path))
+    return {"path": log_path, "session": session_id}
+
+
 # ---- Run log modal handlers ----
 @app.callback(
     Output("runlog-modal", "is_open", allow_duplicate=True),
@@ -469,7 +512,7 @@ def toggle_runlog_modal(open_clicks, close_clicks, is_open):
         raise dash.exceptions.PreventUpdate
     trig = ctx.triggered[0]["prop_id"].split(".")[0]
     if trig == "log-open" and open_clicks:
-        return True, False, None
+        return True, True, None
     if trig == "runlog-close" and close_clicks:
         return False, True, dash.no_update
     return is_open, dash.no_update, dash.no_update
@@ -478,12 +521,35 @@ def toggle_runlog_modal(open_clicks, close_clicks, is_open):
 @app.callback(
     Output("runlog-content", "children"),
     Output("runlog-file-meta", "data"),
+    Input("session-websocket", "message"),
     Input("runlog-interval", "n_intervals"),
     State("runlog-path", "data"),
     State("runlog-file-meta", "data"),
     State("runlog-content", "children"),
 )
-def update_runlog_content(n, log_path, file_meta, previous_content):
+def update_runlog_content(ws_message, n, log_path, file_meta, previous_content):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    if trigger == "session-websocket":
+        payload = parse_ws_payload(ws_message)
+        if not payload or payload.get("kind") != "runlog":
+            raise dash.exceptions.PreventUpdate
+        if log_path:
+            resolved = str(Path(log_path).resolve())
+            meta_path = None
+            meta = payload.get("meta") if isinstance(payload, dict) else None
+            if isinstance(meta, dict):
+                meta_path = meta.get("path")
+            if meta_path and meta_path != resolved:
+                raise dash.exceptions.PreventUpdate
+        text = payload.get("text") if isinstance(payload, dict) else None
+        meta = payload.get("meta") if isinstance(payload, dict) else None
+        if text is None:
+            raise dash.exceptions.PreventUpdate
+        return text, meta
+
     if not log_path:
         raise dash.exceptions.PreventUpdate
     try:

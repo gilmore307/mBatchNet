@@ -33,6 +33,8 @@ from _2_utils import (
     build_ranking_tab,
     build_raw_assessments_tab,
     append_run_log,
+    start_output_watch,
+    parse_ws_payload,
 )
 
 
@@ -752,6 +754,7 @@ def register_pre_post_callbacks(app):
             *outputs,
             Input(run_id, "n_clicks"),
             Input(f"{sid}-poll-interval", "n_intervals"),
+            Input("session-websocket", "message"),
             *states,
             State(refresh_token_id, "data"),
             State(f"{sid}-run-state", "data"),
@@ -760,6 +763,7 @@ def register_pre_post_callbacks(app):
         def _run_one(
             n_clicks: int,
             poll_ticks: int,
+            ws_message,
             *values,
             _stage=stage,
             _key=key,
@@ -844,17 +848,11 @@ def register_pre_post_callbacks(app):
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
 
+            job_key = f"{_stage}:{_key}"
+
             if trigger_id == f"{sid}-poll-interval":
-                # Ignore background polling if we never initiated a run for this tab or if
-                # this response is older than a later poll we've already handled.
-                if not run_state_value:
-                    raise dash.exceptions.PreventUpdate
-                if isinstance(run_state_value, dict):
-                    latest_poll = run_state_value.get("latest_poll")
-                    if latest_poll is not None and poll_ticks < latest_poll:
-                        raise dash.exceptions.PreventUpdate
-                    if run_state_value.get("status") == "complete":
-                        raise dash.exceptions.PreventUpdate
+                # Polling is replaced by WebSocket pushes; keep disabled.
+                raise dash.exceptions.PreventUpdate
 
             if trigger_id == run_id:
                 # Build CLI flags from parameters
@@ -924,6 +922,14 @@ def register_pre_post_callbacks(app):
                     run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
 
                 threading.Thread(target=_worker, daemon=True).start()
+                start_output_watch(
+                    session_id,
+                    job_key,
+                    session_dir,
+                    expected_files,
+                    _assessment_outputs_status,
+                    log_path=log_path,
+                )
                 stage_flag = True if _stage == "pre" else dash.no_update
                 spinner = dbc.Spinner(
                     html.Div("Running..."),
@@ -939,44 +945,54 @@ def register_pre_post_callbacks(app):
                     log_path_value=str(log_path),
                     log_meta=None,
                     modal_open=dash.no_update,
-                    log_interval_disabled=False,
+                    log_interval_disabled=True,
                     poll_disabled=False,
                     poll_count=0,
-                    run_state_value={"status": "running", "latest_poll": 0},
+                    run_state_value={"status": "running"},
                     run_button_disabled=True,
                 )
 
-            # Polling branch
-            files_ready, ready_count, total_expected = _assessment_outputs_status(
-                session_dir, expected_files, log_path=log_path
-            )
+            files_ready = False
+            ready_count = 0
+            total_expected = len(expected_files)
 
-            if not files_ready:
-                progress = (
-                    f"Waiting for output files ({ready_count}/{total_expected})..."
-                    if total_expected
-                    else "Waiting for output files..."
-                )
-                placeholder = dbc.Spinner(
-                    html.Div(progress),
-                    color="primary",
-                    type="border",
-                    size="md",
-                    fullscreen=False,
-                )
-                return _output(
-                    placeholder,
-                    dash.no_update,
-                    dash.no_update,
-                    param_store=persisted_payload,
-                    poll_disabled=dash.no_update,
-                    poll_count=dash.no_update,
-                    run_state_value={
-                        "status": "running",
-                        "latest_poll": poll_ticks,
-                    },
-                    run_button_disabled=dash.no_update,
-                )
+            if trigger_id == "session-websocket":
+                payload = parse_ws_payload(ws_message)
+                if not payload or payload.get("kind") != "outputs":
+                    raise dash.exceptions.PreventUpdate
+                payload_session = payload.get("session") if isinstance(payload, dict) else None
+                if payload_session not in (None, session_id):
+                    raise dash.exceptions.PreventUpdate
+                if payload.get("job") != job_key:
+                    raise dash.exceptions.PreventUpdate
+
+                files_ready = bool(payload.get("ready"))
+                ready_count = int(payload.get("readyCount") or 0)
+                total_expected = int(payload.get("total") or total_expected)
+
+                if not files_ready:
+                    progress = (
+                        f"Waiting for output files ({ready_count}/{total_expected})..."
+                        if total_expected
+                        else "Waiting for output files..."
+                    )
+                    placeholder = dbc.Spinner(
+                        html.Div(progress),
+                        color="primary",
+                        type="border",
+                        size="md",
+                        fullscreen=False,
+                    )
+                    return _output(
+                        placeholder,
+                        dash.no_update,
+                        dash.no_update,
+                        param_store=persisted_payload,
+                        poll_disabled=True,
+                        poll_count=0,
+                        run_state_value={"status": "running"},
+                        run_button_disabled=True,
+                    )
 
             complete_key = f"{log_path.resolve()}::COMPLETE::{_title}"
             if complete_key not in _FOUND_OUTPUT_LOGS:
@@ -1015,7 +1031,6 @@ def register_pre_post_callbacks(app):
                     poll_count=0,
                     run_state_value={
                         "status": "complete",
-                        "latest_poll": poll_ticks,
                     },
                     run_button_disabled=False,
                 )
@@ -1034,7 +1049,6 @@ def register_pre_post_callbacks(app):
                 poll_count=0,
                 run_state_value={
                     "status": "complete",
-                    "latest_poll": poll_ticks,
                 },
                 run_button_disabled=False,
             )
