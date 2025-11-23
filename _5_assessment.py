@@ -721,7 +721,7 @@ def register_pre_post_callbacks(app):
             Output(content_id, "children", allow_duplicate=True),
             Input(refresh_token_id, "data"),
             State("session-id", "data"),
-            prevent_initial_call=False,
+            prevent_initial_call="initial_duplicate",
         )
         def _refresh_group_tabset(refresh_token, session_id, _stage=stage, _key=key):
             if not refresh_token:
