@@ -20,6 +20,9 @@ from _2_utils import (
     load_integrated_summary,
     method_output_exists,
     _remove_method_from_summary,
+    clear_method_failure,
+    mark_method_failed,
+    method_failed_last_run,
     log_file_meta,
     run_single_method,
 )
@@ -414,7 +417,13 @@ def register_correction_callbacks(app):
                     avg_elapsed = None
             avg_display = "-" if avg_elapsed in (None, "") else f"{float(avg_elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
-            status_text = "Selected" if outputs_present else "Not selected"
+            failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
+            if outputs_present:
+                status_text = "Selected"
+            elif failed_state:
+                status_text = "Failed"
+            else:
+                status_text = "Not selected"
             run_disabled = not session_ready or outputs_present
             delete_disabled = not outputs_present
             status_cell = html.Td(
@@ -629,11 +638,13 @@ def register_correction_callbacks(app):
         success, _ = run_single_method(session_dir, method_code, log_path=log_path, params=params)
         new_refresh = refresh_value + 1 if success else refresh_value
         if success:
+            clear_method_failure(session_dir, method_code)
             status_text = "Selected"
             run_disabled = True
             delete_disabled = False
             message = f"{display_name} correction complete."
         else:
+            mark_method_failed(session_dir, method_code)
             _remove_method_from_summary(session_dir, method_code)
             status_text = "Failed"
             run_disabled = False
@@ -747,6 +758,7 @@ def register_correction_callbacks(app):
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
+        clear_method_failure(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
         status_text = "Not selected"
         run_disabled = not session_ready
