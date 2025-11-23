@@ -339,7 +339,6 @@ def register_correction_callbacks(app):
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
-        Output("runlog-interval", "disabled", allow_duplicate=True),
         Input({"type": "method-operation-result", "code": ALL}, "data"),
         State({"type": "method-operation-result", "code": ALL}, "id"),
         prevent_initial_call=True,
@@ -371,10 +370,6 @@ def register_correction_callbacks(app):
         log_path = payload.get("log_path") if "log_path" in payload else dash.no_update
         log_meta = payload.get("log_meta") if "log_meta" in payload else dash.no_update
         open_log = payload.get("open_log") if "open_log" in payload else dash.no_update
-        interval_disabled = (
-            payload.get("interval_disabled") if "interval_disabled" in payload else dash.no_update
-        )
-
         status_message = message if message is not None else dash.no_update
         complete_flag = bool(complete) if isinstance(complete, bool) else complete
 
@@ -385,7 +380,6 @@ def register_correction_callbacks(app):
             log_path,
             log_meta,
             open_log,
-            interval_disabled,
         )
 
     @app.callback(

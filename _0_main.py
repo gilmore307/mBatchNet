@@ -7,11 +7,14 @@ import uuid
 import shutil
 import zipfile
 import tempfile
+import time
 
 import dash
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
+from flask import request
+from flask_sock import Sock
 
 # Local modules
 from _1_components import build_navbar, NAV_LINKS, NAV_ID_MAP
@@ -33,6 +36,7 @@ app: Dash = dash.Dash(
     suppress_callback_exceptions=True,
 )
 server = app.server
+sock = Sock(server)
 
 
 # ---- Layout factory ----
@@ -68,6 +72,7 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-path", storage_type="session", data=""),
             dcc.Store(id="runlog-file-meta", storage_type="memory", data=None),
             dcc.Store(id="runlog-scroll-trigger", storage_type="memory", data=None),
+            dcc.Store(id="runlog-ws-status", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -76,9 +81,6 @@ def serve_layout() -> html.Div:
 
             # Page mount (preload Home so navbar buttons exist for callbacks)
             html.Div(id="page-content", children=welcome_layout("/")),
-
-            # Background log poller
-            dcc.Interval(id="runlog-interval", interval=800, n_intervals=0, disabled=True),
 
             # Confirm restart modal (shown when clicking Upload from other pages)
             dbc.Modal(
@@ -455,7 +457,6 @@ def highlight_next(
 # ---- Run log modal handlers ----
 @app.callback(
     Output("runlog-modal", "is_open", allow_duplicate=True),
-    Output("runlog-interval", "disabled", allow_duplicate=True),
     Output("runlog-file-meta", "data", allow_duplicate=True),
     Input("log-open", "n_clicks"),
     Input("runlog-close", "n_clicks"),
@@ -469,45 +470,98 @@ def toggle_runlog_modal(open_clicks, close_clicks, is_open):
         raise dash.exceptions.PreventUpdate
     trig = ctx.triggered[0]["prop_id"].split(".")[0]
     if trig == "log-open" and open_clicks:
-        return True, False, None
+        return True, None
     if trig == "runlog-close" and close_clicks:
-        return False, True, dash.no_update
-    return is_open, dash.no_update, dash.no_update
+        return False, dash.no_update
+    return is_open, dash.no_update
 
 
-@app.callback(
-    Output("runlog-content", "children"),
-    Output("runlog-file-meta", "data"),
-    Input("runlog-interval", "n_intervals"),
-    State("runlog-path", "data"),
-    State("runlog-file-meta", "data"),
-    State("runlog-content", "children"),
-)
-def update_runlog_content(n, log_path, file_meta, previous_content):
-    if not log_path:
-        raise dash.exceptions.PreventUpdate
+def _resolve_log_path(raw_path: str | None) -> Path | None:
+    if not raw_path:
+        return None
     try:
-        p = Path(log_path)
-        if not p.exists():
-            return "Waiting for log file...", file_meta
-        stat = p.stat()
-        current_meta = {
-            "path": str(p.resolve()),
-            "mtime": stat.st_mtime,
-            "size": stat.st_size,
-        }
-        if isinstance(file_meta, dict) and file_meta == current_meta and n:
-            raise dash.exceptions.PreventUpdate
-        text = p.read_text(encoding="utf-8", errors="replace")
-        return text, current_meta
+        path = Path(raw_path).expanduser().resolve()
     except Exception:
-        if previous_content is not None:
-            return previous_content, file_meta
-        return dash.no_update, file_meta
+        return None
+    try:
+        root = OUTPUT_ROOT.resolve()
+    except Exception:
+        root = OUTPUT_ROOT
+    try:
+        if path == root or root in path.parents:
+            return path
+    except Exception:
+        return None
+    return None
 
 
-# (Removed init_runlog_on_actions to avoid referencing page-specific IDs
-#  that are not present in the current layout.)
+@sock.route("/ws/runlog")
+def stream_runlog(ws):
+    raw_path = request.args.get("path")
+    log_path = _resolve_log_path(raw_path)
+    if not log_path:
+        try:
+            ws.send("Invalid log path.\n")
+        finally:
+            return
+
+    try:
+        ws.send("__runlog_reset__")
+    except Exception:
+        return
+
+    last_size = 0
+    missing_sent = False
+
+    while True:
+        try:
+            if getattr(ws, "closed", False):
+                break
+
+            if not log_path.exists():
+                if not missing_sent:
+                    ws.send("Waiting for log file...\n")
+                    missing_sent = True
+                time.sleep(0.6)
+                continue
+
+            missing_sent = False
+            current_size = log_path.stat().st_size
+            if current_size < last_size:
+                last_size = 0
+                ws.send("__runlog_reset__")
+
+            if current_size > last_size:
+                with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+                    fh.seek(last_size)
+                    chunk = fh.read()
+                    last_size = fh.tell()
+                if chunk:
+                    ws.send(chunk)
+
+            time.sleep(0.4)
+        except Exception as exc:  # pragma: no cover - runtime guard
+            try:
+                ws.send(f"[stream error] {exc}\n")
+            except Exception:
+                pass
+            break
+
+
+app.clientside_callback(
+    """
+    function(logPath, isOpen) {
+        if (!window.handleRunlogSocket) {
+            return window.dash_clientside.no_update;
+        }
+        return window.handleRunlogSocket(logPath, isOpen);
+    }
+    """,
+    Output("runlog-ws-status", "data"),
+    Input("runlog-path", "data"),
+    Input("runlog-modal", "is_open"),
+)
+
 
 
 app.clientside_callback(
