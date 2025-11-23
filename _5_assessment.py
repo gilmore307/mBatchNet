@@ -500,6 +500,7 @@ def assessment_layout(active_path: str, stage: str):
     for key, title, _ in groups:
         run_id = f"run-{stage}-{key}"
         content_id = f"{stage}-{key}-content"
+        refresh_token_id = f"{stage}-{key}-subtab-refresh-token"
         placeholder = html.Div(
             [
                 html.Div("Click Run to generate results."),
