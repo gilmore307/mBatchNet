@@ -971,7 +971,7 @@ def register_pre_post_callbacks(app):
             Input("assessment-input-check", "n_intervals"),
             State("session-id", "data"),
             State(f"{sid}-poll-interval", "disabled"),
-            prevent_initial_call=False,
+            prevent_initial_call="initial_duplicate",
         )
         def _toggle_run_enabled(_, session_id, poll_disabled, _stage=stage):
             if session_id is None:
