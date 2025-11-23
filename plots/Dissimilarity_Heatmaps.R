@@ -404,120 +404,6 @@ for (nm in names(mat_list_bc)) {
   )
 }
 
-# ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
-mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
-mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else numeric()
-
-all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
-only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
-stage_suffix <- if (only_baseline) "pre" else "post"
-
-write_assessment_outputs <- function(df) {
-  if (!nrow(df)) return(invisible(NULL))
-
-  geom_map <- c(
-    "Ait" = "aitchison",
-    "Aitchison" = "aitchison",
-    "BC" = "braycurtis",
-    "Bray-Curtis" = "braycurtis"
-  )
-
-  for (geom in unique(df$Geometry)) {
-    token <- geom_map[[as.character(geom)]]
-    if (is.null(token)) {
-      token <- tolower(gsub("[^A-Za-z0-9]+", "", geom))
-    }
-    fname <- sprintf("dissimilarity_%s_raw_assessment_%s.csv", token, stage_suffix)
-    geom_df <- df[df$Geometry == geom, , drop = FALSE]
-    readr::write_csv(geom_df, file.path(output_folder, fname))
-  }
-}
-
-build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
-  anosim_vals <- safe_anosim(dist_obj, grouping)
-  tibble::tibble(
-    Method = method,
-    Geometry = geometry,
-    ANOSIM_R = anosim_vals[["ANOSIM_R"]],
-  )
-}
-
-if (only_baseline) {
-  assess_rows <- list()
-
-  # Aitchison baseline assessment
-  if ("Before correction" %in% names(file_list_clr)) {
-    df_raw_clr <- read_csv(file_list_clr[["Before correction"]], show_col_types = FALSE)
-    comp_zero  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "zero")
-    comp_mean  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "mean")
-    between    <- upper_mean(comp_zero$Db)
-    within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    assess_rows[["Ait"]] <- build_assessment_row(
-      method = "Before correction",
-      geometry = "Ait",
-      between = between,
-      within = within,
-      dist_obj = comp_zero$dist,
-      grouping = comp_zero$grouping
-    )
-  }
-  
-  # Bray-Curtis baseline assessment
-  if ("Before correction" %in% names(file_list_tss)) {
-    df_raw_tss <- read_csv(file_list_tss[["Before correction"]], show_col_types = FALSE)
-    comp_zero  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "zero")
-    comp_mean  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "mean")
-    between    <- upper_mean(comp_zero$Db)
-    within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
-    assess_rows[["BC"]] <- build_assessment_row(
-      method = "Before correction",
-      geometry = "BC",
-      between = between,
-      within = within,
-      dist_obj = comp_zero$dist,
-      grouping = comp_zero$grouping
-    )
-  }
-
-    assess_df <- dplyr::bind_rows(assess_rows)
-
-    print(assess_df, n = nrow(assess_df))
-    write_assessment_outputs(assess_df)
-
-  # No correction recommendation messages
-
-} else {
-  # ---- Summaries for multiple methods (no ranking) ----
-  rows <- list()
-  for (m in names(mean_ait)) {
-    rows[[length(rows) + 1L]] <- build_assessment_row(
-      method = m,
-      geometry = "Ait",
-      between = mean_ait[[m]],
-      within = within_means_ait[[m]],
-      dist_obj = dist_list_ait[[m]],
-      grouping = grouping_ait[[m]]
-    )
-  }
-  for (m in names(mean_bc)) {
-    rows[[length(rows) + 1L]] <- build_assessment_row(
-      method = m,
-      geometry = "BC",
-      between = mean_bc[[m]],
-      within = within_means_bc[[m]],
-      dist_obj = dist_list_bc[[m]],
-      grouping = grouping_bc[[m]]
-    )
-  }
-
-  assessment_tbl <- dplyr::bind_rows(rows)
-  assessment_tbl <- assessment_tbl %>%
-    dplyr::arrange(Geometry, Method)
-
-  print(assessment_tbl, n = nrow(assessment_tbl))
-  write_assessment_outputs(assessment_tbl)
-}
-
 # ---- Combine & save (Aitchison) ----
 n_panels_ait <- length(plots_ait)
 panel_cols_ait <- 1L
@@ -568,4 +454,119 @@ tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
 ggsave(tif_path_bc,
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
 rm(combined_bc, plots_bc)
+
+# ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
+mean_ait <- if (length(mat_list_ait)) sapply(mat_list_ait, upper_mean) else numeric()
+mean_bc  <- if (length(mat_list_bc))  sapply(mat_list_bc,  upper_mean) else numeric()
+
+all_methods <- sort(unique(c(names(mean_ait), names(mean_bc))))
+only_baseline <- (length(all_methods) == 1L) && identical(all_methods, "Before correction")
+stage_suffix <- if (only_baseline) "pre" else "post"
+
+write_assessment_outputs <- function(df) {
+  if (!nrow(df)) return(invisible(NULL))
+  
+  geom_map <- c(
+    "Ait" = "aitchison",
+    "Aitchison" = "aitchison",
+    "BC" = "braycurtis",
+    "Bray-Curtis" = "braycurtis"
+  )
+  
+  for (geom in unique(df$Geometry)) {
+    token <- geom_map[[as.character(geom)]]
+    if (is.null(token)) {
+      token <- tolower(gsub("[^A-Za-z0-9]+", "", geom))
+    }
+    fname <- sprintf("dissimilarity_%s_raw_assessment_%s.csv", token, stage_suffix)
+    geom_df <- df[df$Geometry == geom, , drop = FALSE]
+    readr::write_csv(geom_df, file.path(output_folder, fname))
+  }
+}
+
+build_assessment_row <- function(method, geometry, between, within, dist_obj, grouping) {
+  anosim_vals <- safe_anosim(dist_obj, grouping)
+  tibble::tibble(
+    Method = method,
+    Geometry = geometry,
+    ANOSIM_R = anosim_vals[["ANOSIM_R"]],
+  )
+}
+
+if (only_baseline) {
+  assess_rows <- list()
+  
+  # Aitchison baseline assessment
+  if ("Before correction" %in% names(file_list_clr)) {
+    df_raw_clr <- read_csv(file_list_clr[["Before correction"]], show_col_types = FALSE)
+    comp_zero  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "zero")
+    comp_mean  <- rmse_batch_matrix_aitchison(df_raw_clr, metadata, batch_var = batch_var, diag_mode = "mean")
+    between    <- upper_mean(comp_zero$Db)
+    within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
+    assess_rows[["Ait"]] <- build_assessment_row(
+      method = "Before correction",
+      geometry = "Ait",
+      between = between,
+      within = within,
+      dist_obj = comp_zero$dist,
+      grouping = comp_zero$grouping
+    )
+  }
+  
+  # Bray-Curtis baseline assessment
+  if ("Before correction" %in% names(file_list_tss)) {
+    df_raw_tss <- read_csv(file_list_tss[["Before correction"]], show_col_types = FALSE)
+    comp_zero  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "zero")
+    comp_mean  <- dissim_batch_matrix_bray(df_raw_tss, metadata, batch_var = batch_var, diag_mode = "mean")
+    between    <- upper_mean(comp_zero$Db)
+    within     <- mean(diag(comp_mean$Db), na.rm = TRUE)
+    assess_rows[["BC"]] <- build_assessment_row(
+      method = "Before correction",
+      geometry = "BC",
+      between = between,
+      within = within,
+      dist_obj = comp_zero$dist,
+      grouping = comp_zero$grouping
+    )
+  }
+  
+  assess_df <- dplyr::bind_rows(assess_rows)
+  
+  print(assess_df, n = nrow(assess_df))
+  write_assessment_outputs(assess_df)
+  
+  # No correction recommendation messages
+  
+} else {
+  # ---- Summaries for multiple methods (no ranking) ----
+  rows <- list()
+  for (m in names(mean_ait)) {
+    rows[[length(rows) + 1L]] <- build_assessment_row(
+      method = m,
+      geometry = "Ait",
+      between = mean_ait[[m]],
+      within = within_means_ait[[m]],
+      dist_obj = dist_list_ait[[m]],
+      grouping = grouping_ait[[m]]
+    )
+  }
+  for (m in names(mean_bc)) {
+    rows[[length(rows) + 1L]] <- build_assessment_row(
+      method = m,
+      geometry = "BC",
+      between = mean_bc[[m]],
+      within = within_means_bc[[m]],
+      dist_obj = dist_list_bc[[m]],
+      grouping = grouping_bc[[m]]
+    )
+  }
+  
+  assessment_tbl <- dplyr::bind_rows(rows)
+  assessment_tbl <- assessment_tbl %>%
+    dplyr::arrange(Geometry, Method)
+  
+  print(assessment_tbl, n = nrow(assessment_tbl))
+  write_assessment_outputs(assessment_tbl)
+}
+
 gc()

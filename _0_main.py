@@ -35,6 +35,7 @@ app: Dash = dash.Dash(
     external_stylesheets=[dbc.themes.FLATLY],
     suppress_callback_exceptions=True,
 )
+app.title = "Batch-Effect Explorer"
 server = app.server
 sock = Sock(server)
 
@@ -661,7 +662,6 @@ if __name__ == "__main__":
         debug=debug,
         host=host,
         port=port,
-        dev_tools_hot_reload=False,
         use_reloader=False,
     )
 
