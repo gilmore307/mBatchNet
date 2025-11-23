@@ -907,6 +907,39 @@ def method_output_exists(session_dir: Path, method: str) -> bool:
     return False
 
 
+def _failure_flag_path(session_dir: Path, method: str) -> Path | None:
+    code = _normalize_method_code(method)
+    if not code:
+        return None
+    return session_dir / f"{code}.failed"
+
+
+def mark_method_failed(session_dir: Path, method: str) -> None:
+    path = _failure_flag_path(session_dir, method)
+    if not path:
+        return
+    try:
+        path.write_text("failed", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def clear_method_failure(session_dir: Path, method: str) -> None:
+    path = _failure_flag_path(session_dir, method)
+    if not path:
+        return
+    try:
+        if path.exists():
+            path.unlink()
+    except OSError:
+        pass
+
+
+def method_failed_last_run(session_dir: Path, method: str) -> bool:
+    path = _failure_flag_path(session_dir, method)
+    return bool(path and path.exists())
+
+
 def _remove_method_from_summary(session_dir: Path, method: str) -> bool:
     summary_path = session_dir / "session_summary.json"
     if not summary_path.exists():

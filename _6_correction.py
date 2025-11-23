@@ -20,6 +20,9 @@ from _2_utils import (
     load_integrated_summary,
     method_output_exists,
     _remove_method_from_summary,
+    clear_method_failure,
+    mark_method_failed,
+    method_failed_last_run,
     log_file_meta,
     run_single_method,
 )
@@ -111,11 +114,23 @@ def _build_parameter_layout(code: str) -> object | None:
             cols = []
     if cols:
         rows.append(dbc.Row(cols, className="px-3 pt-3"))
+    header = html.Div(
+        [
+            html.H6("Correction Parameters", className="mb-0"),
+            dbc.Button(
+                "Reset to defaults",
+                id={"type": "method-config-reset", "code": code},
+                color="secondary",
+                size="sm",
+                className="ms-2",
+                outline=False,
+            ),
+        ],
+        className="d-flex align-items-center justify-content-between p-3 bg-light border-bottom gap-2",
+    )
     content = html.Div(
         [
-            html.Div(
-                [html.H6("Correction Parameters", className="mb-0 p-3 bg-light border-bottom")]
-            ),
+            header,
             html.Div(rows, className="method-config-body"),
         ],
         className="method-config-wrapper border-top",
@@ -244,7 +259,7 @@ _PARAMETER_CONFIG = {
             "step": 0.0001,
         },
     ],
-    "PLSDAbatch": [
+    "PLSDA": [
         {
             "name": "ncomp.trt",
             "type": "number",
@@ -279,11 +294,10 @@ _PARAMETER_CONFIG = {
             "name": "balance",
             "type": "dropdown",
             "options": [
-                {"label": "Overall", "value": "overall"},
-                {"label": "Treatment", "value": "treatment"},
-                {"label": "Batch", "value": "batch"},
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
             ],
-            "default": "overall",
+            "default": False,
         },
     ],
     "RUV": [
@@ -415,7 +429,13 @@ def register_correction_callbacks(app):
                     avg_elapsed = None
             avg_display = "-" if avg_elapsed in (None, "") else f"{float(avg_elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
-            status_text = "Selected" if outputs_present else "Not selected"
+            failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
+            if outputs_present:
+                status_text = "Selected"
+            elif failed_state:
+                status_text = "Failed"
+            else:
+                status_text = "Not selected"
             run_disabled = not session_ready or outputs_present
             delete_disabled = not outputs_present
             status_cell = html.Td(
@@ -497,7 +517,7 @@ def register_correction_callbacks(app):
             toggle_button = dbc.Button(
                 "Show",
                 id={"type": "method-config-toggle", "code": code},
-                color="info",
+                color=button_color(False),
                 size="sm",
                 className="w-100",
                 n_clicks=0,
@@ -565,6 +585,29 @@ def register_correction_callbacks(app):
         return next_state, ("Hide" if next_state else "Show")
 
     @app.callback(
+        Output({"type": "method-config-input", "code": MATCH, "param": ALL}, "value"),
+        Input({"type": "method-config-reset", "code": MATCH}, "n_clicks"),
+        State({"type": "method-config-input", "code": MATCH, "param": ALL}, "id"),
+        prevent_initial_call=True,
+    )
+    def reset_method_config(n_clicks: int | None, ids: List[Dict[str, object]] | None):
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        if not ids:
+            raise dash.exceptions.PreventUpdate
+        method_code = None
+        first_id = ids[0]
+        if isinstance(first_id, dict):
+            method_code = first_id.get("code")
+        specs = _PARAMETER_CONFIG.get(method_code) if method_code else None
+        default_lookup = {spec.get("name"): spec.get("default") for spec in specs or []}
+        defaults: List[object] = []
+        for control_id in ids:
+            param_name = control_id.get("param") if isinstance(control_id, dict) else None
+            defaults.append(default_lookup.get(param_name, dash.no_update))
+        return defaults
+
+    @app.callback(
         Output({"type": "method-status-label", "code": MATCH}, "children", allow_duplicate=True),
         Output({"type": "method-run-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-run-button", "code": MATCH}, "color", allow_duplicate=True),
@@ -630,11 +673,13 @@ def register_correction_callbacks(app):
         success, _ = run_single_method(session_dir, method_code, log_path=log_path, params=params)
         new_refresh = refresh_value + 1 if success else refresh_value
         if success:
+            clear_method_failure(session_dir, method_code)
             status_text = "Selected"
             run_disabled = True
             delete_disabled = False
             message = f"{display_name} correction complete."
         else:
+            mark_method_failed(session_dir, method_code)
             _remove_method_from_summary(session_dir, method_code)
             status_text = "Failed"
             run_disabled = False
@@ -748,6 +793,7 @@ def register_correction_callbacks(app):
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
+        clear_method_failure(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
         status_text = "Not selected"
         run_disabled = not session_ready
