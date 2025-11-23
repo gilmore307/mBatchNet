@@ -1,6 +1,7 @@
 ﻿# ===============================
 # File: _5_assessment.py
 # ===============================
+import shutil
 import threading
 from pathlib import Path
 
@@ -21,6 +22,10 @@ from _1_components import build_navbar
 from _2_utils import (
     get_session_dir,
     run_r_scripts,
+    session_data_dir,
+    session_preview_dir,
+    session_results_dir,
+    reorganize_session_outputs,
     PRE_SCRIPTS,
     POST_SCRIPTS,
     PRE_FIGURES,
@@ -53,6 +58,39 @@ FIGURE_DEFAULTS = {
 _FOUND_OUTPUT_LOGS: Set[str] = set()
 
 
+def _output_path_for(session_dir: Path, fname: str) -> Path:
+    target = Path(fname)
+    suffix = target.suffix.lower()
+    if suffix == ".png":
+        return session_preview_dir(session_dir) / target.name
+    if suffix in {".csv", ".tif", ".tiff"}:
+        return session_results_dir(session_dir) / target.name
+    return session_results_dir(session_dir) / target.name
+
+
+def _prepare_results_inputs(session_dir: Path) -> None:
+    data_dir = session_data_dir(session_dir)
+    results_dir = session_results_dir(session_dir)
+
+    def _mirror(src: Path, dest: Path) -> None:
+        try:
+            if dest.exists() or dest.is_symlink():
+                dest.unlink()
+            dest.symlink_to(src)
+        except OSError:
+            try:
+                shutil.copy2(src, dest)
+            except OSError:
+                pass
+
+    for csv_path in data_dir.glob("*.csv"):
+        _mirror(csv_path, results_dir / csv_path.name)
+
+    cfg_path = session_dir / "session_config.json"
+    if cfg_path.exists():
+        _mirror(cfg_path, results_dir / cfg_path.name)
+
+
 def _reset_found_logs(log_path: Optional[Path]) -> None:
     """Drop cached discovery entries for the given run log so re-runs re-log finds."""
 
@@ -68,7 +106,7 @@ def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
     """Remove prior output files (figures and tables) before starting a run."""
 
     for fname in expected_files:
-        path = session_dir / fname
+        path = _output_path_for(session_dir, fname)
         stem = path.with_suffix("")
         for target in (path, stem.with_suffix(".png"), stem.with_suffix(".tif"), stem.with_suffix(".tiff")):
             try:
@@ -178,7 +216,7 @@ def _assessment_outputs_status(
         return False, 0, 0
 
     def _exists(name: str) -> bool:
-        target = session_dir / name
+        target = _output_path_for(session_dir, name)
 
         def _log_hit(hit: Path) -> None:
             if log_path is None:
@@ -195,8 +233,8 @@ def _assessment_outputs_status(
 
         # On some platforms the filesystem can surface unexpected casing; fall back to a
         # case-insensitive search so detected files always advance progress.
-        lowered = name.lower()
-        for candidate in session_dir.glob("*"):
+        lowered = target.name.lower()
+        for candidate in target.parent.glob("*"):
             if candidate.name.lower() == lowered:
                 _log_hit(candidate)
                 return True
@@ -223,8 +261,9 @@ def _assessment_inputs_ready(session_dir: Optional[Path], stage: str) -> bool:
     if session_dir is None:
         return False
 
-    raw = (session_dir / "raw.csv").exists()
-    meta = (session_dir / "metadata.csv").exists()
+    data_dir = session_data_dir(session_dir)
+    raw = (data_dir / "raw.csv").exists()
+    meta = (data_dir / "metadata.csv").exists()
     if not (raw and meta):
         return False
 
@@ -805,7 +844,10 @@ def register_pre_post_callbacks(app):
                 )
 
             session_dir = get_session_dir(session_id)
-            if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
+            data_dir = session_data_dir(session_dir)
+            results_dir = session_results_dir(session_dir)
+            preview_dir = session_preview_dir(session_dir)
+            if not (data_dir / "raw.csv").exists() or not (data_dir / "metadata.csv").exists():
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
                     return _output(
@@ -891,7 +933,15 @@ def register_pre_post_callbacks(app):
                         flags.append("--fig-per-panel=true")
 
                 def _worker():
-                    run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
+                    _prepare_results_inputs(session_dir)
+                    run_r_scripts(
+                        (_script,),
+                        results_dir,
+                        log_path=log_path,
+                        extra_args=flags,
+                        preview_dir=preview_dir,
+                    )
+                    reorganize_session_outputs(session_dir)
 
                 threading.Thread(target=_worker, daemon=True).start()
                 stage_flag = True if _stage == "pre" else dash.no_update

@@ -20,6 +20,10 @@ from _2_utils import (
     BASE_DIR,
     _make_ag_grid,
     _encode_image_source,
+    session_data_dir,
+    session_results_dir,
+    session_preview_dir,
+    reorganize_session_outputs,
 )
 
 
@@ -169,7 +173,36 @@ def _resolve_label_column(session_dir: Path, header: Optional[List[str]] = None)
 def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
     """Run the Mosaic.R script for the current session."""
     log_path = session_dir / "run.log"
-    ok, log = run_r_scripts(("Mosaic.R",), session_dir, log_path=log_path)
+    data_dir = session_data_dir(session_dir)
+    results_dir = session_results_dir(session_dir)
+    preview_dir = session_preview_dir(session_dir)
+
+    for src in data_dir.glob("*.csv"):
+        dest = results_dir / src.name
+        try:
+            if dest.exists() or dest.is_symlink():
+                dest.unlink()
+            dest.symlink_to(src)
+        except OSError:
+            try:
+                shutil.copy2(src, dest)
+            except OSError:
+                pass
+    cfg_path = session_dir / "session_config.json"
+    if cfg_path.exists():
+        dest = results_dir / cfg_path.name
+        try:
+            if dest.exists() or dest.is_symlink():
+                dest.unlink()
+            dest.symlink_to(cfg_path)
+        except OSError:
+            try:
+                shutil.copy2(cfg_path, dest)
+            except OSError:
+                pass
+
+    ok, log = run_r_scripts(("Mosaic.R",), results_dir, log_path=log_path, preview_dir=preview_dir)
+    reorganize_session_outputs(session_dir)
     if not ok:
         return False, log
     return True, None
@@ -426,6 +459,7 @@ def register_upload_callbacks(app):
             return False, "No file uploaded yet.", "No file uploaded yet.", dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
+        data_dir = session_data_dir(session_dir)
         saved_items: List[str] = []
         matrix_info = dash.no_update
         metadata_info = dash.no_update
@@ -455,20 +489,20 @@ def register_upload_callbacks(app):
                 else:
                     raw_src, meta_src = pair
                     if raw_src.exists():
-                        shutil.copy2(raw_src, session_dir / "raw.csv")
+                        shutil.copy2(raw_src, data_dir / "raw.csv")
                     if meta_src.exists():
-                        shutil.copy2(meta_src, session_dir / "metadata_origin.csv")
+                        shutil.copy2(meta_src, data_dir / "metadata_origin.csv")
                     if selected_key:
                         _update_session_config(session_dir, example_key=selected_key)
                     # Build file info
-                    if (session_dir / "raw.csv").exists():
-                        size = (session_dir / "raw.csv").stat().st_size
+                    if (data_dir / "raw.csv").exists():
+                        size = (data_dir / "raw.csv").stat().st_size
                         matrix_info = (
                             dbc.Badge("Loaded", color="info", className="me-2"),
                             html.Span(f"Source: {raw_src.relative_to(BASE_DIR)} | Saved as: raw.csv | {human_size(size)}"),
                         )
-                    if (session_dir / "metadata_origin.csv").exists():
-                        size = (session_dir / "metadata_origin.csv").stat().st_size
+                    if (data_dir / "metadata_origin.csv").exists():
+                        size = (data_dir / "metadata_origin.csv").stat().st_size
                         metadata_info = (
                             dbc.Badge("Loaded", color="info", className="me-2"),
                             html.Span(
@@ -481,8 +515,8 @@ def register_upload_callbacks(app):
                 example_status = html.Span("Failed to load example files.", className="text-danger")
 
         if matrix_contents and trig == "upload-matrix":
-            save_uploaded_file(matrix_contents, session_dir, "raw.csv")
-            size = (session_dir / "raw.csv").stat().st_size
+            save_uploaded_file(matrix_contents, data_dir, "raw.csv")
+            size = (data_dir / "raw.csv").stat().st_size
             matrix_info = (
                 dbc.Badge("Uploaded", color="success", className="me-2"),
                 html.Span(f"Source: {matrix_name} | Saved as: raw.csv | {human_size(size)}"),
@@ -490,15 +524,15 @@ def register_upload_callbacks(app):
             saved_items.append(f"Matrix saved as raw.csv (source: {matrix_name})")
 
         if metadata_contents and trig == "upload-metadata":
-            save_uploaded_file(metadata_contents, session_dir, "metadata_origin.csv")
-            size = (session_dir / "metadata_origin.csv").stat().st_size
+            save_uploaded_file(metadata_contents, data_dir, "metadata_origin.csv")
+            size = (data_dir / "metadata_origin.csv").stat().st_size
             metadata_info = (
                 dbc.Badge("Uploaded", color="success", className="me-2"),
                 html.Span(f"Source: {metadata_name} | Saved as: metadata_origin.csv | {human_size(size)}"),
             )
             saved_items.append(f"Metadata saved as metadata_origin.csv (source: {metadata_name})")
 
-        upload_complete = (session_dir / "raw.csv").exists() and (session_dir / "metadata_origin.csv").exists()
+        upload_complete = (data_dir / "raw.csv").exists() and (data_dir / "metadata_origin.csv").exists()
         return upload_complete, matrix_info, metadata_info, example_status, example_loaded_out
 
     @app.callback(
@@ -530,7 +564,8 @@ def register_upload_callbacks(app):
             return html.Div()
 
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata_origin.csv"
+        data_dir = session_data_dir(session_dir)
+        meta_path = data_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return html.Div("Metadata file not found; preprocess the data first.", className="text-danger")
 
@@ -701,7 +736,8 @@ def register_upload_callbacks(app):
         if not session_id:
             return dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata_origin.csv"
+        data_dir = session_data_dir(session_dir)
+        meta_path = data_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return dash.no_update, dash.no_update
 
@@ -821,7 +857,8 @@ def register_upload_callbacks(app):
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata_origin.csv"
+        data_dir = session_data_dir(session_dir)
+        meta_path = data_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
@@ -885,7 +922,8 @@ def register_upload_callbacks(app):
         if not session_id:
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
-        meta_path = session_dir / "metadata_origin.csv"
+        data_dir = session_data_dir(session_dir)
+        meta_path = data_dir / "metadata_origin.csv"
         if not meta_path.exists():
             return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 

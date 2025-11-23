@@ -29,6 +29,9 @@ import dash_bootstrap_components as dbc
 # Paths & constants
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "output"
+DATA_SUBDIR = "data"
+RESULTS_SUBDIR = "results"
+PREVIEW_SUBDIR = "preview"
 PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
 METHODS_DIR = CORRECTION_DIR / "methods"
@@ -269,13 +272,20 @@ def _resolve_png_max_side(path: Path) -> int:
     return PNG_MAX_DISPLAY_SIDE
 
 
-def _materialize_png_sidecar(source_path: Path, *, max_side: int = PNG_MAX_DISPLAY_SIDE) -> Optional[Path]:
+def _materialize_png_sidecar(
+    source_path: Path,
+    preview_dir: Optional[Path] = None,
+    *,
+    max_side: int = PNG_MAX_DISPLAY_SIDE,
+) -> Optional[Path]:
     """Ensure a PNG thumbnail exists for the provided TIFF image."""
 
     if source_path.suffix.lower() not in {".tif", ".tiff"}:
         return None
 
-    png_path = source_path.with_suffix(".png")
+    preview_root = preview_dir or source_path.parent
+    preview_root.mkdir(parents=True, exist_ok=True)
+    png_path = preview_root / (source_path.stem + ".png")
     try:
         _generate_png_preview(
             source_path,
@@ -289,13 +299,18 @@ def _materialize_png_sidecar(source_path: Path, *, max_side: int = PNG_MAX_DISPL
     return png_path if png_path.exists() else None
 
 
-def _ensure_png_previews(directory: Path, *, max_side: int = PNG_MAX_DISPLAY_SIDE) -> None:
+def _ensure_png_previews(
+    directory: Path,
+    preview_dir: Optional[Path] = None,
+    *,
+    max_side: int = PNG_MAX_DISPLAY_SIDE,
+) -> None:
     """Create PNG thumbnails next to any TIFF figures in the directory."""
 
     try:
         for path in directory.iterdir():
             if path.is_file() and path.suffix.lower() in {".tif", ".tiff"}:
-                _materialize_png_sidecar(path, max_side=max_side)
+                _materialize_png_sidecar(path, preview_dir or directory, max_side=max_side)
     except OSError:
         return
 
@@ -530,6 +545,57 @@ def ensure_output_root() -> None:
     OUTPUT_ROOT.mkdir(exist_ok=True)
 
 
+def session_data_dir(session_dir: Path) -> Path:
+    path = session_dir / DATA_SUBDIR
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+def session_results_dir(session_dir: Path) -> Path:
+    path = session_dir / RESULTS_SUBDIR
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+def session_preview_dir(session_dir: Path) -> Path:
+    path = session_dir / PREVIEW_SUBDIR
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+def reorganize_session_outputs(session_dir: Path) -> None:
+    """Normalize the session directory layout into data/results/preview."""
+
+    data_dir = session_data_dir(session_dir)
+    results_dir = session_results_dir(session_dir)
+    preview_dir = session_preview_dir(session_dir)
+
+    def _move_matches(pattern: str, target_dir: Path) -> None:
+        for path in session_dir.glob(pattern):
+            if not path.is_file():
+                continue
+            dest = target_dir / path.name
+            try:
+                if dest.exists():
+                    dest.unlink()
+                shutil.move(str(path), dest)
+            except OSError:
+                continue
+
+    _move_matches("raw.csv", data_dir)
+    _move_matches("metadata.csv", data_dir)
+    _move_matches("metadata_origin.csv", data_dir)
+    _move_matches("*_tss.csv", data_dir)
+    _move_matches("*_clr.csv", data_dir)
+    _move_matches("normalized_*.csv", data_dir)
+
+    _move_matches("*.tif", results_dir)
+    _move_matches("*.tiff", results_dir)
+    _move_matches("*_assessment_*.csv", results_dir)
+
+    _move_matches("*.png", preview_dir)
+
+
 def cleanup_old_sessions(max_age_hours: int = CLEANUP_HOURS) -> None:
     if not OUTPUT_ROOT.exists():
         return
@@ -548,6 +614,9 @@ def get_session_dir(session_id: str) -> Path:
     ensure_output_root()
     session_path = OUTPUT_ROOT / session_id
     session_path.mkdir(exist_ok=True, parents=True)
+    session_data_dir(session_path)
+    session_results_dir(session_path)
+    session_preview_dir(session_path)
     return session_path
 
 
@@ -704,6 +773,7 @@ def run_r_scripts(
     output_dir: Path,
     log_path: Optional[Path] = None,
     extra_args: Optional[Sequence[str]] = None,
+    preview_dir: Optional[Path] = None,
 ) -> Tuple[bool, str]:
     """Run one or more R scripts with the output directory and optional flags.
 
@@ -721,7 +791,7 @@ def run_r_scripts(
             success, log = run_command_streaming(cmd, cwd=BASE_DIR, log_path=log_path)
         else:
             success, log = run_command(cmd, cwd=BASE_DIR)
-        _ensure_png_previews(output_dir)
+        _ensure_png_previews(output_dir, preview_dir or output_dir)
         logs.append(log)
         if not success:
             return False, "\n\n".join(logs)
@@ -760,7 +830,8 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     if not script_path.exists():
         return False, f"Script not found for method {canonical_code}: {script_path.name}"
 
-    command = build_rscript_command(script_path, session_dir)
+    data_dir = session_data_dir(session_dir)
+    command = build_rscript_command(script_path, data_dir)
     if log_path is not None:
         success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     else:
@@ -849,9 +920,10 @@ def method_output_paths(session_dir: Path, method: str) -> List[Path]:
     base = METHOD_OUTPUT_BASENAMES.get(code)
     if not base:
         return []
+    data_dir = session_data_dir(session_dir)
     return [
-        session_dir / f"{base}_tss.csv",
-        session_dir / f"{base}_clr.csv",
+        data_dir / f"{base}_tss.csv",
+        data_dir / f"{base}_clr.csv",
     ]
 
 
@@ -957,13 +1029,14 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
 def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[bool, str]:
     """Run preprocess.R in the project root for a given session directory.
 
-    It writes outputs into the provided session directory and reads the
-    matrix from session_dir/raw.csv by default.
+    It writes outputs into the session's data directory and reads the
+    matrix from data/raw.csv by default.
     """
     if not PREPROCESS_SCRIPT.exists():
         return False, f"Script not found: {PREPROCESS_SCRIPT.name}"
-    matrix_path = session_dir / "raw.csv"
-    command = build_rscript_command(PREPROCESS_SCRIPT, session_dir, matrix_path)
+    data_dir = session_data_dir(session_dir)
+    matrix_path = data_dir / "raw.csv"
+    command = build_rscript_command(PREPROCESS_SCRIPT, data_dir, matrix_path)
     if log_path is not None:
         return run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     return run_command(command, cwd=BASE_DIR)
@@ -972,7 +1045,14 @@ def run_preprocess(session_dir: Path, log_path: Optional[Path] = None) -> Tuple[
 def render_figures(session_dir: Path, figures: Sequence[FigureSpec]):
     cards = []
     for spec in figures:
-        file_path = session_dir / spec.filename
+        file_path = session_preview_dir(session_dir) / spec.filename
+        if not file_path.exists():
+            file_path = session_results_dir(session_dir) / spec.filename
+        if not file_path.exists():
+            stem = Path(spec.filename).with_suffix("")
+            alt = session_results_dir(session_dir) / (stem.name + ".tif")
+            if alt.exists():
+                file_path = alt
         if not file_path.exists():
             continue
         src = _encode_image_source(file_path, max_png_side=_resolve_png_max_side(file_path))
@@ -1376,11 +1456,17 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     }
 
     def content_for_image(filename: str) -> html.Div:
-        img_path = session_dir / filename
+        img_path = session_preview_dir(session_dir) / filename
+        if not img_path.exists():
+            img_path = session_results_dir(session_dir) / filename
         if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
-            png_path = img_path.with_suffix(".png")
+            png_path = session_preview_dir(session_dir) / (img_path.stem + ".png")
             if png_path.exists():
                 img_path = png_path
+        if not img_path.exists():
+            alt_tif = session_results_dir(session_dir) / (Path(filename).with_suffix(".tif").name)
+            if alt_tif.exists():
+                img_path = alt_tif
         if not img_path.exists():
             return html.Div("Image not found.")
         src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))
@@ -1525,11 +1611,17 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     figures = PRE_FIGURES if stage == "pre" else POST_FIGURES
 
     def content_for_image(filename: str) -> html.Div:
-        img_path = session_dir / filename
+        img_path = session_preview_dir(session_dir) / filename
+        if not img_path.exists():
+            img_path = session_results_dir(session_dir) / filename
         if not img_path.exists() and img_path.suffix.lower() in {".tif", ".tiff"}:
-            png_path = img_path.with_suffix(".png")
+            png_path = session_preview_dir(session_dir) / (img_path.stem + ".png")
             if png_path.exists():
                 img_path = png_path
+        if not img_path.exists():
+            alt_tif = session_results_dir(session_dir) / (Path(filename).with_suffix(".tif").name)
+            if alt_tif.exists():
+                img_path = alt_tif
         if not img_path.exists():
             return html.Div("Image not found.")
         src = _encode_image_source(img_path, max_png_side=_resolve_png_max_side(img_path))

@@ -17,6 +17,7 @@ from _2_utils import (
     compute_integrated_summary,
     delete_method_outputs,
     get_session_dir,
+    session_data_dir,
     load_integrated_summary,
     mark_method_completed,
     method_output_exists,
@@ -117,7 +118,8 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id) if session_id else None
         session_ready = False
         if session_dir and session_dir.exists():
-            session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+            data_dir = session_data_dir(session_dir)
+            session_ready = (data_dir / "raw.csv").exists() and (data_dir / "metadata.csv").exists()
         header = html.Thead(
             html.Tr(
                 [
@@ -287,7 +289,8 @@ def register_correction_callbacks(app):
                 payload,
             )
         session_dir = get_session_dir(session_id)
-        if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
+        data_dir = session_data_dir(session_dir)
+        if not (data_dir / "raw.csv").exists() or not (data_dir / "metadata.csv").exists():
             message = "Upload data before running corrections."
             payload = {"message": message}
             return (
@@ -427,7 +430,8 @@ def register_correction_callbacks(app):
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
-        session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+        data_dir = session_data_dir(session_dir)
+        session_ready = (data_dir / "raw.csv").exists() and (data_dir / "metadata.csv").exists()
         status_text = "Not selected"
         run_disabled = not session_ready
         delete_disabled = True
