@@ -273,6 +273,7 @@ def register_correction_callbacks(app):
         Output({"type": "method-delete-button", "code": MATCH}, "disabled", allow_duplicate=True),
         Output({"type": "method-delete-button", "code": MATCH}, "color", allow_duplicate=True),
         Output({"type": "method-operation-result", "code": MATCH}, "data", allow_duplicate=True),
+        Output("method-busy-store", "data", allow_duplicate=True),
         Input({"type": "method-run-button", "code": MATCH}, "n_clicks"),
         State({"type": "method-run-button", "code": MATCH}, "id"),
         State("session-id", "data"),
@@ -306,6 +307,7 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
+                False,
             )
         session_dir = get_session_dir(session_id)
         if not (session_dir / "raw.csv").exists() or not (session_dir / "metadata.csv").exists():
@@ -318,6 +320,7 @@ def register_correction_callbacks(app):
                 True,
                 "secondary",
                 payload,
+                False,
             )
         log_path = session_dir / "run.log"
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
@@ -350,6 +353,7 @@ def register_correction_callbacks(app):
             delete_disabled,
             delete_color,
             payload,
+            False,
         )
 
     @app.callback(
