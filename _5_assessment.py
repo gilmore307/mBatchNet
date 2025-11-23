@@ -75,12 +75,12 @@ def _prepare_results_inputs(session_dir: Path) -> None:
 
     def _mirror(src: Path, dest: Path) -> None:
         try:
-            if dest.exists() or dest.is_symlink():
+            if dest.exists():
                 dest.unlink()
-            dest.symlink_to(src)
+            shutil.copy2(src, dest)
         except OSError:
             try:
-                shutil.copy2(src, dest)
+                shutil.copyfile(src, dest)
             except OSError:
                 pass
 

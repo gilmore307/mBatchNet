@@ -185,24 +185,24 @@ def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
     for src in data_dir.glob("*.csv"):
         dest = results_dir / src.name
         try:
-            if dest.exists() or dest.is_symlink():
+            if dest.exists():
                 dest.unlink()
-            dest.symlink_to(src)
+            shutil.copy2(src, dest)
         except OSError:
             try:
-                shutil.copy2(src, dest)
+                shutil.copyfile(src, dest)
             except OSError:
                 pass
     cfg_path = session_dir / "session_config.json"
     if cfg_path.exists():
         dest = results_dir / cfg_path.name
         try:
-            if dest.exists() or dest.is_symlink():
+            if dest.exists():
                 dest.unlink()
-            dest.symlink_to(cfg_path)
+            shutil.copy2(cfg_path, dest)
         except OSError:
             try:
-                shutil.copy2(cfg_path, dest)
+                shutil.copyfile(cfg_path, dest)
             except OSError:
                 pass
 

@@ -592,6 +592,7 @@ def reorganize_session_outputs(session_dir: Path) -> None:
     _move_matches("*.tif", results_dir)
     _move_matches("*.tiff", results_dir)
     _move_matches("*_assessment_*.csv", results_dir)
+    _move_matches("*_ranking.csv", results_dir)
 
     _move_matches("*.png", preview_dir)
 
@@ -1173,10 +1174,39 @@ def _make_ag_grid(
 
 def _find_file_case_insensitive(directory: Path, target_name: str) -> Path | None:
     t = target_name.lower()
-    for p in directory.iterdir():
-        if p.is_file() and p.name.lower() == t:
-            return p
+    search_roots = [directory]
+    if directory.name != DATA_SUBDIR:
+        search_roots.append(session_data_dir(directory))
+    if directory.name != RESULTS_SUBDIR:
+        search_roots.append(session_results_dir(directory))
+    if directory.name != PREVIEW_SUBDIR:
+        search_roots.append(session_preview_dir(directory))
+
+    for root in search_roots:
+        for p in root.iterdir():
+            if p.is_file() and p.name.lower() == t:
+                return p
     return None
+
+
+def _iter_session_files(session_dir: Path, pattern: str):
+    """Yield files matching a pattern across session subdirectories (de-duplicated)."""
+
+    seen: Set[Path] = set()
+    for root in (
+        session_dir,
+        session_data_dir(session_dir),
+        session_results_dir(session_dir),
+        session_preview_dir(session_dir),
+    ):
+        for path in root.glob(pattern):
+            if not path.is_file():
+                continue
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield path
 
 
 def _candidate_csvs_for_image(filename: str) -> List[str]:
@@ -2299,7 +2329,7 @@ def _load_ranking_table_for_key(session_dir: Path, key: str) -> Optional[dag.AgG
             if table is not None:
                 return table
     alias_lower = {alias.lower() for alias in aliases}
-    for candidate in session_dir.glob("*_ranking.csv"):
+    for candidate in _iter_session_files(session_dir, "*_ranking.csv"):
         stem = candidate.stem
         metric_key = stem[:-len("_ranking")] if stem.lower().endswith("_ranking") else stem
         if metric_key.lower() in alias_lower:
@@ -2310,7 +2340,7 @@ def _load_ranking_table_for_key(session_dir: Path, key: str) -> Optional[dag.AgG
 
 
 def aggregate_rankings(session_dir: Path) -> Tuple[List[str], List[Dict[str, str]], Dict[str, List[MethodRankingEntry]]]:
-    ranking_files = sorted(session_dir.glob("*_ranking.csv"))
+    ranking_files = sorted(_iter_session_files(session_dir, "*_ranking.csv"))
     if not ranking_files:
         return [], [], {}
 
