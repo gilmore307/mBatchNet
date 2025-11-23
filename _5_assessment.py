@@ -951,18 +951,15 @@ def register_pre_post_callbacks(app):
                     if total_expected
                     else "Waiting for output files..."
                 )
-
-                prev_ready = None
-                prev_total = None
-                if isinstance(run_state_value, dict):
-                    prev_ready = run_state_value.get("ready_count")
-                    prev_total = run_state_value.get("total_expected")
-
-                if ready_count != prev_ready or total_expected != prev_total:
-                    append_run_log(log_path, progress, icon="⏱️")
-
+                placeholder = dbc.Spinner(
+                    html.Div(progress),
+                    color="primary",
+                    type="border",
+                    size="md",
+                    fullscreen=False,
+                )
                 return _output(
-                    dash.no_update,
+                    placeholder,
                     dash.no_update,
                     dash.no_update,
                     param_store=persisted_payload,
@@ -971,8 +968,6 @@ def register_pre_post_callbacks(app):
                     run_state_value={
                         "status": "running",
                         "latest_poll": poll_ticks,
-                        "ready_count": ready_count,
-                        "total_expected": total_expected,
                     },
                     run_button_disabled=dash.no_update,
                 )
