@@ -244,7 +244,7 @@ _PARAMETER_CONFIG = {
             "step": 0.0001,
         },
     ],
-    "PLSDAbatch": [
+    "PLSDA": [
         {
             "name": "ncomp.trt",
             "type": "number",
@@ -279,11 +279,10 @@ _PARAMETER_CONFIG = {
             "name": "balance",
             "type": "dropdown",
             "options": [
-                {"label": "Overall", "value": "overall"},
-                {"label": "Treatment", "value": "treatment"},
-                {"label": "Batch", "value": "batch"},
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
             ],
-            "default": "overall",
+            "default": False,
         },
     ],
     "RUV": [
