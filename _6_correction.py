@@ -18,10 +18,9 @@ from _2_utils import (
     delete_method_outputs,
     get_session_dir,
     load_integrated_summary,
-    mark_method_completed,
     method_output_exists,
+    _remove_method_from_summary,
     run_single_method,
-    clear_method_completion,
 )
 
 
@@ -302,13 +301,12 @@ def register_correction_callbacks(app):
         success, _ = run_single_method(session_dir, method_code, log_path=log_path)
         new_refresh = refresh_value + 1
         if success:
-            mark_method_completed(session_dir, method_code)
             status_text = "Selected"
             run_disabled = True
             delete_disabled = False
             message = f"{display_name} correction complete."
         else:
-            clear_method_completion(session_dir, method_code)
+            _remove_method_from_summary(session_dir, method_code)
             status_text = "Not selected"
             run_disabled = False
             delete_disabled = True
