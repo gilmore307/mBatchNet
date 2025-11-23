@@ -36,7 +36,6 @@ METHODS_DIR = CORRECTION_DIR / "methods"
 DOCS_DIR = BASE_DIR / "assets" / "doc"
 METHODS_REFERENCE_PATH = DOCS_DIR / "methods.csv"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
-COMPLETED_METHODS_FILENAME = "completed_methods.json"
 CLEANUP_HOURS = 6
 SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 PREVIEW_SENTINEL = ".previews_generated"
@@ -821,41 +820,6 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     return False, combined
 
 
-def _completed_methods_path(session_dir: Path) -> Path:
-    return session_dir / COMPLETED_METHODS_FILENAME
-
-
-def _load_completed_methods(session_dir: Path) -> Set[str]:
-    path = _completed_methods_path(session_dir)
-    if not path.exists():
-        return set()
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, json.JSONDecodeError, TypeError):
-        return set()
-    items: Iterable[str]
-    if isinstance(data, dict):
-        items = data.get("completed", [])  # legacy-friendly
-    else:
-        items = data if isinstance(data, list) else []
-    normalized: Set[str] = set()
-    for item in items:
-        code = _normalize_method_code(str(item))
-        if code:
-            normalized.add(code)
-    return normalized
-
-
-def _save_completed_methods(session_dir: Path, completed: Set[str]) -> None:
-    path = _completed_methods_path(session_dir)
-    try:
-        with path.open("w", encoding="utf-8") as fh:
-            json.dump(sorted(completed), fh, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
-
-
 def _append_log_message(log_path: Path, message: str) -> None:
     try:
         with log_path.open("a", encoding="utf-8", errors="replace") as fh:
@@ -864,26 +828,25 @@ def _append_log_message(log_path: Path, message: str) -> None:
         pass
 
 
-def mark_method_completed(session_dir: Path, method: str) -> None:
-    code = _normalize_method_code(method)
-    if not code:
-        return
-    completed = _load_completed_methods(session_dir)
-    if code in completed:
-        return
-    completed.add(code)
-    _save_completed_methods(session_dir, completed)
-
-
-def clear_method_completion(session_dir: Path, method: str) -> None:
-    code = _normalize_method_code(method)
-    if not code:
-        return
-    completed = _load_completed_methods(session_dir)
-    if code not in completed:
-        return
-    completed.discard(code)
-    _save_completed_methods(session_dir, completed)
+def _successful_methods_from_summary(session_dir: Path) -> Set[str]:
+    summary = _load_session_summary(session_dir)
+    if not summary:
+        return set()
+    methods = summary.get("methods")
+    if not isinstance(methods, list):
+        return set()
+    completed: Set[str] = set()
+    for entry in methods:
+        if not isinstance(entry, dict):
+            continue
+        status = entry.get("status")
+        name = entry.get("name")
+        if status != "success" or not name:
+            continue
+        code = _normalize_method_code(str(name))
+        if code:
+            completed.add(code)
+    return completed
 
 
 def method_output_paths(session_dir: Path, method: str) -> List[Path]:
@@ -950,7 +913,6 @@ def delete_method_outputs(session_dir: Path, method: str) -> bool:
             pass
     if _remove_method_from_summary(session_dir, method):
         removed = True
-    clear_method_completion(session_dir, method)
     return removed
 
 
@@ -966,7 +928,7 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
 
     logs: List[str] = []
     overall_success = True
-    completed_codes = _load_completed_methods(session_dir)
+    completed_codes = _successful_methods_from_summary(session_dir)
 
     for method in methods:
         if not method:
@@ -989,7 +951,6 @@ def run_methods(session_dir: Path, methods: Iterable[str], log_path: Optional[Pa
         if success:
             if normalized_code:
                 completed_codes.add(normalized_code)
-                mark_method_completed(session_dir, canonical_code or normalized_code)
         else:
             overall_success = False
 

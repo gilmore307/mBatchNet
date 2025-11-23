@@ -190,9 +190,19 @@ prepare_metadata_outputs <- function(output_dir) {
     target_binary = if (!is.null(bin_res$mapping)) list(label_column = label_col, mapping = bin_res$mapping) else NULL,
     encodings = if (length(col_maps)) col_maps else NULL
   )
-  map_path <- file.path(output_dir, "metadata_mappings.json")
+  cfg_path <- file.path(output_dir, "session_config.json")
+  cfg <- list()
+  if (file.exists(cfg_path)) {
+    cfg <- tryCatch(jsonlite::fromJSON(cfg_path, simplifyVector = FALSE), error = function(e) list())
+  }
+  if (!is.null(label_col) && is.null(cfg$label_column)) {
+    cfg$label_column <- label_col
+  }
   if (length(Filter(Negate(is.null), mapping_payload)) > 0) {
-    jsonlite::write_json(mapping_payload, map_path, pretty = TRUE, auto_unbox = TRUE)
+    cfg$metadata_mappings <- mapping_payload
+  }
+  if (length(cfg) > 0) {
+    jsonlite::write_json(cfg, cfg_path, pretty = TRUE, auto_unbox = TRUE)
   }
 
   ok_step("Prepare metadata for correction", t0)
