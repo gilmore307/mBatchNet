@@ -31,6 +31,7 @@ from _2_utils import (
     build_ranking_tab,
     build_raw_assessments_tab,
     append_run_log,
+    any_method_outputs,
 )
 
 
@@ -214,6 +215,23 @@ def _assessment_outputs_status(
             append_run_log(log_path, "All expected outputs found.", icon="✅")
 
     return ready == total, ready, total
+
+
+def _assessment_inputs_ready(session_dir: Optional[Path], stage: str) -> bool:
+    """Check whether required inputs are present for the given stage."""
+
+    if session_dir is None:
+        return False
+
+    raw = (session_dir / "raw.csv").exists()
+    meta = (session_dir / "metadata.csv").exists()
+    if not (raw and meta):
+        return False
+
+    if stage == "post":
+        return any_method_outputs(session_dir)
+
+    return True
 
 
 def _param_controls(stage: str, key: str):
@@ -579,6 +597,7 @@ def assessment_layout(active_path: str, stage: str):
     return html.Div(
         [
             build_navbar(active_path),
+            dcc.Interval(id="assessment-input-check", interval=3000, n_intervals=0),
             dbc.Container(
                 [
                     html.H2(header),
@@ -695,11 +714,11 @@ def register_pre_post_callbacks(app):
                 f"{sid}-param-fig-height",
                 f"{sid}-param-fig-dpi",
             ])
-            states += [
-                State(f"{sid}-param-fig-width", "value"),
-                State(f"{sid}-param-fig-height", "value"),
-                State(f"{sid}-param-fig-dpi", "value"),
-            ]
+        states += [
+            State(f"{sid}-param-fig-width", "value"),
+            State(f"{sid}-param-fig-height", "value"),
+            State(f"{sid}-param-fig-dpi", "value"),
+        ]
             if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
                 param_state_ids.append(f"{sid}-param-fig-ncol")
                 states.append(State(f"{sid}-param-fig-ncol", "value"))
@@ -946,6 +965,21 @@ def register_pre_post_callbacks(app):
                     else:
                         restored.append(dash.no_update)
                 return restored
+
+        @app.callback(
+            Output(run_id, "disabled", allow_duplicate=True),
+            Input("assessment-input-check", "n_intervals"),
+            State("session-id", "data"),
+            State(f"{sid}-poll-interval", "disabled"),
+            prevent_initial_call=False,
+        )
+        def _toggle_run_enabled(_, session_id, poll_disabled, _stage=stage):
+            if session_id is None:
+                return True
+            session_dir = get_session_dir(session_id)
+            if poll_disabled is False:
+                return True
+            return not _assessment_inputs_ready(session_dir, _stage)
 
         # Update subtab content when user clicks a subtab (after results are rendered)
         @app.callback(
