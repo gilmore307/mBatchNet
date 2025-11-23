@@ -517,7 +517,7 @@ def register_correction_callbacks(app):
             toggle_button = dbc.Button(
                 "Show",
                 id={"type": "method-config-toggle", "code": code},
-                color="info",
+                color=button_color(False),
                 size="sm",
                 className="w-100",
                 n_clicks=0,
