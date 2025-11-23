@@ -564,14 +564,19 @@ def session_preview_dir(session_dir: Path) -> Path:
 
 
 def reorganize_session_outputs(session_dir: Path) -> None:
-    """Normalize the session directory layout into data/results/preview."""
+    """Normalize the session directory layout into data/results/preview.
+
+    Results should only retain final figures (TIF/TIFF) and assessment tables.
+    Any inputs or auxiliary files created during runs are moved back into the
+    data directory (or preview directory for PNGs) so ``results`` stays clean.
+    """
 
     data_dir = session_data_dir(session_dir)
     results_dir = session_results_dir(session_dir)
     preview_dir = session_preview_dir(session_dir)
 
-    def _move_matches(pattern: str, target_dir: Path) -> None:
-        for path in session_dir.glob(pattern):
+    def _move_matches(pattern: str, source_dir: Path, target_dir: Path) -> None:
+        for path in source_dir.glob(pattern):
             if not path.is_file():
                 continue
             dest = target_dir / path.name
@@ -582,19 +587,35 @@ def reorganize_session_outputs(session_dir: Path) -> None:
             except OSError:
                 continue
 
-    _move_matches("raw.csv", data_dir)
-    _move_matches("metadata.csv", data_dir)
-    _move_matches("metadata_origin.csv", data_dir)
-    _move_matches("*_tss.csv", data_dir)
-    _move_matches("*_clr.csv", data_dir)
-    _move_matches("normalized_*.csv", data_dir)
+    # Collect inputs from both the session root and results workspace.
+    for src in (session_dir, results_dir):
+        _move_matches("raw.csv", src, data_dir)
+        _move_matches("metadata.csv", src, data_dir)
+        _move_matches("metadata_origin.csv", src, data_dir)
+        _move_matches("*_tss.csv", src, data_dir)
+        _move_matches("*_clr.csv", src, data_dir)
+        _move_matches("normalized_*.csv", src, data_dir)
+        _move_matches("*_ranking.csv", src, data_dir)
+        _move_matches("*.png", src, preview_dir)
 
-    _move_matches("*.tif", results_dir)
-    _move_matches("*.tiff", results_dir)
-    _move_matches("*_assessment_*.csv", results_dir)
-    _move_matches("*_ranking.csv", results_dir)
-
-    _move_matches("*.png", preview_dir)
+    # Keep only TIF/TIFF and assessment tables in results; move everything else
+    # out so results remains tidy for the user.
+    for path in list(results_dir.glob("*")):
+        if not path.is_file():
+            continue
+        name_lower = path.name.lower()
+        suffix = path.suffix.lower()
+        if suffix in {".tif", ".tiff"}:
+            continue
+        if "_assessment_" in name_lower:
+            continue
+        if suffix == ".png":
+            _move_matches(path.name, results_dir, preview_dir)
+            continue
+        if name_lower == "session_config.json":
+            _move_matches(path.name, results_dir, session_dir)
+            continue
+        _move_matches(path.name, results_dir, data_dir)
 
 
 def cleanup_old_sessions(max_age_hours: int = CLEANUP_HOURS) -> None:
