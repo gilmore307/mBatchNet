@@ -804,7 +804,30 @@ def _normalize_method_name(method: str) -> Tuple[Optional[str], Optional[Path]]:
     return None, None
 
 
-def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] = None) -> Tuple[bool, str]:
+def _format_method_params(params: Optional[Dict[str, object]]) -> Tuple[str, ...]:
+    if not params:
+        return tuple()
+    args: List[str] = []
+    for key, value in params.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and value == "":
+            continue
+        normalized_value: object
+        if isinstance(value, bool):
+            normalized_value = str(value).lower()
+        else:
+            normalized_value = value
+        args.append(f"--{key}={normalized_value}")
+    return tuple(args)
+
+
+def run_single_method(
+    session_dir: Path,
+    method: str,
+    log_path: Optional[Path] = None,
+    params: Optional[Dict[str, object]] = None,
+) -> Tuple[bool, str]:
     """Execute a single correction method via its dedicated R script."""
 
     canonical_code, script_path = _normalize_method_name(method)
@@ -817,7 +840,8 @@ def run_single_method(session_dir: Path, method: str, log_path: Optional[Path] =
     if not script_path.exists():
         return False, f"Script not found for method {canonical_code}: {script_path.name}"
 
-    command = build_rscript_command(script_path, session_dir)
+    param_args = _format_method_params(params)
+    command = build_rscript_command(script_path, session_dir, *param_args)
     if log_path is not None:
         success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     else:
