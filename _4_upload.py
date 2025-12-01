@@ -263,14 +263,7 @@ def upload_layout(active_path: str):
                                                 dbc.CardBody(
                                                     [
                                                         html.P(
-                                                            [
-                                                                "Select an example pair from ",
-                                                                html.Code("assets/example"),
-                                                                ". Files are matched by suffix: ",
-                                                                html.Code("raw_<key>"),
-                                                                " and ",
-                                                                html.Code("metadata_<key>"),
-                                                            ]
+                                                            "Load a curated example dataset to explore the workflow without uploading your own files."
                                                         ),
                                                         dcc.Dropdown(
                                                             id="example-select",

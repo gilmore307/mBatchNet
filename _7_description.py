@@ -90,8 +90,8 @@ HELP_MODAL_SECTIONS: List = [
                                         "each method to review parameter presets before launching."
                                     ),
                                     html.Li(
-                                        "Avg Time (s) displays the average runtime gathered from prior "
-                                        "sessions to help gauge how long a run may take."
+                                        "Time (s) shows how long each method took to run in the current session "
+                                        "so you can monitor performance without relying on prior sessions."
                                     ),
                                     html.Li(
                                         "Status shows whether that method already has outputs stored for "
