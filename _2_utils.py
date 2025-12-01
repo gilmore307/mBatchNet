@@ -441,7 +441,9 @@ _DETAIL_COLUMN_ALLOWLIST: Dict[str, Set[str]] = {
     "nmds": {"method", "nmds_stress"},
 }
 
-_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "nmds", "dissimilarity", "permanova"}
+# NMDS assessment tables no longer carry a Geometry column; treat them as single-geometry
+# when rendering details so the tables are still displayed.
+_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "dissimilarity", "permanova"}
 _AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
 _BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
 
