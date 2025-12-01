@@ -656,36 +656,9 @@ summarise_pca_method <- function(fr, method_name, metadata, batch_var = "batch",
     Target_vs_Batch_Centroid_Delta = target_vs_batch_dominance(target_stats$centroid, batch_stats$centroid)
   )
 }
-only_baseline <- (length(frames_cache) == 1L) && identical(names(frames_cache), "Before correction")
-output_name <- if (only_baseline) "pca_raw_assessment_pre.csv" else "pca_raw_assessment_post.csv"
 
-if (only_baseline) {
-  # ---- Assess RAW only (no ranking) ----
-  m <- "Before correction"
-  fr <- frames_cache[[m]]
-  stopifnot(!is.null(fr))
-  assess_df <- summarise_pca_method(fr, m, metadata, batch_var = batch_var, target_var = target_var)
-  if (is.null(assess_df)) assess_df <- tibble::tibble()
-
-  print(assess_df, n = nrow(assess_df))
-  readr::write_csv(assess_df, file.path(output_folder, output_name))
-
-} else {
-  # ---- Summarise multiple matrices without ranking ----
-  rows <- lapply(names(frames_cache), function(m) {
-    fr <- frames_cache[[m]]
-    summarise_pca_method(fr, m, metadata, batch_var = batch_var, target_var = target_var)
-  })
-  rows <- rows[!vapply(rows, is.null, logical(1))]
-  assessment_tbl <- if (length(rows)) {
-    dplyr::bind_rows(rows) %>% dplyr::arrange(Method)
-  } else {
-    tibble::tibble()
-  }
-
-  print(assessment_tbl, n = nrow(assessment_tbl))
-  readr::write_csv(assessment_tbl, file.path(output_folder, output_name))
-}
+# Assessment tables are no longer generated for PCA; only plots are saved.
+message("Skipping PCA assessment table generation (plots only).")
 
 # =========================
 # Plot rendering (after CSVs are written)

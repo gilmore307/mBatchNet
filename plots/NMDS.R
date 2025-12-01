@@ -614,38 +614,11 @@ ellipse_overlap_ratio <- function(coords, groups, level = 0.95) {
   mean(ratios)
 }
 
-compute_group_metrics <- function(plot_df, metadata, axes, group_var) {
-  prep <- prepare_group_scores(plot_df, metadata, axes = axes, group_var = group_var)
-  if (is.null(prep)) {
-    return(list(centroid = NA_real_, overlap = NA_real_))
-  }
-  coords <- prep$coords
-  groups <- prep$groups
-  list(
-    centroid = mean_centroid_distance(coords, groups),
-    overlap = ellipse_overlap_ratio(coords, groups)
-  )
-}
-
-target_vs_batch_dominance <- function(target_distance, batch_distance) {
-  if (!is.finite(target_distance) || !is.finite(batch_distance)) return(NA_real_)
-  target_distance - batch_distance
-}
-
-summarise_nmds_method <- function(fr, method_name, geometry_label, metadata,
-                                   axes = c("NMDS1", "NMDS2"), batch_var = "batch",
-                                   target_var = "target") {
-  batch_stats <- compute_group_metrics(fr$plot.df, metadata, axes = axes, group_var = batch_var)
-  target_stats <- compute_group_metrics(fr$plot.df, metadata, axes = axes, group_var = target_var)
+summarise_nmds_method <- function(fr, method_name, geometry_label) {
   tibble::tibble(
     Method = method_name,
     Geometry = geometry_label,
-    NMDS_Stress = fr$stress,
-    Centroid_Distance_Batch = batch_stats$centroid,
-    Centroid_Distance_Target = target_stats$centroid,
-    Ellipse_Overlap_Batch = batch_stats$overlap,
-    Ellipse_Overlap_Target = target_stats$overlap,
-    Target_vs_Batch_Centroid_Delta = target_vs_batch_dominance(target_stats$centroid, batch_stats$centroid)
+    NMDS_Stress = fr$stress
   )
 }
 
@@ -673,6 +646,7 @@ write_assessment_outputs <- function(df) {
     }
     fname <- sprintf("nmds_%s_raw_assessment_%s.csv", token, stage_suffix)
     geom_df <- df[df$Geometry == geom, , drop = FALSE]
+    geom_df <- geom_df[, intersect(names(geom_df), c("Method", "NMDS_Stress")), drop = FALSE]
     readr::write_csv(geom_df, file.path(output_folder, fname))
   }
 }
@@ -683,23 +657,19 @@ if (only_baseline) {
 
   if ("Before correction" %in% methods_clr) {
     fr <- frames_cache_clr[["Before correction"]]
-    row <- summarise_nmds_method(fr, "Before correction", "Ait", metadata,
-                                 axes = c("NMDS1", "NMDS2"), batch_var = batch_var,
-                                 target_var = target_var)
+    row <- summarise_nmds_method(fr, "Before correction", "Ait")
     if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
   if ("Before correction" %in% methods_tss) {
     fr <- frames_cache_tss[["Before correction"]]
-    row <- summarise_nmds_method(fr, "Before correction", "BC", metadata,
-                                 axes = c("NMDS1", "NMDS2"), batch_var = batch_var,
-                                 target_var = target_var)
+    row <- summarise_nmds_method(fr, "Before correction", "BC")
     if (!is.null(row)) assess_rows[[length(assess_rows) + 1L]] <- row
   }
 
   assess_df <- if (length(assess_rows)) dplyr::bind_rows(assess_rows) else tibble::tibble()
 
-  print(assess_df, n = nrow(assess_df))
+  print(assess_df[, intersect(names(assess_df), c("Method", "NMDS_Stress"))], n = nrow(assess_df))
   write_assessment_outputs(assess_df)
 
   # No correction recommendation messages
@@ -710,16 +680,12 @@ if (only_baseline) {
   for (m in all_methods) {
     if (m %in% methods_clr) {
       fr_a <- frames_cache_clr[[m]]
-      row_a <- summarise_nmds_method(fr_a, m, "Ait", metadata,
-                                     axes = c("NMDS1", "NMDS2"), batch_var = batch_var,
-                                     target_var = target_var)
+      row_a <- summarise_nmds_method(fr_a, m, "Ait")
       if (!is.null(row_a)) rows[[length(rows) + 1L]] <- row_a
     }
     if (m %in% methods_tss) {
       fr_b <- frames_cache_tss[[m]]
-      row_b <- summarise_nmds_method(fr_b, m, "BC", metadata,
-                                     axes = c("NMDS1", "NMDS2"), batch_var = batch_var,
-                                     target_var = target_var)
+      row_b <- summarise_nmds_method(fr_b, m, "BC")
       if (!is.null(row_b)) rows[[length(rows) + 1L]] <- row_b
     }
   }
@@ -730,7 +696,7 @@ if (only_baseline) {
     tibble::tibble()
   }
 
-  print(assessment_tbl, n = nrow(assessment_tbl))
+  print(assessment_tbl[, intersect(names(assessment_tbl), c("Method", "NMDS_Stress"))], n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
 }
 
