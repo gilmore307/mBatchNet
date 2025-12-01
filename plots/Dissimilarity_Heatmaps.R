@@ -318,7 +318,7 @@ safe_anosim <- function(dist_obj, grouping) {
   if (is.null(dist_obj) || is.null(grouping)) return(default)
   grouping <- droplevels(factor(grouping))
   if (nlevels(grouping) < 2) return(default)
-  out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping), error = function(e) NULL)
+  out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping, permutations = 10), error = function(e) NULL)
   if (is.null(out)) return(default)
   c(ANOSIM_R = unname(out$statistic))
 }
