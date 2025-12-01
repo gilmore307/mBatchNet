@@ -2045,8 +2045,6 @@ RANKING_FILE_ALIASES: Dict[str, List[str]] = {
 }
 
 
-REQUIRED_METHOD_CODES: Set[str] = {code.lower() for code, _ in SUPPORTED_METHODS}
-
 REQUIRED_RANKING_KEYS: Set[str] = {
     "pca",
     "pcoa",
@@ -2654,26 +2652,5 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return json.loads(summary_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-
-
-def _all_methods_selected(summary: Dict[str, object]) -> bool:
-    methods = summary.get("methods")
-    if not isinstance(methods, list):
-        return False
-    codes: Set[str] = set()
-    for entry in methods:
-        if not isinstance(entry, dict):
-            continue
-        raw_name = (entry.get("name") or "").strip()
-        if not raw_name:
-            continue
-        lowered = raw_name.lower()
-        if lowered in REQUIRED_METHOD_CODES:
-            codes.add(lowered)
-            continue
-        code = _method_code_from_display(raw_name)
-        if code:
-            codes.add(code.lower())
-    return REQUIRED_METHOD_CODES.issubset(codes)
 
 
