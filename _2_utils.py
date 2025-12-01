@@ -1239,7 +1239,7 @@ def _load_info_table_for_key(
         if not header:
             continue
 
-        geometry_token = _canonical_geometry_token(found.stem)
+        geometry_token = _geometry_token_from_filename(found)
         geometry_token_lower = geometry_token.lower() if geometry_token else None
 
         column_info: List[Tuple[Optional[int], str, str]] = []
@@ -1993,6 +1993,16 @@ def _canonical_geometry_token(value: object) -> Optional[str]:
     if normalized in _BRAY_GEOMETRY_ALIASES:
         return "braycurtis"
     return normalized or None
+
+
+def _geometry_token_from_filename(path: Path) -> Optional[str]:
+    segments = re.split(r"[_\W]+", path.stem)
+    for segment in segments:
+        token = _canonical_geometry_token(segment)
+        if token in {"aitchison", "braycurtis"}:
+            return token
+    token = _canonical_geometry_token(path.stem)
+    return token if token in {"aitchison", "braycurtis"} else None
 
 
 def _format_geometry_value(value: object) -> object:
