@@ -116,9 +116,6 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
             add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_batch"), spec.filename)
             add_if(low.startswith("pcoa_braycurtis_target"), spec.filename)
-            add_assessment_tables(
-                "pcoa", multi_geometry=True, include_combined=False
-            )
         elif key == "nmds":
             add_if(low.startswith("nmds_aitchison_batch"), spec.filename)
             add_if(low.startswith("nmds_aitchison_target"), spec.filename)
@@ -154,7 +151,6 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
         elif key == "pca":
             add_if(stem == "pca_batch", spec.filename)
             add_if(stem == "pca_target", spec.filename)
-            add_assessment_tables("pca")
         elif key == "pvca" and stem == "pvca":
             add_if(True, spec.filename)
             add_assessment_tables("PVCA")

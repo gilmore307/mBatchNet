@@ -16,7 +16,6 @@ import hashlib
 import threading
 from io import BytesIO
 from datetime import datetime
-from statistics import mean
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +36,6 @@ DOCS_DIR = BASE_DIR / "assets" / "doc"
 METHODS_REFERENCE_PATH = DOCS_DIR / "methods.csv"
 PREPROCESS_SCRIPT = CORRECTION_DIR / "preprocess.R"
 CLEANUP_HOURS = 6
-SESSION_SIGNATURES_PATH = OUTPUT_ROOT / "session_signatures.json"
 PREVIEW_SENTINEL = ".previews_generated"
 
 
@@ -437,11 +435,6 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     ),
     "nmds": (
         ("NMDS_Stress", "down"),
-        ("Centroid_Distance_Batch", "down"),
-        ("Centroid_Distance_Target", "up"),
-        ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "down"),
-        ("Target_vs_Batch_Centroid_Delta", "up"),
     ),
     "dissimilarity": (
         ("ANOSIM_R", "down"),
@@ -474,6 +467,10 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "silhouette": (
         ("Silhouette", "up"),
     ),
+}
+
+_DETAIL_COLUMN_ALLOWLIST: Dict[str, Set[str]] = {
+    "nmds": {"method", "nmds_stress"},
 }
 
 _MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "nmds", "dissimilarity", "permanova"}
@@ -1243,6 +1240,9 @@ def _load_info_table_for_key(
     if not representative:
         return None
 
+    if key.lower() in {"pca", "pcoa"}:
+        return None
+
     candidates = [
         cand
         for cand in _candidate_csvs_for_image(representative)
@@ -1252,6 +1252,13 @@ def _load_info_table_for_key(
         return None
 
     geometry_filter_set = {token.lower() for token in (geometry_filter or set())}
+
+    column_allowlist = {col.lower() for col in _DETAIL_COLUMN_ALLOWLIST.get(key.lower(), set())}
+
+    def _allowed_column(name: str) -> bool:
+        if not column_allowlist:
+            return True
+        return name.lower() in column_allowlist
 
     for cand in _sort_raw_assessment_names(candidates, stage):
         found = _find_file_case_insensitive(session_dir, cand)
@@ -1269,6 +1276,8 @@ def _load_info_table_for_key(
         header_lookup = {str(col).lower(): idx for idx, col in enumerate(header)}
 
         def _append_column(idx: Optional[int], display: str, canonical: str):
+            if not _allowed_column(canonical):
+                return
             canonical_key = canonical.lower()
             if display in seen_headers or canonical_key in seen_canonical:
                 return
@@ -2666,43 +2675,6 @@ def _file_sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
-def _example_signatures() -> List[tuple[str, str]]:
-    ex_dir = BASE_DIR / "assets" / "example"
-    if not ex_dir.exists():
-        return []
-    raws: Dict[str, Path] = {}
-    metas: Dict[str, Path] = {}
-    for p in ex_dir.iterdir():
-        if not p.is_file():
-            continue
-        name = p.name
-        if name.lower().startswith("raw_"):
-            key = name.split("_", 1)[1]
-            raws[key] = p
-        elif name.lower().startswith("metadata_"):
-            key = name.split("_", 1)[1]
-            metas[key] = p
-    signatures: List[tuple[str, str]] = []
-    for key in set(raws) & set(metas):
-        try:
-            signatures.append((_file_sha256(raws[key]), _file_sha256(metas[key])))
-        except Exception:
-            continue
-    return signatures
-
-
-def _session_signature(session_dir: Path) -> tuple[str, str] | None:
-    raw_path = session_dir / "raw.csv"
-    meta_path = session_dir / "metadata.csv"
-    if not raw_path.exists() or not meta_path.exists():
-        return None
-    try:
-        return _file_sha256(raw_path), _file_sha256(meta_path)
-    except Exception:
-        return None
-
-
 def _method_code_from_display(display: str) -> Optional[str]:
     if not display:
         return None
@@ -2727,51 +2699,6 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return json.loads(summary_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-
-
-def _load_signature_sessions() -> Dict[tuple[str, str], Set[str]]:
-    if not SESSION_SIGNATURES_PATH.exists():
-        return {}
-    try:
-        data = json.loads(SESSION_SIGNATURES_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    sessions_map: Dict[tuple[str, str], Set[str]] = {}
-    if isinstance(data, list):
-        for item in data:
-            if isinstance(item, dict):
-                raw = item.get("raw")
-                meta = item.get("meta")
-                recorded_sessions = item.get("sessions", [])
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
-                raw, meta = item
-                recorded_sessions = []
-            else:
-                continue
-            if raw is None or meta is None:
-                continue
-            raw_hash = str(raw)
-            meta_hash = str(meta)
-            key = (raw_hash, meta_hash)
-            if key not in sessions_map:
-                sessions_map[key] = set()
-            if isinstance(recorded_sessions, (list, tuple)):
-                for session_id in recorded_sessions:
-                    if session_id is None:
-                        continue
-                    sessions_map[key].add(str(session_id))
-    return sessions_map
-
-
-def _store_signature_sessions(sessions_map: Dict[tuple[str, str], Set[str]]) -> None:
-    try:
-        serialisable = [
-            {"raw": raw, "meta": meta, "sessions": sorted(session_ids)}
-            for (raw, meta), session_ids in sorted(sessions_map.items())
-        ]
-        SESSION_SIGNATURES_PATH.write_text(json.dumps(serialisable, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
@@ -2833,105 +2760,4 @@ def _all_methods_selected(summary: Dict[str, object]) -> bool:
             codes.add(code.lower())
     return REQUIRED_METHOD_CODES.issubset(codes)
 
-
-def compute_integrated_summary() -> Dict[str, object]:
-    """Aggregate cross-session performance statistics and persist the summary."""
-    ensure_output_root()
-    example_signatures = set(_example_signatures())
-    signature_sessions = _load_signature_sessions()
-    method_stats: Dict[str, Dict[str, object]] = {
-        code: {
-            "code": code,
-            "display": CODE_TO_DISPLAY.get(code, code),
-            "selections": 0,
-            "elapsed": [],
-            "sessions": set(),
-        }
-        for code, _ in SUPPORTED_METHODS
-    }
-    included_sessions: List[str] = []
-    for session_dir in sorted(p for p in OUTPUT_ROOT.iterdir() if p.is_dir()):
-        signature = _session_signature(session_dir)
-        if signature and signature in example_signatures:
-            continue
-        summary = _load_session_summary(session_dir)
-        if not summary:
-            continue
-        methods_block = summary.get("methods")
-        if not isinstance(methods_block, list):
-            continue
-        session_id = session_dir.name
-        session_contributed = False
-        for entry in methods_block:
-            if not isinstance(entry, dict):
-                continue
-            status = (entry.get("status") or "").lower()
-            if status != "success":
-                continue
-            name = entry.get("name")
-            code = name if name in method_stats else _method_code_from_display(str(name))
-            if not code or code not in method_stats:
-                continue
-            stat = method_stats[code]
-            stat["selections"] = int(stat.get("selections", 0)) + 1
-            stat["sessions"].add(session_id)
-            elapsed_val = entry.get("elapsed_sec")
-            try:
-                elapsed_float = float(elapsed_val)
-            except (TypeError, ValueError):
-                elapsed_float = None
-            if elapsed_float is not None:
-                stat["elapsed"].append(elapsed_float)
-            session_contributed = True
-        if session_contributed:
-            included_sessions.append(session_id)
-            if signature:
-                signature_sessions.setdefault(signature, set()).add(session_id)
-
-    rows: List[Dict[str, object]] = []
-    methods_payload: Dict[str, Dict[str, object]] = {}
-    for code, payload in method_stats.items():
-        elapsed_vals: List[float] = payload["elapsed"]  # type: ignore[assignment]
-        avg_elapsed = mean(elapsed_vals) if elapsed_vals else None
-        selections = int(payload.get("selections", 0))
-        methods_payload[code] = {
-            "code": code,
-            "display": payload["display"],
-            "selections": selections,
-            "sessions": sorted(payload["sessions"]),
-            "avg_elapsed_sec": avg_elapsed,
-        }
-        rows.append(
-            {
-                "code": code,
-                "method": payload["display"],
-                "selections": selections,
-                "avg_elapsed_sec": round(avg_elapsed, 3) if avg_elapsed is not None else None,
-            }
-        )
-    rows.sort(key=lambda item: (-item["selections"], item["method"]))
-    summary = {
-        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-        "sessions": included_sessions,
-        "methods": methods_payload,
-        "table_rows": rows,
-        "notes": "Statistics capture selection counts and average runtime in seconds.",
-    }
-    try:
-        integrated_path = OUTPUT_ROOT / "integrated_summary.json"
-        integrated_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    except Exception:
-        pass
-    _store_signature_sessions(signature_sessions)
-    return summary
-
-
-def load_integrated_summary() -> Dict[str, object]:
-    integrated_path = OUTPUT_ROOT / "integrated_summary.json"
-    if integrated_path.exists():
-        try:
-            return json.loads(integrated_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return compute_integrated_summary()
 
