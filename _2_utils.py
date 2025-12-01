@@ -441,9 +441,9 @@ _DETAIL_COLUMN_ALLOWLIST: Dict[str, Set[str]] = {
     "nmds": {"method", "nmds_stress"},
 }
 
-# NMDS assessment tables no longer carry a Geometry column; treat them as single-geometry
-# when rendering details so the tables are still displayed.
-_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "dissimilarity", "permanova"}
+# NMDS assessment tables no longer carry a Geometry column, but we still want to show the
+# Aitchison and Bray-Curtis tables separately in the UI.
+_MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "dissimilarity", "permanova", "nmds"}
 _AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
 _BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
 
@@ -1239,6 +1239,9 @@ def _load_info_table_for_key(
         if not header:
             continue
 
+        geometry_token = _canonical_geometry_token(found.stem)
+        geometry_token_lower = geometry_token.lower() if geometry_token else None
+
         column_info: List[Tuple[Optional[int], str, str]] = []
         display_headers: List[str] = []
         seen_headers: Set[str] = set()
@@ -1262,7 +1265,8 @@ def _load_info_table_for_key(
 
         geometry_idx = header_lookup.get("geometry")
         if geometry_filter_set and geometry_idx is None:
-            continue
+            if geometry_token_lower is None or geometry_token_lower not in geometry_filter_set:
+                continue
 
         trend_spec = _DETAIL_METRIC_TRENDS.get(key.lower(), ())
         arrow_map = {"up": "↑", "down": "↓", "flat": "↔"}
@@ -1295,9 +1299,10 @@ def _load_info_table_for_key(
         for raw_row in data:
             if geometry_filter_set:
                 geometry_raw: Optional[str] = None
+                token = geometry_token_lower
                 if geometry_idx is not None and geometry_idx < len(raw_row):
                     geometry_raw = raw_row[geometry_idx]
-                token = _canonical_geometry_token(geometry_raw)
+                    token = _canonical_geometry_token(geometry_raw)
                 if token is None or token.lower() not in geometry_filter_set:
                     continue
             row_dict: Dict[str, object] = {}
