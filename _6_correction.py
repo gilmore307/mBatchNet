@@ -13,11 +13,11 @@ from _2_utils import (
     CODE_TO_DISPLAY,
     METHOD_REFERENCE_BY_CODE,
     SUPPORTED_METHODS,
+    _method_code_from_display,
+    _load_session_summary,
     any_method_outputs,
-    compute_integrated_summary,
     delete_method_outputs,
     get_session_dir,
-    load_integrated_summary,
     method_output_exists,
     _remove_method_from_summary,
     clear_method_failure,
@@ -65,8 +65,6 @@ def _parameter_input(code: str, spec: Dict[str, object]) -> dbc.Col:
     control: object
     common_props = {
         "id": {"type": "method-config-input", "code": code, "param": name},
-        "persistence": True,
-        "persisted_props": ["value"],
     }
     if input_type == "dropdown":
         control = dcc.Dropdown(
@@ -349,7 +347,7 @@ def correction_layout(active_path: str):
                 [
                     html.H2("Batch Effect Correction"),
                     html.P(
-                        "Review available correction methods along with their average runtime and citation details."
+                        "Review available correction methods along with their runtime for this session and citation details."
                     ),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
@@ -366,18 +364,42 @@ def register_correction_callbacks(app):
         Input("page-url", "pathname"),
         Input("correction-complete", "data"),
         Input("method-operation-trigger", "data"),
+        Input("session-id", "data"),
         prevent_initial_call=False,
     )
-    def refresh_method_summary(pathname: str, correction_complete: bool, refresh_token: int):
+    def refresh_method_summary(
+        pathname: str, correction_complete: bool, refresh_token: int, session_id: str | None
+    ):
         ctx = dash.callback_context
         triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
         current_path = (pathname or "/").split("?", 1)[0]
         if current_path != "/correction" and triggered in (None, "page-url"):
             return dash.no_update
+        session_dir = get_session_dir(session_id) if session_id else None
+        if not session_dir or not session_dir.exists():
+            return {"methods": {}}
         try:
-            return compute_integrated_summary()
+            session_summary = _load_session_summary(session_dir)
         except Exception:
-            return load_integrated_summary()
+            session_summary = None
+        method_timings: Dict[str, Dict[str, object]] = {}
+        if session_summary and isinstance(session_summary, dict):
+            methods_block = session_summary.get("methods")
+            if isinstance(methods_block, list):
+                for entry in methods_block:
+                    if not isinstance(entry, dict):
+                        continue
+                    name = entry.get("name")
+                    if not name:
+                        continue
+                    code = _method_code_from_display(str(name)) or str(name)
+                    elapsed_val = entry.get("elapsed_sec")
+                    try:
+                        elapsed_float = float(elapsed_val)
+                    except (TypeError, ValueError):
+                        elapsed_float = None
+                    method_timings[code] = {"elapsed_sec": elapsed_float}
+        return {"methods": method_timings}
 
     @app.callback(
         Output("method-table-container", "children"),
@@ -395,19 +417,19 @@ def register_correction_callbacks(app):
                     if isinstance(payload, dict):
                         summary_lookup[str(key)] = payload
                         summary_lookup[str(key).lower()] = payload
-            session_dir = get_session_dir(session_id) if session_id else None
-            session_ready = False
-            if session_dir and session_dir.exists():
-                session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
-            header = html.Thead(
-                html.Tr(
-                    [
-                        html.Th("Config", className="text-center", style=_CONFIG_COLUMN_WIDTH),
-                        html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
-                        html.Th("Avg Time (s)", className="text-center", style=_LABEL_COLUMN_WIDTH),
-                        html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
-                        html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
-                        html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),
+        session_dir = get_session_dir(session_id) if session_id else None
+        session_ready = False
+        if session_dir and session_dir.exists():
+            session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th("Config", className="text-center", style=_CONFIG_COLUMN_WIDTH),
+                    html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Time (s)", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
+                    html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),
                     html.Th("Citation", className="text-center"),
                 ]
             )
@@ -419,15 +441,15 @@ def register_correction_callbacks(app):
             return "secondary" if disabled else "success"
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
-            avg_elapsed = None
+            elapsed = None
             if isinstance(stats, dict):
-                avg_elapsed = stats.get("avg_elapsed_sec")
-            if isinstance(avg_elapsed, str):
+                elapsed = stats.get("elapsed_sec")
+            if isinstance(elapsed, str):
                 try:
-                    avg_elapsed = float(avg_elapsed)
+                    elapsed = float(elapsed)
                 except ValueError:
-                    avg_elapsed = None
-            avg_display = "-" if avg_elapsed in (None, "") else f"{float(avg_elapsed):.2f}"
+                    elapsed = None
+            time_display = "-" if elapsed in (None, "") else f"{float(elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
             failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
             if outputs_present:
@@ -531,7 +553,7 @@ def register_correction_callbacks(app):
                 [
                     toggle_cell,
                     html.Td(method_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
-                    html.Td(avg_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Td(time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
                     delete_cell,
