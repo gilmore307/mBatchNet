@@ -4,7 +4,6 @@
 import base64
 import csv
 import json
-import math
 import os
 import re
 import sys
@@ -12,7 +11,6 @@ import shutil
 import subprocess
 import textwrap
 import time
-import hashlib
 import threading
 from io import BytesIO
 from datetime import datetime
@@ -145,22 +143,6 @@ POST_SCRIPTS: Sequence[str] = PRE_SCRIPTS + (
 
 PNG_MAX_DISPLAY_SIDE = 1400
 # Downscale all PNG previews to a uniform 1400px longest side
-
-
-RANKING_SCORE_LABELS: Dict[str, str] = {
-    "alignment": "Alignment score",
-    "pca": "PCA score",
-    "pcoa": "PCoA score",
-    "nmds": "NMDS score",
-    "dissimilarity": "Dissimilarity score",
-    "permanova": "PERMANOVA score",
-    "r2": "R² score",
-    "prda": "pRDA score",
-    "pvca": "PVCA score",
-    "ebm": "Entropy score",
-    "silhouette": "Silhouette score",
-}
-
 
 def _guess_mime_type(path: Path) -> str:
     ext = path.suffix.lower()
@@ -419,20 +401,6 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
-    "pca": (
-        ("Centroid_Distance_Batch", "down"),
-        ("Centroid_Distance_Target", "up"),
-        ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "down"),
-        ("Target_vs_Batch_Centroid_Delta", "up"),
-    ),
-    "pcoa": (
-        ("Centroid_Distance_Batch", "down"),
-        ("Centroid_Distance_Target", "up"),
-        ("Ellipse_Overlap_Batch", "up"),
-        ("Ellipse_Overlap_Target", "down"),
-        ("Target_vs_Batch_Centroid_Delta", "up"),
-    ),
     "nmds": (
         ("NMDS_Stress", "down"),
     ),
@@ -2091,12 +2059,6 @@ REQUIRED_RANKING_KEYS: Set[str] = {
     "silhouette",
 }
 
-RANKING_KEY_LOOKUP: Dict[str, str] = {
-    alias.lower(): canonical
-    for canonical, aliases in RANKING_FILE_ALIASES.items()
-    for alias in [canonical, *aliases]
-}
-
 
 def _compute_absolute_score(metric_key: str, row: Dict[str, str]) -> Optional[float]:
     spec = RANKING_SCORE_SPECS.get(metric_key)
@@ -2668,13 +2630,6 @@ def build_raw_assessments_tab(session_dir: Path):
     return dcc.Tab(label="Raw Assessments", value="tab-raw", children=html.Div(body))
 
 
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
 def _method_code_from_display(display: str) -> Optional[str]:
     if not display:
         return None
@@ -2699,45 +2654,6 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return json.loads(summary_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-
-
-def _load_ranking_deltas(session_dir: Path) -> Dict[str, Dict[str, float]]:
-    """Return {method_code: {metric_name: score_delta}} for a session."""
-    ret: Dict[str, Dict[str, float]] = defaultdict(dict)
-    for csv_path in sorted(session_dir.glob("*_ranking.csv")):
-        data = _parse_ranking_file(csv_path)
-        if not data.entries:
-            continue
-        baseline_entry = next((e for e in data.entries if e.is_baseline and e.absolute not in (None, 0)), None)
-        baseline_abs = baseline_entry.absolute if baseline_entry else None
-        for entry in data.entries:
-            if entry.is_baseline:
-                continue
-            method_code = entry.method_code
-            if not method_code:
-                continue
-            absolute = entry.absolute
-            if absolute is None:
-                continue
-            if baseline_abs in (None, 0):
-                continue
-            ratio = absolute / baseline_abs
-            if not math.isfinite(ratio):
-                continue
-            ret[method_code][data.display_name] = ratio - 1.0
-    return ret
-
-
-def _collect_ranking_metric_keys(session_dir: Path) -> Set[str]:
-    metrics: Set[str] = set()
-    for csv_path in session_dir.glob("*_ranking.csv"):
-        stem = csv_path.stem
-        if stem.lower().endswith("_ranking"):
-            stem = stem[:-len("_ranking")]
-        canonical = RANKING_KEY_LOOKUP.get(stem.lower())
-        if canonical:
-            metrics.add(canonical)
-    return metrics
 
 
 def _all_methods_selected(summary: Dict[str, object]) -> bool:
