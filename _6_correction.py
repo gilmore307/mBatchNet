@@ -350,6 +350,9 @@ def correction_layout(active_path: str):
                     html.P(
                         "Review available correction methods along with their runtime for this session and citation details."
                     ),
+                    html.P(
+                        "Click a method name to open its package source, where you can read the manual or download the package version."
+                    ),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
                 ],
