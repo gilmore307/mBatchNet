@@ -11,7 +11,7 @@ import time
 
 import dash
 from dash import Dash, dcc, html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from flask import request
 from flask_sock import Sock
@@ -375,22 +375,21 @@ def enable_download(session_id: str, *_stage_flags) -> bool:
 @app.callback(
     Output("help-modal", "is_open"),
     Output("help-shown", "data"),
-    Input("help-open", "n_clicks"),
-    Input("help-open-resources", "n_clicks"),
+    Input({"type": "help-open-trigger", "source": ALL}, "n_clicks"),
     Input("help-close", "n_clicks"),
     State("help-shown", "data"),
     prevent_initial_call=True,
 )
-def toggle_help_modal(open_clicks, open_resources_clicks, close_clicks, help_shown):
+def toggle_help_modal(open_clicks_list, close_clicks, help_shown):
     # Only open/close on explicit user clicks; block initial/layout triggers.
     ctx = dash.callback_context
     if not ctx.triggered:
         raise dash.exceptions.PreventUpdate
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    if trigger_id in {"help-open", "help-open-resources"} and (
-        open_clicks or open_resources_clicks
-    ):
-        return True, True
+
+    trigger_id = ctx.triggered_id
+    if isinstance(trigger_id, dict) and trigger_id.get("type") == "help-open-trigger":
+        if any(click or 0 for click in open_clicks_list):
+            return True, True
     if trigger_id == "help-close" and close_clicks:
         return False, dash.no_update
     raise dash.exceptions.PreventUpdate

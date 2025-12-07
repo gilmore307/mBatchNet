@@ -93,7 +93,7 @@ def build_navbar(active_path: str) -> dbc.Navbar:
     right_group = [
         dbc.Button(
             [html.I(className="bi bi-question-circle me-1"), "Help"],
-            id="help-open",
+            id={"type": "help-open-trigger", "source": "nav"},
             color="light",
             outline=True,
             className="mb-2 ms-2",
