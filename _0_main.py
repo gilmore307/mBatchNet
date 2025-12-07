@@ -76,6 +76,7 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-ws-status", storage_type="memory", data=None),
             dcc.Store(id="runlog-unread", storage_type="session", data=False),
             dcc.Store(id="runlog-last-seen", storage_type="memory", data=None),
+            dcc.Store(id="help-scroll-target", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -119,10 +120,15 @@ def serve_layout() -> html.Div:
                                         html.Ul(
                                             [
                                                 html.Li(
-                                                    dcc.Link(
+                                                    dbc.Button(
                                                         toc_item["title"],
-                                                        href=f"#{toc_item['id']}",
-                                                        className="text-decoration-none",
+                                                        id={
+                                                            "type": "help-toc-link",
+                                                            "id": toc_item["id"],
+                                                        },
+                                                        color="link",
+                                                        className="p-0 text-start w-100 text-decoration-none",
+                                                        n_clicks=0,
                                                     ),
                                                     className="mb-2",
                                                 )
@@ -132,8 +138,8 @@ def serve_layout() -> html.Div:
                                         ),
                                     ],
                                     width=3,
-                                    className="pe-3",
-                                    style={"position": "sticky", "top": 0},
+                                    className="pe-3 position-sticky align-self-start",
+                                    style={"top": 0},
                                 ),
                                 dbc.Col(
                                     html.Div(HELP_MODAL_SECTIONS, id="help-modal-content"),
@@ -142,6 +148,7 @@ def serve_layout() -> html.Div:
                             ],
                             className="g-4",
                         ),
+                        id="help-modal-body",
                         style={"maxHeight": "70vh", "overflowY": "auto"},
                     ),
                     dbc.ModalFooter(
@@ -154,6 +161,9 @@ def serve_layout() -> html.Div:
                 size="xl",
                 scrollable=True,
             ),
+
+            # Anchor scroll feedback element
+            html.Div(id="help-scroll-ack", style={"display": "none"}),
 
             # Run log modal
             dbc.Modal(
@@ -426,6 +436,19 @@ def toggle_help_modal(open_clicks_list, close_clicks, help_shown):
     raise dash.exceptions.PreventUpdate
 
 
+@app.callback(
+    Output("help-scroll-target", "data"),
+    Input({"type": "help-toc-link", "id": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def trigger_help_scroll(toc_clicks):
+    ctx = getattr(dash, "ctx", dash.callback_context)
+    trigger_id = ctx.triggered_id
+    if isinstance(trigger_id, dict) and trigger_id.get("type") == "help-toc-link":
+        return trigger_id.get("id")
+    raise dash.exceptions.PreventUpdate
+
+
 # Highlight next-step nav button when user can proceed
 @app.callback(
     Output(NAV_ID_MAP["/"], "color"), Output(NAV_ID_MAP["/"], "outline"),
@@ -616,6 +639,35 @@ def stream_runlog(ws):
             except Exception:
                 pass
             break
+
+
+app.clientside_callback(
+    """
+    function(targetId) {
+        if (!targetId) {
+            return window.dash_clientside.no_update;
+        }
+        var container = document.getElementById('help-modal-body');
+        var el = document.getElementById(targetId);
+        if (!container || !el) {
+            return window.dash_clientside.no_update;
+        }
+        window.requestAnimationFrame(function() {
+            var top = el.offsetTop;
+            var parent = el.offsetParent;
+            while (parent && parent !== container) {
+                top += parent.offsetTop;
+                parent = parent.offsetParent;
+            }
+            var targetTop = top - (container.offsetTop || 0);
+            container.scrollTo({ top: targetTop, behavior: "smooth" });
+        });
+        return "";
+    }
+    """,
+    Output("help-scroll-ack", "children"),
+    Input("help-scroll-target", "data"),
+)
 
 
 app.clientside_callback(
