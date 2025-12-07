@@ -618,7 +618,7 @@ summarise_nmds_method <- function(fr, method_name, geometry_label) {
   tibble::tibble(
     Method = method_name,
     Geometry = geometry_label,
-    NMDS_Stress = fr$stress
+    `NMDS Stress` = fr$stress
   )
 }
 
@@ -646,7 +646,7 @@ write_assessment_outputs <- function(df) {
     }
     fname <- sprintf("nmds_%s_raw_assessment_%s.csv", token, stage_suffix)
     geom_df <- df[df$Geometry == geom, , drop = FALSE]
-    geom_df <- geom_df[, intersect(names(geom_df), c("Method", "NMDS_Stress")), drop = FALSE]
+    geom_df <- geom_df[, intersect(names(geom_df), c("Method", "NMDS Stress")), drop = FALSE]
     readr::write_csv(geom_df, file.path(output_folder, fname))
   }
 }
@@ -669,7 +669,7 @@ if (only_baseline) {
 
   assess_df <- if (length(assess_rows)) dplyr::bind_rows(assess_rows) else tibble::tibble()
 
-  print(assess_df[, intersect(names(assess_df), c("Method", "NMDS_Stress"))], n = nrow(assess_df))
+  print(assess_df[, intersect(names(assess_df), c("Method", "NMDS Stress"))], n = nrow(assess_df))
   write_assessment_outputs(assess_df)
 
   # No correction recommendation messages
@@ -696,7 +696,7 @@ if (only_baseline) {
     tibble::tibble()
   }
 
-  print(assessment_tbl[, intersect(names(assessment_tbl), c("Method", "NMDS_Stress"))], n = nrow(assessment_tbl))
+  print(assessment_tbl[, intersect(names(assessment_tbl), c("Method", "NMDS Stress"))], n = nrow(assessment_tbl))
   write_assessment_outputs(assessment_tbl)
 }
 

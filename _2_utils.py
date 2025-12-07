@@ -402,10 +402,10 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "nmds": (
-        ("NMDS_Stress", "down"),
+        ("NMDS Stress", "down"),
     ),
     "dissimilarity": (
-        ("ANOSIM_R", "down"),
+        ("ANOSIM R", "down"),
     ),
     "permanova": (
         ("R²", "down"),
@@ -430,15 +430,15 @@ _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
         ("Alignment Score", "up"),
     ),
     "ebm": (
-        ("EBM", "up"),
+        ("Entropy score", "up"),
     ),
     "silhouette": (
-        ("Silhouette", "up"),
+        ("Silhouette score", "up"),
     ),
 }
 
 _DETAIL_COLUMN_ALLOWLIST: Dict[str, Set[str]] = {
-    "nmds": {"method", "nmds_stress"},
+    "nmds": {"method", "nmds stress"},
 }
 
 # NMDS assessment tables no longer carry a Geometry column, but we still want to show the
@@ -1273,7 +1273,8 @@ def _load_info_table_for_key(
         for column_name, trend in trend_spec:
             idx = header_lookup.get(column_name.lower())
             arrow = arrow_map.get(trend.lower(), "↔")
-            display = f"{column_name} {arrow}"
+            display_name = _display_column_name(column_name) or column_name
+            display = f"{display_name} {arrow}"
             _append_column(idx, display, column_name)
 
         for idx, column_name in enumerate(header):
@@ -1942,7 +1943,9 @@ def _safe_float(value: Optional[str]) -> Optional[float]:
 def _display_column_name(name: str) -> str:
     if name is None:
         return ""
-    cleaned = str(name).replace("_", " ")
+    raw_name = str(name)
+
+    cleaned = raw_name.replace("_", " ")
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
 
     ait_pattern = re.compile(r"\b(aitchison|ait|clr)\b", re.IGNORECASE)
