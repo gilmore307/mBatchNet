@@ -27,7 +27,7 @@ from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
 from _5_assessment import assessment_layout, register_pre_post_callbacks
 from _6_correction import correction_layout, register_correction_callbacks
-from _7_description import HELP_MODAL_SECTIONS
+from _7_description import HELP_MODAL_SECTIONS, HELP_SECTION_TOC
 
 
 app: Dash = dash.Dash(
@@ -35,7 +35,7 @@ app: Dash = dash.Dash(
     external_stylesheets=[dbc.themes.FLATLY],
     suppress_callback_exceptions=True,
 )
-app.title = "Batch-Effect Explorer"
+app.title = "mBatchNet"
 server = app.server
 sock = Sock(server)
 
@@ -76,6 +76,7 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-ws-status", storage_type="memory", data=None),
             dcc.Store(id="runlog-unread", storage_type="session", data=False),
             dcc.Store(id="runlog-last-seen", storage_type="memory", data=None),
+            dcc.Store(id="help-scroll-target", storage_type="memory", data=None),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -111,8 +112,76 @@ def serve_layout() -> html.Div:
                 [
                     dbc.ModalHeader(dbc.ModalTitle("Help")),
                     dbc.ModalBody(
-                        html.Div(HELP_MODAL_SECTIONS, id="help-modal-content")
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.Div(
+                                        [
+                                            html.H6("Jump to section", className="mb-3"),
+                                            html.Ul(
+                                                [
+                                                    html.Li(
+                                                        [
+                                                            dbc.Button(
+                                                                toc_item["title"],
+                                                                id={"type": "help-toc-link", "id": toc_item["id"]},
+                                                                color="link",
+                                                                className="p-0 text-start w-100 text-decoration-none fw-semibold",
+                                                                n_clicks=0,
+                                                            ),
+                                                            html.Ul(
+                                                                [
+                                                                    html.Li(
+                                                                        dbc.Button(
+                                                                            child["title"],
+                                                                            id={
+                                                                                "type": "help-toc-link",
+                                                                                "id": child["id"],
+                                                                            },
+                                                                            color="link",
+                                                                            className="p-0 text-start w-100 text-decoration-none small",
+                                                                            n_clicks=0,
+                                                                        ),
+                                                                        className="mb-1",
+                                                                    )
+                                                                    for child in toc_item.get("children", [])
+                                                                ],
+                                                                className="list-unstyled ms-3 mt-2 mb-2",
+                                                            )
+                                                            if toc_item.get("children")
+                                                            else None,
+                                                        ],
+                                                        className="mb-3",
+                                                    )
+                                                    for toc_item in HELP_SECTION_TOC
+                                                ],
+                                                className="list-unstyled mb-0",
+                                            ),
+                                        ],
+                                        style={"maxHeight": "70vh", "overflowY": "auto"},
+                                        className="pe-2",
+                                    ),
+                                    width=3,
+                                    className="pe-3 position-sticky align-self-start",
+                                    style={"top": 0},
+                                ),
+                                dbc.Col(
+                                    html.Div(
+                                        HELP_MODAL_SECTIONS,
+                                        id="help-modal-content",
+                                        style={"maxHeight": "70vh", "overflowY": "auto"},
+                                        className="pe-2",
+                                    ),
+                                    width=9,
+                                ),
+                            ],
+                            className="g-4",
+                            style={"maxHeight": "70vh"},
+                        ),
+                        id="help-modal-body",
+                        style={"maxHeight": "70vh", "overflow": "hidden"},
                     ),
+
                     dbc.ModalFooter(
                         dbc.Button("Close", id="help-close", color="secondary")
                     ),
@@ -123,6 +192,9 @@ def serve_layout() -> html.Div:
                 size="xl",
                 scrollable=True,
             ),
+
+            # Anchor scroll feedback element
+            html.Div(id="help-scroll-ack", style={"display": "none"}),
 
             # Run log modal
             dbc.Modal(
@@ -395,6 +467,19 @@ def toggle_help_modal(open_clicks_list, close_clicks, help_shown):
     raise dash.exceptions.PreventUpdate
 
 
+@app.callback(
+    Output("help-scroll-target", "data"),
+    Input({"type": "help-toc-link", "id": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def trigger_help_scroll(toc_clicks):
+    ctx = getattr(dash, "ctx", dash.callback_context)
+    trigger_id = ctx.triggered_id
+    if isinstance(trigger_id, dict) and trigger_id.get("type") == "help-toc-link":
+        return trigger_id.get("id")
+    raise dash.exceptions.PreventUpdate
+
+
 # Highlight next-step nav button when user can proceed
 @app.callback(
     Output(NAV_ID_MAP["/"], "color"), Output(NAV_ID_MAP["/"], "outline"),
@@ -585,6 +670,35 @@ def stream_runlog(ws):
             except Exception:
                 pass
             break
+
+
+app.clientside_callback(
+    """
+    function(targetId) {
+        if (!targetId) {
+            return window.dash_clientside.no_update;
+        }
+    var container = document.getElementById('help-modal-content');
+        var el = document.getElementById(targetId);
+        if (!container || !el) {
+            return window.dash_clientside.no_update;
+        }
+        window.requestAnimationFrame(function() {
+            var top = el.offsetTop;
+            var parent = el.offsetParent;
+            while (parent && parent !== container) {
+                top += parent.offsetTop;
+                parent = parent.offsetParent;
+            }
+            var targetTop = top - (container.offsetTop || 0);
+            container.scrollTo({ top: targetTop, behavior: "smooth" });
+        });
+        return "";
+    }
+    """,
+    Output("help-scroll-ack", "children"),
+    Input("help-scroll-target", "data"),
+)
 
 
 app.clientside_callback(

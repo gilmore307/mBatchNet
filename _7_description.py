@@ -4,6 +4,45 @@ from typing import Dict, List
 from dash import html
 
 
+HELP_SECTION_TOC: List[Dict[str, str]] = [
+    {"id": "help-overview", "title": "Overview"},
+    {
+        "id": "help-upload",
+        "title": "Upload Files",
+        "children": [
+            {"id": "help-upload-manual", "title": "Manual upload"},
+            {"id": "help-upload-example", "title": "Example dataset"},
+            {"id": "help-upload-mosaic", "title": "Mosaic plot"},
+        ],
+    },
+    {
+        "id": "help-correction",
+        "title": "Batch Effect Correction",
+        "children": [
+            {"id": "help-correction-table", "title": "Table columns"},
+            {"id": "help-correction-run", "title": "Running corrections"},
+        ],
+    },
+    {
+        "id": "help-assessment",
+        "title": "Assessment (Pre & Post)",
+        "children": [
+            {"id": "help-assessment-alignment", "title": "Alignment score"},
+            {"id": "help-assessment-pca", "title": "PCA ordination"},
+            {"id": "help-assessment-pcoa", "title": "PCoA ordination"},
+            {"id": "help-assessment-nmds", "title": "NMDS ordination"},
+            {"id": "help-assessment-heatmap", "title": "Dissimilarity heatmaps"},
+            {"id": "help-assessment-permanova", "title": "PERMANOVA"},
+            {"id": "help-assessment-anova", "title": "Per-feature ANOVA"},
+            {"id": "help-assessment-rda", "title": "Partial RDA"},
+            {"id": "help-assessment-pvca", "title": "PVCA"},
+            {"id": "help-assessment-ebm", "title": "Entropy batch mixing"},
+            {"id": "help-assessment-silhouette", "title": "UMAP silhouette"},
+        ],
+    },
+]
+
+
 HELP_MODAL_SECTIONS: List = [
     html.Div(
         [
@@ -14,6 +53,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-4",
+        id="help-overview",
     ),
     html.Div(
         [
@@ -23,7 +63,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Manual upload", className="mb-2 mt-3"),
+                    html.H5("Manual upload", className="mb-2 mt-3", id="help-upload-manual"),
                     html.Ul(
                         [
                             html.Li(
@@ -44,7 +84,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Example dataset", className="mb-2 mt-4"),
+                    html.H5("Example dataset", className="mb-2 mt-4", id="help-upload-example"),
                     html.Ul(
                         [
                             html.Li(
@@ -59,7 +99,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Mosaic plot", className="mb-2 mt-4"),
+                    html.H5("Mosaic plot", className="mb-2 mt-4", id="help-upload-mosaic"),
                     html.P(
                         "The mosaic plot cross-tabulates the Batch and target mappings so you "
                         "can confirm how many samples fall into each batch/label combination "
@@ -70,6 +110,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-4",
+        id="help-upload",
     ),
     html.Div(
         [
@@ -77,56 +118,62 @@ HELP_MODAL_SECTIONS: List = [
             html.P(
                 "Select one or more correction strategies to run on the uploaded data."
             ),
-            html.Ul(
+            html.Div(
                 [
-                    html.Li(
+                    html.H5("Table columns", className="mb-2 mt-3", id="help-correction-table"),
+                    html.Ul(
                         [
-                            "Table columns:",
-                            html.Ul(
-                                [
-                                    html.Li(
-                                        "Methods lists each available algorithm so you can scan the "
-                                        "options alongside their references. Expand the accordion on "
-                                        "each method to review parameter presets before launching."
-                                    ),
-                                    html.Li(
-                                        "Time (s) shows how long each method took to run in the current session "
-                                        "so you can monitor performance without relying on prior sessions."
-                                    ),
-                                    html.Li(
-                                        "Status shows whether that method already has outputs stored for "
-                                        "the current session."
-                                    ),
-                                    html.Li(
-                                        "Run Correction launches the job. The button disables itself after results are saved."
-                                    ),
-                                    html.Li(
-                                        "Delete removes the stored outputs so you can re-run the method "
-                                        "with different settings. This action only affects the selected "
-                                        "method, while other results remain intact."
-                                    ),
-                                    html.Li(
-                                        "Citation links to the publication or documentation for the "
-                                        "selected method."
-                                    ),
-                                ],
-                                className="mt-2",
+                            html.Li(
+                                "Methods lists each available algorithm so you can scan the "
+                                "options alongside their references. Expand the accordion on "
+                                "each method to review parameter presets before launching."
+                            ),
+                            html.Li(
+                                "Time (s) shows how long each method took to run in the current session "
+                                "so you can monitor performance without relying on prior sessions."
+                            ),
+                            html.Li(
+                                "Status shows whether that method already has outputs stored for "
+                                "the current session."
+                            ),
+                            html.Li(
+                                "Run Correction launches the job. The button disables itself after results are saved."
+                            ),
+                            html.Li(
+                                "Delete removes the stored outputs so you can re-run the method "
+                                "with different settings. This action only affects the selected "
+                                "method, while other results remain intact."
+                            ),
+                            html.Li(
+                                "Citation links to the publication or documentation for the "
+                                "selected method."
+                            ),
+                        ],
+                        className="mt-2",
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Running corrections", className="mb-2 mt-4", id="help-correction-run"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Jobs run sequentially and stream status updates to the run log. You can "
+                                "re-open the log modal while methods are running to watch the process in real time."
+                            ),
+                            html.Li(
+                                "Once a method completes, its corrected matrix is stored for the "
+                                "post-correction assessments and final download bundle. Use \"Download "
+                                "results\" to export intermediate corrections at any time."
                             ),
                         ]
-                    ),
-                    html.Li(
-                        "Jobs run sequentially and stream status updates to the run log. You can "
-                        "re-open the log modal while methods are running to watch the process in real time."
-                    ),
-                    html.Li(
-                        "Once a method completes, its corrected matrix is stored for the "
-                        "post-correction assessments and final download bundle. Use \"Download "
-                        "results\" to export intermediate corrections at any time."
                     ),
                 ]
             ),
         ],
         className="mb-4",
+        id="help-correction",
     ),
     html.Div(
         [
@@ -164,7 +211,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Alignment score", className="mb-2 mt-4"),
+                    html.H5("Alignment score", className="mb-2 mt-4", id="help-assessment-alignment"),
                     html.Ul(
                         [
                             html.Li(
@@ -184,7 +231,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("PCA ordination", className="mb-2 mt-4"),
+                    html.H5("PCA ordination", className="mb-2 mt-4", id="help-assessment-pca"),
                     html.Ul(
                         [
                             html.Li(
@@ -219,7 +266,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("PCoA ordination", className="mb-2 mt-4"),
+                    html.H5("PCoA ordination", className="mb-2 mt-4", id="help-assessment-pcoa"),
                     html.Ul(
                         [
                             html.Li(
@@ -252,7 +299,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("NMDS ordination", className="mb-2 mt-4"),
+                    html.H5("NMDS ordination", className="mb-2 mt-4", id="help-assessment-nmds"),
                     html.Ul(
                         [
                             html.Li(
@@ -288,7 +335,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Dissimilarity heatmaps", className="mb-2 mt-4"),
+                    html.H5("Dissimilarity heatmaps", className="mb-2 mt-4", id="help-assessment-heatmap"),
                     html.Ul(
                         [
                             html.Li(
@@ -312,7 +359,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("PERMANOVA", className="mb-2 mt-4"),
+                    html.H5("PERMANOVA", className="mb-2 mt-4", id="help-assessment-permanova"),
                     html.Ul(
                         [
                             html.Li(
@@ -333,7 +380,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Per-feature ANOVA (Median R²)", className="mb-2 mt-4"),
+                    html.H5("Per-feature ANOVA (Median R²)", className="mb-2 mt-4", id="help-assessment-anova"),
                     html.Ul(
                         [
                             html.Li(
@@ -358,7 +405,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Partial RDA", className="mb-2 mt-4"),
+                    html.H5("Partial RDA", className="mb-2 mt-4", id="help-assessment-rda"),
                     html.Ul(
                         [
                             html.Li(
@@ -394,7 +441,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("PVCA", className="mb-2 mt-4"),
+                    html.H5("PVCA", className="mb-2 mt-4", id="help-assessment-pvca"),
                     html.Ul(
                         [
                             html.Li(
@@ -426,7 +473,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("Entropy batch mixing (EBM)", className="mb-2 mt-4"),
+                    html.H5("Entropy batch mixing (EBM)", className="mb-2 mt-4", id="help-assessment-ebm"),
                     html.Ul(
                         [
                             html.Li(
@@ -443,7 +490,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
             html.Div(
                 [
-                    html.H5("UMAP silhouette", className="mb-2 mt-4"),
+                    html.H5("UMAP silhouette", className="mb-2 mt-4", id="help-assessment-silhouette"),
                     html.Ul(
                         [
                             html.Li(
@@ -462,6 +509,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-0",
+        id="help-assessment",
     ),
 ]
 
