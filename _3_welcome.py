@@ -35,8 +35,8 @@ def welcome_layout(active_path: str):
                                                 ),
                                                 dbc.Button(
                                                     [html.I(className="bi bi-collection-play me-2"), "Try sample workflow"],
-                                                    color="secondary",
-                                                    outline=True,
+                                                    color="primary",
+                                                    outline=False,
                                                     href="/upload?tab=example",
                                                     size="lg",
                                                 ),
@@ -85,7 +85,7 @@ def welcome_layout(active_path: str):
                                                     html.Li("No installation required; everything runs in the browser."),
                                                     html.Li("Interactive figures with shareable links for collaboration."),
                                                     html.Li("Multiple correction methods with transparent defaults."),
-                                                    html.Li("Session privacy: uploads stay within your session and are cleared when you finish."),
+                                                    html.Li("Exportable figures and tables ready to drop into manuscripts or reports."),
                                                 ]
                                             )
                                         ),
@@ -103,17 +103,16 @@ def welcome_layout(active_path: str):
                                         dbc.CardBody(
                                             [
                                                 html.P(
-                                                    "We follow the NAR Web Server Issue requirements for web browsers: "
-                                                    "we use the HTTPS protocol on the standard port (443) and do not use "
-                                                    "cookies, so no consent banner is required."
+                                                    "All traffic is served over HTTPS (port 443) with no third-party "
+                                                    "trackers or cookies, so consent banners are unnecessary."
                                                 ),
                                                 html.P(
-                                                    "Sample data are provided for immediate use, and rich outputs "
-                                                    "(hyperlinks and visualisations) accompany every step."
+                                                    "Uploads stay confined to your live session and are discarded when "
+                                                    "you finish working."
                                                 ),
                                                 html.P(
-                                                    "We keep sessions self-contained: data, figures, and logs live only "
-                                                    "while you are working and are discarded when the session ends."
+                                                    "We avoid cross-origin data sharing; nothing is retained or shared "
+                                                    "outside your browser."
                                                 ),
                                             ],
                                         ),
@@ -196,49 +195,47 @@ def welcome_layout(active_path: str):
                                 [
                                     dbc.CardHeader([html.I(className="bi bi-info-circle me-2"), "Helpful resources"]),
                                     dbc.CardBody(
-                                        [
-                                            html.Ul(
-                                                [
-                                                    html.Li("Built-in tooltips explain parameters inline as you work."),
-                                                    html.Li("Downloadable tables accompany each plot for transparent reporting."),
+                                            [
+                                                html.Ul(
+                                                    [
+                                                        html.Li("Built-in tooltips explain parameters inline as you work."),
+                                                        html.Li("Downloadable tables accompany each plot for transparent reporting."),
                                                     html.Li("Session-specific logs track progress for reproducibility."),
+                                                    html.Li(
+                                                        "Help pages and tutorials link to interactive examples so you can "
+                                                        "see how to interpret outputs."
+                                                    ),
                                                 ]
                                             ),
                                             dbc.Button(
                                                 [html.I(className="bi bi-question-circle me-2"), "Help page"],
                                                 id="help-open-resources",
-                                                color="secondary",
-                                                outline=True,
+                                                color="primary",
+                                                outline=False,
                                                 className="mt-3",
-                                                size="sm",
                                             ),
                                         ]
                                     ),
                                 ],
-                                className="h-100 shadow-sm",
+                                    className="h-100 shadow-sm",
+                                ),
+                                md=6,
+                                className="mb-4",
                             ),
-                            md=6,
-                            className="mb-4",
-                        ),
                             dbc.Col(
                                 dbc.Card(
                                     [
-                                        dbc.CardHeader([html.I(className="bi bi-lock me-2"), "NAR compliance highlights"]),
+                                        dbc.CardHeader([html.I(className="bi bi-file-earmark-code me-2"), "Template script"]),
                                         dbc.CardBody(
                                             [
                                                 html.P(
-                                                    "All uploads remain private within your browser session and are not "
-                                                    "shared or retained once your work is complete."
-                                                ),
-                                                html.P(
-                                                    "Help pages and tutorials include links to sample output that performs "
-                                                    "interactively in the same way as real output, so you can see how to "
-                                                    "interpret results."
+                                                    "Jump-start local analyses with the companion template script that "
+                                                    "mirrors the web workflow."
                                                 ),
                                                 dbc.Button(
                                                     [html.I(className="bi bi-github me-2"), "Template script on GitHub"],
-                                                    color="secondary",
-                                                    outline=True,
+                                                    color="primary",
+                                                    outline=False,
                                                     href="https://github.com/gilmore307/Batch-Effect-Correction",
                                                     target="_blank",
                                                 ),
