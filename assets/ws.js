@@ -66,4 +66,59 @@
   };
 
   window.addEventListener('beforeunload', closeSocket);
+
+  const statusSockets = {};
+
+  function statusKey(stage, key) {
+    return stage + '::' + key;
+  }
+
+  window.handleStatusSocket = function(sessionId, stage, key, triggerId, runState) {
+    const mapKey = statusKey(stage, key);
+    const shouldRun = sessionId && runState && runState.status === 'running';
+    const entry = statusSockets[mapKey];
+
+    if (!shouldRun) {
+      if (entry && entry.socket) {
+        try { entry.socket.close(); } catch (e) {}
+      }
+      delete statusSockets[mapKey];
+      return { connected: false };
+    }
+
+    if (entry && entry.sessionId === sessionId &&
+        (entry.socket.readyState === 0 || entry.socket.readyState === 1)) {
+      return { connected: true };
+    }
+
+    if (entry && entry.socket) {
+      try { entry.socket.close(); } catch (e) {}
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const url = protocol + window.location.host + '/ws/status?session=' +
+      encodeURIComponent(sessionId) + '&stage=' + encodeURIComponent(stage) +
+      '&key=' + encodeURIComponent(key);
+
+    const sock = new WebSocket(url);
+    statusSockets[mapKey] = { socket: sock, sessionId: sessionId };
+
+    sock.onmessage = function(evt) {
+      const target = document.getElementById(triggerId);
+      if (!target) { return; }
+      target.value = evt.data || '';
+      const ev = new Event('input', { bubbles: true });
+      target.dispatchEvent(ev);
+    };
+
+    sock.onclose = function() {
+      const target = document.getElementById(triggerId);
+      if (!target) { return; }
+      target.value = '';
+      const ev = new Event('input', { bubbles: true });
+      target.dispatchEvent(ev);
+    };
+
+    return { connected: true };
+  };
 })();

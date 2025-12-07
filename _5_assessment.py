@@ -1,6 +1,7 @@
 ﻿# ===============================
 # File: _5_assessment.py
 # ===============================
+import json
 import threading
 from pathlib import Path
 
@@ -535,11 +536,14 @@ def assessment_layout(active_path: str, stage: str):
                             storage_type="session",
                         ),
                         dcc.Store(id=f"{stage}-{key}-run-state", storage_type="session"),
-                        dcc.Interval(
-                            id=f"{stage}-{key}-poll-interval",
-                            interval=2000,
-                            n_intervals=0,
-                            disabled=True,
+                        dcc.Store(
+                            id=f"{stage}-{key}-status-connection",
+                            storage_type="memory",
+                        ),
+                        dcc.Input(
+                            id=f"{stage}-{key}-status-trigger",
+                            type="hidden",
+                            value="",
                         ),
                         *(controls or []),
                         html.Div(
@@ -649,13 +653,7 @@ def register_pre_post_callbacks(app):
             Output("runlog-modal", "is_open", allow_duplicate=True),
         ])
         outputs.append(Output(f"{sid}-param-store", "data", allow_duplicate=True))
-        outputs.extend(
-            [
-                Output(f"{sid}-poll-interval", "disabled", allow_duplicate=True),
-                Output(f"{sid}-poll-interval", "n_intervals", allow_duplicate=True),
-                Output(f"{sid}-run-state", "data", allow_duplicate=True),
-            ]
-        )
+        outputs.append(Output(f"{sid}-run-state", "data", allow_duplicate=True))
         outputs.append(Output(run_id, "disabled", allow_duplicate=True))
         # Parameter States by group
         states: list = [State("session-id", "data")]
@@ -747,7 +745,7 @@ def register_pre_post_callbacks(app):
         @app.callback(
             *outputs,
             Input(run_id, "n_clicks"),
-            Input(f"{sid}-poll-interval", "n_intervals"),
+            Input(f"{sid}-status-trigger", "value"),
             *states,
             State(refresh_token_id, "data"),
             State(f"{sid}-run-state", "data"),
@@ -755,7 +753,7 @@ def register_pre_post_callbacks(app):
         )
         def _run_one(
             n_clicks: int,
-            poll_ticks: int,
+            ws_payload: str,
             *values,
             _stage=stage,
             _key=key,
@@ -788,8 +786,6 @@ def register_pre_post_callbacks(app):
                 log_meta=dash.no_update,
                 modal_open=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=True,
-                poll_count=dash.no_update,
                 run_state_value=dash.no_update,
                 run_button_disabled=dash.no_update,
             ):
@@ -801,8 +797,6 @@ def register_pre_post_callbacks(app):
                     log_meta,
                     modal_open,
                     param_store,
-                    poll_disabled,
-                    poll_count,
                     run_state_value,
                     run_button_disabled,
                 )
@@ -810,13 +804,12 @@ def register_pre_post_callbacks(app):
                 message = html.Div("Session not initialised.")
                 if _stage == "pre":
                     return _output(
-                        message, dash.no_update, True, poll_disabled=True, run_button_disabled=False
+                        message, dash.no_update, True, run_button_disabled=False
                     )
                 return _output(
                     message,
                     dash.no_update,
                     dash.no_update,
-                    poll_disabled=True,
                     run_button_disabled=False,
                 )
 
@@ -825,30 +818,17 @@ def register_pre_post_callbacks(app):
                 message = html.Div("Upload both raw.csv and metadata.csv first.")
                 if _stage == "pre":
                     return _output(
-                        message, dash.no_update, True, poll_disabled=True, run_button_disabled=False
+                        message, dash.no_update, True, run_button_disabled=False
                     )
                 return _output(
                     message,
                     dash.no_update,
                     dash.no_update,
-                    poll_disabled=True,
                     run_button_disabled=False,
                 )
 
             expected_files = _expected_figure_files(_stage, _key)
             log_path = session_dir / "run.log"
-
-            if trigger_id == f"{sid}-poll-interval":
-                # Ignore background polling if we never initiated a run for this tab or if
-                # this response is older than a later poll we've already handled.
-                if not run_state_value:
-                    raise dash.exceptions.PreventUpdate
-                if isinstance(run_state_value, dict):
-                    latest_poll = run_state_value.get("latest_poll")
-                    if latest_poll is not None and poll_ticks < latest_poll:
-                        raise dash.exceptions.PreventUpdate
-                    if run_state_value.get("status") == "complete":
-                        raise dash.exceptions.PreventUpdate
 
             if trigger_id == run_id:
                 # Build CLI flags from parameters
@@ -933,18 +913,23 @@ def register_pre_post_callbacks(app):
                     log_path_value=str(log_path),
                     log_meta=log_file_meta(log_path),
                     modal_open=dash.no_update,
-                    poll_disabled=False,
-                    poll_count=0,
-                    run_state_value={"status": "running", "latest_poll": 0},
+                    run_state_value={"status": "running"},
                     run_button_disabled=True,
                 )
 
-            # Polling branch
-            files_ready, ready_count, total_expected = _assessment_outputs_status(
-                session_dir, expected_files, log_path=log_path
-            )
+            # WebSocket progress branch
+            if not ws_payload:
+                raise dash.exceptions.PreventUpdate
 
-            if not files_ready:
+            try:
+                payload = json.loads(ws_payload)
+            except Exception:
+                raise dash.exceptions.PreventUpdate
+
+            status_flag = payload.get("status")
+            ready_count = payload.get("ready")
+            total_expected = payload.get("total")
+            if status_flag != "complete":
                 progress = (
                     f"Waiting for output files ({ready_count}/{total_expected})..."
                     if total_expected
@@ -962,12 +947,7 @@ def register_pre_post_callbacks(app):
                     dash.no_update,
                     dash.no_update,
                     param_store=persisted_payload,
-                    poll_disabled=dash.no_update,
-                    poll_count=dash.no_update,
-                    run_state_value={
-                        "status": "running",
-                        "latest_poll": poll_ticks,
-                    },
+                    run_state_value={"status": "running", "ready": ready_count},
                     run_button_disabled=dash.no_update,
                 )
 
@@ -1005,12 +985,7 @@ def register_pre_post_callbacks(app):
                     True if _stage == "pre" else dash.no_update,
                     log_path_value=str(log_path),
                     log_meta=log_file_meta(log_path),
-                    poll_disabled=True,
-                    poll_count=0,
-                    run_state_value={
-                        "status": "complete",
-                        "latest_poll": poll_ticks,
-                    },
+                    run_state_value={"status": "complete"},
                     run_button_disabled=False,
                 )
             stage_flag = True if _stage == "pre" else dash.no_update
@@ -1023,12 +998,7 @@ def register_pre_post_callbacks(app):
                 log_meta=log_file_meta(log_path),
                 modal_open=dash.no_update,
                 param_store=persisted_payload,
-                poll_disabled=True,
-                poll_count=0,
-                run_state_value={
-                    "status": "complete",
-                    "latest_poll": poll_ticks,
-                },
+                run_state_value={"status": "complete"},
                 run_button_disabled=False,
             )
 
@@ -1049,6 +1019,27 @@ def register_pre_post_callbacks(app):
                     else:
                         restored.append(dash.no_update)
                 return restored
+
+        app.clientside_callback(
+            """
+            function(runState, sessionId) {
+                if (!window.handleStatusSocket) {
+                    return window.dash_clientside.no_update;
+                }
+                return window.handleStatusSocket(
+                    sessionId,
+                    "%s",
+                    "%s",
+                    "%s",
+                    runState || {}
+                );
+            }
+            """
+            % (stage, key, f"{sid}-status-trigger"),
+            Output(f"{sid}-status-connection", "data"),
+            Input(f"{sid}-run-state", "data"),
+            State("session-id", "data"),
+        )
 
         # Update subtab content when user clicks a subtab (after results are rendered)
         @app.callback(

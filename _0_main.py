@@ -8,6 +8,7 @@ import shutil
 import zipfile
 import tempfile
 import time
+import json
 
 import dash
 from dash import Dash, dcc, html
@@ -25,7 +26,12 @@ from _2_utils import (
 )
 from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
-from _5_assessment import assessment_layout, register_pre_post_callbacks
+from _5_assessment import (
+    assessment_layout,
+    register_pre_post_callbacks,
+    _assessment_outputs_status,
+    _expected_figure_files,
+)
 from _6_correction import correction_layout, register_correction_callbacks
 from _7_description import HELP_MODAL_SECTIONS, HELP_SECTION_TOC
 
@@ -669,6 +675,65 @@ def stream_runlog(ws):
                 ws.send(f"[stream error] {exc}\n")
             except Exception:
                 pass
+            break
+
+
+@sock.route("/ws/status")
+def stream_status(ws):
+    session_id = request.args.get("session")
+    stage = request.args.get("stage")
+    key = request.args.get("key")
+
+    if not session_id or stage not in {"pre", "post"} or not key:
+        try:
+            ws.send(json.dumps({"status": "error", "message": "Invalid parameters"}))
+        finally:
+            return
+
+    try:
+        session_dir = get_session_dir(session_id)
+    except Exception:
+        session_dir = None
+
+    if not session_dir:
+        try:
+            ws.send(json.dumps({"status": "error", "message": "Invalid session"}))
+        finally:
+            return
+
+    expected_files = _expected_figure_files(stage, key)
+    log_path = session_dir / "run.log"
+    last_ready: int | None = None
+
+    if not expected_files:
+        _send_status("complete", 0, 0)
+        return
+
+    def _send_status(status: str, ready: int, total: int) -> None:
+        try:
+            ws.send(json.dumps({"status": status, "ready": ready, "total": total}))
+        except Exception:
+            pass
+
+    while True:
+        try:
+            if getattr(ws, "closed", False):
+                break
+
+            files_ready, ready_count, total_expected = _assessment_outputs_status(
+                session_dir, expected_files, log_path=log_path
+            )
+
+            if ready_count != last_ready:
+                last_ready = ready_count
+                _send_status("running", ready_count, total_expected)
+
+            if files_ready:
+                _send_status("complete", ready_count, total_expected)
+                break
+
+            time.sleep(0.5)
+        except Exception:
             break
 
 
