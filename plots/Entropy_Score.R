@@ -218,7 +218,7 @@ batch_entropy_mixing_knn <- function(
 }
 
 summarise_methods_ebm <- function(ebm_table) {
-  ebm_table %>% filter(is.finite(EBM))
+  ebm_table %>% filter(is.finite(`Entropy score`))
 }
 
 pretty_metric <- function(m) {
@@ -229,7 +229,7 @@ pretty_metric <- function(m) {
 }
 
 # --------- Compute EBM per CLR matrix ---------
-ebm_tbl <- tibble(Method = character(), EBM = numeric())
+ebm_tbl <- tibble(Method = character(), `Entropy score` = numeric())
 
 for (nm in names(file_list)) {
   cat("Processing:", nm, "\n")
@@ -270,10 +270,10 @@ for (nm in names(file_list)) {
     ),
     error = function(e) NULL
   )
-  if (is.null(out)) { warning(sprintf("Skipping %s: EBM failed.", nm)); next }
+  if (is.null(out)) { warning(sprintf("Skipping %s: Entropy score failed.", nm)); next }
   
   m  <- out$mean_entropy
-  ebm_tbl <- bind_rows(ebm_tbl, tibble(Method = nm, EBM = m))
+  ebm_tbl <- bind_rows(ebm_tbl, tibble(Method = nm, `Entropy score` = m))
 }
 
 # --------- Save/plot with special handling for baseline-only ---------
@@ -282,18 +282,18 @@ output_name <- if (only_baseline) "ebm_raw_assessment_pre.csv" else "ebm_raw_ass
 
 if (only_baseline) {
   base_row <- ebm_tbl %>% filter(Method == "Before correction")
-  if (nrow(base_row) == 0) stop("No EBM computed for 'Before correction'.")
+  if (nrow(base_row) == 0) stop("No Entropy score computed for 'Before correction'.")
   
   base_summary <- summarise_methods_ebm(base_row)
   readr::write_csv(base_summary, file.path(output_folder, output_name))
   print(base_summary)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
-  y_max <- max(plot_df$EBM, na.rm = TRUE)
+  y_max <- max(plot_df$`Entropy score`, na.rm = TRUE)
   y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
-  p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +
+  p_ebm <- ggplot(plot_df, aes(x = Method, y = `Entropy score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", EBM)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Entropy score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Entropy Score (baseline)",
@@ -322,11 +322,11 @@ if (only_baseline) {
   print(ebm_summary, n = nrow(ebm_summary))
   
   plot_df <- ebm_tbl %>% mutate(Method = factor(Method, levels = method_levels))
-  y_max <- max(plot_df$EBM, na.rm = TRUE)
+  y_max <- max(plot_df$`Entropy score`, na.rm = TRUE)
   y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
-  p_ebm <- ggplot(plot_df, aes(x = Method, y = EBM, fill = Method)) +
+  p_ebm <- ggplot(plot_df, aes(x = Method, y = `Entropy score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", EBM)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Entropy score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Entropy Score",
