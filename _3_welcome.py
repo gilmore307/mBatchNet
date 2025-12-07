@@ -209,7 +209,7 @@ def welcome_layout(active_path: str):
                                             ),
                                             dbc.Button(
                                                 [html.I(className="bi bi-question-circle me-2"), "Help page"],
-                                                id="help-open-resources",
+                                                id={"type": "help-open-trigger", "source": "resources"},
                                                 color="primary",
                                                 outline=False,
                                                 className="mt-3",
