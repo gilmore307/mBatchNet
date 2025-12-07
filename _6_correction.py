@@ -550,11 +550,11 @@ def register_correction_callbacks(app):
                 id={"type": "method-config-toggle", "code": code},
                 color=button_color(False),
                 size="sm",
-                className="w-100",
+                style={"width": "200px"},
                 n_clicks=0,
             )
             toggle_cell = html.Td(
-                html.Div(toggle_button, className="d-flex"),
+                html.Div(toggle_button, className="d-flex justify-content-center"),
                 className="text-center",
                 style=_CONFIG_COLUMN_WIDTH,
             )
