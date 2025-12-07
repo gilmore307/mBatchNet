@@ -85,7 +85,7 @@ def welcome_layout(active_path: str):
                                                     html.Li("No installation required; everything runs in the browser."),
                                                     html.Li("Multiple correction methods with transparent defaults."),
                                                     html.Li("Exportable figures and tables ready to drop into manuscripts or reports."),
-                                                    html.Li("结果可下载"),
+                                                    html.Li("Results are downloadable."),
                                                 ]
                                             )
                                         ),
