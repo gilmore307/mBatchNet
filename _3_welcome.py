@@ -37,7 +37,7 @@ def welcome_layout(active_path: str):
                                                     [html.I(className="bi bi-collection-play me-2"), "Try sample workflow"],
                                                     color="secondary",
                                                     outline=True,
-                                                    href="/upload",
+                                                    href="/upload?tab=example",
                                                     size="lg",
                                                 ),
                                             ],
@@ -103,8 +103,13 @@ def welcome_layout(active_path: str):
                                         dbc.CardBody(
                                             [
                                                 html.P(
-                                                    "We follow NAR Web Server guidelines: HTTPS access, example data, "
-                                                    "and rich outputs at every step."
+                                                    "We follow the NAR Web Server Issue requirements for web browsers: "
+                                                    "we use the HTTPS protocol on the standard port (443) and do not use "
+                                                    "cookies, so no consent banner is required."
+                                                ),
+                                                html.P(
+                                                    "Sample data are provided for immediate use, and rich outputs "
+                                                    "(hyperlinks and visualisations) accompany every step."
                                                 ),
                                                 html.P(
                                                     "We keep sessions self-contained: data, figures, and logs live only "
@@ -187,28 +192,38 @@ def welcome_layout(active_path: str):
                     dbc.Row(
                         [
                             dbc.Col(
-                                dbc.Card(
-                                    [
-                                        dbc.CardHeader([html.I(className="bi bi-info-circle me-2"), "Helpful resources"]),
-                                        dbc.CardBody(
+                            dbc.Card(
+                                [
+                                    dbc.CardHeader([html.I(className="bi bi-info-circle me-2"), "Helpful resources"]),
+                                    dbc.CardBody(
+                                        [
                                             html.Ul(
                                                 [
                                                     html.Li("Built-in tooltips explain parameters inline as you work."),
                                                     html.Li("Downloadable tables accompany each plot for transparent reporting."),
                                                     html.Li("Session-specific logs track progress for reproducibility."),
                                                 ]
-                                            )
-                                        ),
-                                    ],
-                                    className="h-100 shadow-sm",
-                                ),
-                                md=6,
-                                className="mb-4",
+                                            ),
+                                            dbc.Button(
+                                                [html.I(className="bi bi-question-circle me-2"), "Help page"],
+                                                id="help-open-resources",
+                                                color="secondary",
+                                                outline=True,
+                                                className="mt-3",
+                                                size="sm",
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                className="h-100 shadow-sm",
                             ),
+                            md=6,
+                            className="mb-4",
+                        ),
                             dbc.Col(
                                 dbc.Card(
                                     [
-                                        dbc.CardHeader([html.I(className="bi bi-lock me-2"), "Data handling"]),
+                                        dbc.CardHeader([html.I(className="bi bi-lock me-2"), "NAR compliance highlights"]),
                                         dbc.CardBody(
                                             [
                                                 html.P(
@@ -216,8 +231,16 @@ def welcome_layout(active_path: str):
                                                     "shared or retained once your work is complete."
                                                 ),
                                                 html.P(
-                                                    "When you finish, use the Download results button in the navigation bar "
-                                                    "to save corrected outputs and logs."
+                                                    "Help pages and tutorials include links to sample output that performs "
+                                                    "interactively in the same way as real output, so you can see how to "
+                                                    "interpret results."
+                                                ),
+                                                dbc.Button(
+                                                    [html.I(className="bi bi-github me-2"), "Template script on GitHub"],
+                                                    color="secondary",
+                                                    outline=True,
+                                                    href="https://github.com/gilmore307/Batch-Effect-Correction",
+                                                    target="_blank",
                                                 ),
                                             ],
                                         ),

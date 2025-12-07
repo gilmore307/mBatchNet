@@ -489,7 +489,7 @@ build_assessment_row <- function(method, geometry, between, within, dist_obj, gr
   tibble::tibble(
     Method = method,
     Geometry = geometry,
-    ANOSIM_R = anosim_vals[["ANOSIM_R"]],
+    `ANOSIM R` = anosim_vals[["ANOSIM_R"]],
   )
 }
 

@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import shutil
 import json
+from urllib.parse import parse_qs
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import dash
@@ -374,6 +375,28 @@ def upload_layout(active_path: str):
 
 
 def register_upload_callbacks(app):
+    # Switch to Example tab when explicitly requested via URL query (?tab=example)
+    @app.callback(
+        Output("upload-tabs", "value"),
+        Input("page-url", "search"),
+        State("page-url", "pathname"),
+        State("upload-tabs", "value"),
+        prevent_initial_call=False,
+    )
+    def select_tab_from_query(search: str, pathname: str, current_tab: str):
+        # Only react on the Upload page to avoid interfering with other routes
+        if (pathname or "/").split("?", 1)[0] != "/upload":
+            raise dash.exceptions.PreventUpdate
+
+        query = (search or "").lstrip("?")
+        params = parse_qs(query)
+        desired_tab = params.get("tab", [None])[0]
+
+        if desired_tab in {"manual", "example"} and desired_tab != current_tab:
+            return desired_tab
+
+        raise dash.exceptions.PreventUpdate
+
     # Reset example-loaded when visiting Upload under a new session
     @app.callback(
         Output("example-loaded", "data", allow_duplicate=True),

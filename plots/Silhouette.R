@@ -176,7 +176,7 @@ pretty_metric <- function(m) {
 }
 
 # ---- Compute Silhouette per method ----
-sil_tbl <- tibble(Method = character(), Silhouette = numeric())
+sil_tbl <- tibble(Method = character(), `Silhouette score` = numeric())
 
 for (nm in names(file_list)) {
   cat("Processing (Silhouette):", nm, "\n")
@@ -205,7 +205,7 @@ for (nm in names(file_list)) {
   
   labs <- merged[[LABEL_COL_NAME]]
   sil  <- tryCatch(silhouette_on_umap(um, labs), error = function(e) NA_real_)
-  sil_tbl <- bind_rows(sil_tbl, tibble(Method = nm, Silhouette = sil))
+  sil_tbl <- bind_rows(sil_tbl, tibble(Method = nm, `Silhouette score` = sil))
 }
 
 # ---- Save + Plot (handle baseline-only specially; keep bar order for multi) ----
@@ -215,16 +215,16 @@ output_name <- if (only_baseline) "silhouette_raw_assessment_pre.csv" else "silh
 if (only_baseline) {
   # Baseline-only assessment: no ranking, just evaluate value and recommend correction if low
   base_row <- sil_tbl %>% filter(Method == "Before correction")
-  if (nrow(base_row) == 0) stop("No Silhouette computed for 'Before correction'.")
+  if (nrow(base_row) == 0) stop("No Silhouette score computed for 'Before correction'.")
   readr::write_csv(base_row, file.path(output_folder, output_name))
   print(base_row)
   
   plot_df <- base_row %>% mutate(Method = factor(Method, levels = method_levels))
-  y_max <- max(plot_df$Silhouette, na.rm = TRUE)
+  y_max <- max(plot_df$`Silhouette score`, na.rm = TRUE)
   y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
-  p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
+  p_sil <- ggplot(plot_df, aes(x = Method, y = `Silhouette score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Silhouette score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Silhouette Score (baseline)",
@@ -248,11 +248,11 @@ if (only_baseline) {
   print(sil_tbl, n = nrow(sil_tbl))
   
   plot_df <- sil_tbl %>% mutate(Method = factor(Method, levels = method_levels))
-  y_max <- max(plot_df$Silhouette, na.rm = TRUE)
+  y_max <- max(plot_df$`Silhouette score`, na.rm = TRUE)
   y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
-  p_sil <- ggplot(plot_df, aes(x = Method, y = Silhouette, fill = Method)) +
+  p_sil <- ggplot(plot_df, aes(x = Method, y = `Silhouette score`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", Silhouette)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = sprintf("%.3f", `Silhouette score`)), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "Silhouette Score",
