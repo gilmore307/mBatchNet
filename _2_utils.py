@@ -2671,3 +2671,81 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
+_RUNTIME_LOG_PATTERN = re.compile(r"DONE:\s*(.+?)\s*\(([-+]?\d*\.?\d+)s\)")
+_TIMESTAMP_PATTERN = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]")
+_START_PATTERN = re.compile(r"START:\s*(.+?)\s*$")
+_COMPLETED_PATTERN = re.compile(r"Method completed:\s*(.+?)\s*$")
+
+
+def extract_method_timings_from_log(session_dir: Path) -> Dict[str, float]:
+    """Parse the run log and extract elapsed seconds per correction method.
+
+    The R helper `run_method` emits lines like `✅ DONE:  ComBat (0.12s)` when a
+    method completes. We stream those messages into ``run.log`` with timestamp
+    prefixes; this function scans the log for the most recent timing entry per
+    method and returns a mapping keyed by the canonical method code.
+    """
+
+    log_path = session_dir / "run.log"
+    if not log_path.exists():
+        return {}
+
+    try:
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    timings: Dict[str, float] = {}
+    start_times: Dict[str, datetime] = {}
+    completion_times: Dict[str, datetime] = {}
+
+    for line in log_text.splitlines():
+        timestamp_match = _TIMESTAMP_PATTERN.match(line)
+        stamp: Optional[datetime] = None
+        if timestamp_match:
+            try:
+                stamp = datetime.strptime(timestamp_match.group(1), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                stamp = None
+
+        done_match = _RUNTIME_LOG_PATTERN.search(line)
+        if done_match:
+            method_name = done_match.group(1).strip()
+            elapsed_raw = done_match.group(2)
+            try:
+                elapsed = float(elapsed_raw)
+            except (TypeError, ValueError):
+                elapsed = None
+            code = _method_code_from_display(method_name)
+            if code and elapsed is not None:
+                timings[code] = elapsed
+                if stamp:
+                    completion_times[code] = stamp
+            continue
+
+        start_match = _START_PATTERN.search(line)
+        if start_match:
+            method_name = start_match.group(1).strip()
+            code = _method_code_from_display(method_name)
+            if code and stamp:
+                start_times.setdefault(code, stamp)
+            continue
+
+        completed_match = _COMPLETED_PATTERN.search(line)
+        if completed_match:
+            method_name = completed_match.group(1).strip()
+            code = _method_code_from_display(method_name)
+            if code and stamp:
+                completion_times[code] = stamp
+
+    for code in completion_times:
+        if code in timings:
+            continue
+        start_stamp = start_times.get(code)
+        end_stamp = completion_times.get(code)
+        if start_stamp and end_stamp:
+            timings[code] = max(0.0, (end_stamp - start_stamp).total_seconds())
+
+    return timings
+
+

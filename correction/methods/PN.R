@@ -186,6 +186,6 @@ run_method("PN", {
   
   # Write out the normalized table
   write_tss_clr("PN", pn_pos, "positive", "normalized_pn.csv")
-})
+}, log_name = "Percentile Normalization")
 
 finalize_method()
