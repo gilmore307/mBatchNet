@@ -59,7 +59,7 @@ def welcome_layout(active_path: str):
                                     [
                                         dbc.CardHeader([html.I(className="bi bi-rocket-takeoff me-2"), "Quick start"]),
                                         dbc.CardBody(
-                                            html.Ol(
+                                            html.Ul(
                                                 [
                                                     html.Li("Upload count matrices and metadata (or load the example dataset)."),
                                                     html.Li("Review pre-correction QC plots to spot batch effects early."),
