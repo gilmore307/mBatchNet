@@ -102,17 +102,17 @@ def welcome_layout(active_path: str):
                                         dbc.CardHeader([html.I(className="bi bi-shield-check me-2"), "Best practices"]),
                                         dbc.CardBody(
                                             [
-                                                html.P(
-                                                    "All traffic is served over HTTPS (port 443) with no third-party "
-                                                    "trackers or cookies, so consent banners are unnecessary."
+                                                html.Li(
+                                                    "All traffic is served over HTTPS (port 443) with no third-party cookies."
                                                 ),
-                                                html.P(
-                                                    "Uploads stay confined to your live session and are discarded when "
-                                                    "you finish working."
+                                                html.Li(
+                                                    "Uploads stay in your live session and are discarded when you finish working."
                                                 ),
-                                                html.P(
-                                                    "We avoid cross-origin data sharing; nothing is retained or shared "
-                                                    "outside your browser."
+                                                html.Li(
+                                                    "We avoid cross-origin data sharing; nothing is shared outside your browser."
+                                                ),
+                                                html.Li(
+                                                    "All resources and tools on this website are freely accessible to the public."
                                                 ),
                                             ],
                                         ),
@@ -199,7 +199,6 @@ def welcome_layout(active_path: str):
                                                 html.Ul(
                                                     [
                                                         html.Li("Built-in tooltips explain parameters inline as you work."),
-                                                        html.Li("Downloadable tables accompany each plot for transparent reporting."),
                                                     html.Li("Session-specific logs track progress for reproducibility."),
                                                     html.Li(
                                                         "Help pages and tutorials link to interactive examples so you can "
