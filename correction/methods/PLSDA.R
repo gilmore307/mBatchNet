@@ -26,6 +26,6 @@ run_method("PLSDA", {
     balance = balance
   )
   write_tss_clr("PLSDA", res$X.nobatch, "clr", "normalized_plsda.csv")
-})
+}, log_name = "PLSDA-batch")
 
 finalize_method()

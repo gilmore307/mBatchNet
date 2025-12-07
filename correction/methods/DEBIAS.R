@@ -106,6 +106,6 @@ run_method("DEBIAS", {
 
   dimnames(out_counts) <- dimnames(X_cnt)
   write_tss_clr("DEBIAS", out_counts, "counts", "normalized_debias.csv")
-})
+}, log_name = "DEBIAS-M")
 
 finalize_method()

@@ -21,6 +21,6 @@ run_method("QN", {
     qn_tss[i, ] <- out
   }
   write_tss_clr("QN", qn_tss, "positive", "normalized_qn.csv")
-})
+}, log_name = "Quantile Normalization")
 
 finalize_method()

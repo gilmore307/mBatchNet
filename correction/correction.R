@@ -201,13 +201,14 @@ cleanup_method_memory <- function(name = NULL) {
   invisible()
 }
 
-run_method <- function(name, expr){
-  t0 <- start_step(name)
+run_method <- function(name, expr, log_name = name){
+  log_label <- if (is.null(log_name) || !nzchar(log_name)) name else log_name
+  t0 <- start_step(log_label)
   on.exit({ cleanup_method_memory(name) }, add = TRUE)
   out <- withCallingHandlers(
     tryCatch({
       val <- force(expr)
-      ok_step(name, t0)
+      ok_step(log_label, t0)
       if (name %in% record_methods) {
         dt <- as.numeric((proc.time() - t0)["elapsed"])
         if (length(.session_summary$methods)) {
@@ -234,9 +235,9 @@ run_method <- function(name, expr){
       }
       val
     }, error = function(e){
-      fail_step(name, conditionMessage(e))
+      fail_step(log_label, conditionMessage(e))
     }),
-    warning = function(w){ warn_step(name, conditionMessage(w)) }
+    warning = function(w){ warn_step(log_label, conditionMessage(w)) }
   )
   invisible(out)
 }
