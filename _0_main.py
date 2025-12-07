@@ -115,65 +115,73 @@ def serve_layout() -> html.Div:
                         dbc.Row(
                             [
                                 dbc.Col(
-                                    [
-                                        html.H6("Jump to section", className="mb-3"),
-                                        html.Ul(
-                                            [
-                                                html.Li(
-                                                    [
-                                                        dbc.Button(
-                                                            toc_item["title"],
-                                                            id={
-                                                                "type": "help-toc-link",
-                                                                "id": toc_item["id"],
-                                                            },
-                                                            color="link",
-                                                            className="p-0 text-start w-100 text-decoration-none fw-semibold",
-                                                            n_clicks=0,
-                                                        ),
-                                                        html.Ul(
-                                                            [
-                                                                html.Li(
-                                                                    dbc.Button(
-                                                                        child["title"],
-                                                                        id={
-                                                                            "type": "help-toc-link",
-                                                                            "id": child["id"],
-                                                                        },
-                                                                        color="link",
-                                                                        className="p-0 text-start w-100 text-decoration-none small",
-                                                                        n_clicks=0,
-                                                                    ),
-                                                                    className="mb-1",
-                                                                )
-                                                                for child in toc_item.get("children", [])
-                                                            ],
-                                                            className="list-unstyled ms-3 mt-2 mb-2",
-                                                        )
-                                                        if toc_item.get("children")
-                                                        else None,
-                                                    ],
-                                                    className="mb-3",
-                                                )
-                                                for toc_item in HELP_SECTION_TOC
-                                            ],
-                                            className="list-unstyled mb-0",
-                                        ),
-                                    ],
+                                    html.Div(
+                                        [
+                                            html.H6("Jump to section", className="mb-3"),
+                                            html.Ul(
+                                                [
+                                                    html.Li(
+                                                        [
+                                                            dbc.Button(
+                                                                toc_item["title"],
+                                                                id={"type": "help-toc-link", "id": toc_item["id"]},
+                                                                color="link",
+                                                                className="p-0 text-start w-100 text-decoration-none fw-semibold",
+                                                                n_clicks=0,
+                                                            ),
+                                                            html.Ul(
+                                                                [
+                                                                    html.Li(
+                                                                        dbc.Button(
+                                                                            child["title"],
+                                                                            id={
+                                                                                "type": "help-toc-link",
+                                                                                "id": child["id"],
+                                                                            },
+                                                                            color="link",
+                                                                            className="p-0 text-start w-100 text-decoration-none small",
+                                                                            n_clicks=0,
+                                                                        ),
+                                                                        className="mb-1",
+                                                                    )
+                                                                    for child in toc_item.get("children", [])
+                                                                ],
+                                                                className="list-unstyled ms-3 mt-2 mb-2",
+                                                            )
+                                                            if toc_item.get("children")
+                                                            else None,
+                                                        ],
+                                                        className="mb-3",
+                                                    )
+                                                    for toc_item in HELP_SECTION_TOC
+                                                ],
+                                                className="list-unstyled mb-0",
+                                            ),
+                                        ],
+                                        style={"maxHeight": "70vh", "overflowY": "auto"},
+                                        className="pe-2",
+                                    ),
                                     width=3,
                                     className="pe-3 position-sticky align-self-start",
                                     style={"top": 0},
                                 ),
                                 dbc.Col(
-                                    html.Div(HELP_MODAL_SECTIONS, id="help-modal-content"),
+                                    html.Div(
+                                        HELP_MODAL_SECTIONS,
+                                        id="help-modal-content",
+                                        style={"maxHeight": "70vh", "overflowY": "auto"},
+                                        className="pe-2",
+                                    ),
                                     width=9,
                                 ),
                             ],
                             className="g-4",
+                            style={"maxHeight": "70vh"},
                         ),
                         id="help-modal-body",
-                        style={"maxHeight": "70vh", "overflowY": "auto"},
+                        style={"maxHeight": "70vh", "overflow": "hidden"},
                     ),
+
                     dbc.ModalFooter(
                         dbc.Button("Close", id="help-close", color="secondary")
                     ),
@@ -670,7 +678,7 @@ app.clientside_callback(
         if (!targetId) {
             return window.dash_clientside.no_update;
         }
-        var container = document.getElementById('help-modal-body');
+    var container = document.getElementById('help-modal-content');
         var el = document.getElementById(targetId);
         if (!container || !el) {
             return window.dash_clientside.no_update;
