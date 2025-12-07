@@ -137,9 +137,9 @@ def _build_parameter_layout(code: str) -> object | None:
     return content
 
 
-_LABEL_COLUMN_WIDTH = {"width": "150px", "minWidth": "150px"}
+_LABEL_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 _ACTION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
-_CONFIG_COLUMN_WIDTH = {"width": "120px", "minWidth": "120px"}
+_CONFIG_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 
 
 _PARAMETER_CONFIG = {
