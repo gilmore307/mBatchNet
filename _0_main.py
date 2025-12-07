@@ -120,17 +120,40 @@ def serve_layout() -> html.Div:
                                         html.Ul(
                                             [
                                                 html.Li(
-                                                    dbc.Button(
-                                                        toc_item["title"],
-                                                        id={
-                                                            "type": "help-toc-link",
-                                                            "id": toc_item["id"],
-                                                        },
-                                                        color="link",
-                                                        className="p-0 text-start w-100 text-decoration-none",
-                                                        n_clicks=0,
-                                                    ),
-                                                    className="mb-2",
+                                                    [
+                                                        dbc.Button(
+                                                            toc_item["title"],
+                                                            id={
+                                                                "type": "help-toc-link",
+                                                                "id": toc_item["id"],
+                                                            },
+                                                            color="link",
+                                                            className="p-0 text-start w-100 text-decoration-none fw-semibold",
+                                                            n_clicks=0,
+                                                        ),
+                                                        html.Ul(
+                                                            [
+                                                                html.Li(
+                                                                    dbc.Button(
+                                                                        child["title"],
+                                                                        id={
+                                                                            "type": "help-toc-link",
+                                                                            "id": child["id"],
+                                                                        },
+                                                                        color="link",
+                                                                        className="p-0 text-start w-100 text-decoration-none small",
+                                                                        n_clicks=0,
+                                                                    ),
+                                                                    className="mb-1",
+                                                                )
+                                                                for child in toc_item.get("children", [])
+                                                            ],
+                                                            className="list-unstyled ms-3 mt-2 mb-2",
+                                                        )
+                                                        if toc_item.get("children")
+                                                        else None,
+                                                    ],
+                                                    className="mb-3",
                                                 )
                                                 for toc_item in HELP_SECTION_TOC
                                             ],
