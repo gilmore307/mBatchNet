@@ -83,9 +83,9 @@ def welcome_layout(active_path: str):
                                             html.Ul(
                                                 [
                                                     html.Li("No installation required; everything runs in the browser."),
-                                                    html.Li("Interactive figures with shareable links for collaboration."),
                                                     html.Li("Multiple correction methods with transparent defaults."),
                                                     html.Li("Exportable figures and tables ready to drop into manuscripts or reports."),
+                                                    html.Li("结果可下载"),
                                                 ]
                                             )
                                         ),
@@ -213,6 +213,7 @@ def welcome_layout(active_path: str):
                                                 color="primary",
                                                 outline=False,
                                                 className="mt-3",
+                                                style={"width": "350px"},
                                             ),
                                         ]
                                     ),
@@ -228,20 +229,21 @@ def welcome_layout(active_path: str):
                                         dbc.CardHeader([html.I(className="bi bi-file-earmark-code me-2"), "Template script"]),
                                         dbc.CardBody(
                                             [
-                                                html.P(
-                                                    "Jump-start local analyses with the companion template script that "
-                                                    "mirrors the web workflow."
-                                                ),
-                                                dbc.Button(
-                                                    [html.I(className="bi bi-github me-2"), "Template script on GitHub"],
-                                                    color="primary",
-                                                    outline=False,
-                                                    href="https://github.com/gilmore307/Batch-Effect-Correction",
-                                                    target="_blank",
-                                                ),
-                                            ],
-                                        ),
-                                    ],
+                                            html.P(
+                                                "Jump-start local analyses with the companion template script that "
+                                                "mirrors the web workflow."
+                                            ),
+                                            dbc.Button(
+                                                [html.I(className="bi bi-github me-2"), "Template script on GitHub"],
+                                                color="primary",
+                                                outline=False,
+                                                href="https://github.com/gilmore307/Batch-Effect-Correction",
+                                                target="_blank",
+                                                style={"width": "350px"},
+                                            ),
+                                        ],
+                                    ),
+                                ],
                                     className="h-100 shadow-sm",
                                 ),
                                 md=6,
