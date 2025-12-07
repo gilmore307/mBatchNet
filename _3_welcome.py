@@ -37,7 +37,7 @@ def welcome_layout(active_path: str):
                                                     [html.I(className="bi bi-collection-play me-2"), "Try sample workflow"],
                                                     color="secondary",
                                                     outline=True,
-                                                    href="/upload",
+                                                    href="/upload?tab=example",
                                                     size="lg",
                                                 ),
                                             ],
