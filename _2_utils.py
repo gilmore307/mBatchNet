@@ -2671,3 +2671,42 @@ def _load_session_summary(session_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
+_RUNTIME_LOG_PATTERN = re.compile(r"DONE:\s*(.+?)\s*\(([-+]?\d*\.?\d+)s\)")
+
+
+def extract_method_timings_from_log(session_dir: Path) -> Dict[str, float]:
+    """Parse the run log and extract elapsed seconds per correction method.
+
+    The R helper `run_method` emits lines like `✅ DONE:  ComBat (0.12s)` when a
+    method completes. We stream those messages into ``run.log`` with timestamp
+    prefixes; this function scans the log for the most recent timing entry per
+    method and returns a mapping keyed by the canonical method code.
+    """
+
+    log_path = session_dir / "run.log"
+    if not log_path.exists():
+        return {}
+
+    try:
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    timings: Dict[str, float] = {}
+    for line in log_text.splitlines():
+        match = _RUNTIME_LOG_PATTERN.search(line)
+        if not match:
+            continue
+        method_name = match.group(1).strip()
+        elapsed_raw = match.group(2)
+        try:
+            elapsed = float(elapsed_raw)
+        except (TypeError, ValueError):
+            continue
+        code = _method_code_from_display(method_name)
+        if not code:
+            continue
+        timings[code] = elapsed
+    return timings
+
+

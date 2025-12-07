@@ -15,6 +15,7 @@ from _2_utils import (
     SUPPORTED_METHODS,
     _method_code_from_display,
     _load_session_summary,
+    extract_method_timings_from_log,
     any_method_outputs,
     delete_method_outputs,
     get_session_dir,
@@ -378,11 +379,14 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id) if session_id else None
         if not session_dir or not session_dir.exists():
             return {"methods": {}}
+        log_timings = extract_method_timings_from_log(session_dir)
+        method_timings: Dict[str, Dict[str, object]] = {
+            code: {"elapsed_sec": elapsed} for code, elapsed in log_timings.items()
+        }
         try:
             session_summary = _load_session_summary(session_dir)
         except Exception:
             session_summary = None
-        method_timings: Dict[str, Dict[str, object]] = {}
         if session_summary and isinstance(session_summary, dict):
             methods_block = session_summary.get("methods")
             if isinstance(methods_block, list):
@@ -393,6 +397,8 @@ def register_correction_callbacks(app):
                     if not name:
                         continue
                     code = _method_code_from_display(str(name)) or str(name)
+                    if code in method_timings:
+                        continue
                     elapsed_val = entry.get("elapsed_sec")
                     try:
                         elapsed_float = float(elapsed_val)
