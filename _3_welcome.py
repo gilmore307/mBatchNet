@@ -18,7 +18,7 @@ def welcome_layout(active_path: str):
                                 dbc.CardBody(
                                     [
                                         dbc.Badge("Welcome", color="primary", className="text-uppercase mb-2"),
-                                        html.H1("Batch-Effect Explorer", className="display-5 mb-2"),
+                                        html.H1("mBatchNet", className="display-5 mb-2"),
                                         html.P(
                                             "Assess, correct, and visualise technical variation across omics datasets "
                                             "in a streamlined, browser-based workspace.",
@@ -85,7 +85,7 @@ def welcome_layout(active_path: str):
                                                     html.Li("No installation required; everything runs in the browser."),
                                                     html.Li("Multiple correction methods with transparent defaults."),
                                                     html.Li("Exportable figures and tables ready to drop into manuscripts or reports."),
-                                                    html.Li("Results are downloadable."),
+                                                    html.Li("Download harmonised matrices, diagnostics, and run logs as a shareable bundle."),
                                                 ]
                                             )
                                         ),
@@ -232,6 +232,25 @@ def welcome_layout(active_path: str):
                                                 "Jump-start local analyses with the companion template script that "
                                                 "mirrors the web workflow."
                                             ),
+                                            html.Ul(
+                                                [
+                                                    html.Li(
+                                                        [
+                                                            "Direct links to the GitHub template keep your offline runs in sync with the app.",
+                                                        ]
+                                                    ),
+                                                    html.Li(
+                                                        [
+                                                            "A concise usage manual walks through setup so you can reproduce the browser steps locally.",
+                                                        ]
+                                                    ),
+                                                    html.Li(
+                                                        [
+                                                            "Each batch-effect correction method includes a link to its source publication for proper citation.",
+                                                        ]
+                                                    ),
+                                                ]
+                                            ),
                                             dbc.Button(
                                                 [html.I(className="bi bi-github me-2"), "Template script on GitHub"],
                                                 color="primary",
@@ -259,7 +278,7 @@ def welcome_layout(active_path: str):
                 dbc.Container(
                     [
                         html.P(
-                            "Batch-Effect Explorer is an open-source tool designed to help researchers "
+                            "mBatchNet is an open-source tool designed to help researchers "
                             "assess, correct, and interpret batch effects across omics datasets. All "
                             "resources and tools on this website are freely accessible to the public.",
                             className="mb-1",

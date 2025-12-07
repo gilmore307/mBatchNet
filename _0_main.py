@@ -35,7 +35,7 @@ app: Dash = dash.Dash(
     external_stylesheets=[dbc.themes.FLATLY],
     suppress_callback_exceptions=True,
 )
-app.title = "Batch-Effect Explorer"
+app.title = "mBatchNet"
 server = app.server
 sock = Sock(server)
 
