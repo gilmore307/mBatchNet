@@ -27,7 +27,7 @@ from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
 from _5_assessment import assessment_layout, register_pre_post_callbacks
 from _6_correction import correction_layout, register_correction_callbacks
-from _7_description import HELP_MODAL_SECTIONS
+from _7_description import HELP_MODAL_SECTIONS, HELP_SECTION_TOC
 
 
 app: Dash = dash.Dash(
@@ -111,7 +111,38 @@ def serve_layout() -> html.Div:
                 [
                     dbc.ModalHeader(dbc.ModalTitle("Help")),
                     dbc.ModalBody(
-                        html.Div(HELP_MODAL_SECTIONS, id="help-modal-content")
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        html.H6("Jump to section", className="mb-3"),
+                                        html.Ul(
+                                            [
+                                                html.Li(
+                                                    dcc.Link(
+                                                        toc_item["title"],
+                                                        href=f"#{toc_item['id']}",
+                                                        className="text-decoration-none",
+                                                    ),
+                                                    className="mb-2",
+                                                )
+                                                for toc_item in HELP_SECTION_TOC
+                                            ],
+                                            className="list-unstyled mb-0",
+                                        ),
+                                    ],
+                                    width=3,
+                                    className="pe-3",
+                                    style={"position": "sticky", "top": 0},
+                                ),
+                                dbc.Col(
+                                    html.Div(HELP_MODAL_SECTIONS, id="help-modal-content"),
+                                    width=9,
+                                ),
+                            ],
+                            className="g-4",
+                        ),
+                        style={"maxHeight": "70vh", "overflowY": "auto"},
                     ),
                     dbc.ModalFooter(
                         dbc.Button("Close", id="help-close", color="secondary")

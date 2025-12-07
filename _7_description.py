@@ -4,6 +4,14 @@ from typing import Dict, List
 from dash import html
 
 
+HELP_SECTION_TOC: List[Dict[str, str]] = [
+    {"id": "help-overview", "title": "Overview"},
+    {"id": "help-upload", "title": "Upload Files"},
+    {"id": "help-correction", "title": "Batch Effect Correction"},
+    {"id": "help-assessment", "title": "Assessment (Pre & Post)"},
+]
+
+
 HELP_MODAL_SECTIONS: List = [
     html.Div(
         [
@@ -14,6 +22,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-4",
+        id="help-overview",
     ),
     html.Div(
         [
@@ -70,6 +79,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-4",
+        id="help-upload",
     ),
     html.Div(
         [
@@ -127,6 +137,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-4",
+        id="help-correction",
     ),
     html.Div(
         [
@@ -462,6 +473,7 @@ HELP_MODAL_SECTIONS: List = [
             ),
         ],
         className="mb-0",
+        id="help-assessment",
     ),
 ]
 
