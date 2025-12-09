@@ -16,12 +16,6 @@ format_method_label <- function(label) {
   if (identical(label, "Before correction")) {
     return("Before\ncorrection")
   }
-  if (identical(label, "Quantile Normalization")) {
-    return("Quantile\nNormalization")
-  }
-  if (identical(label, "Percentile Normalization")) {
-    return("Percentile\nNormalization")
-  }
   if (identical(label, "PLSDA-batch")) {
     return(sub("-", "\n-", label, fixed = TRUE))
   }

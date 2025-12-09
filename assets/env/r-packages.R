@@ -39,7 +39,7 @@ cran_pkgs <- unique(c(cran_core, cran_graphics))
 
 # ---- Bioconductor packages ----
 bioc_pkgs <- c(
-  "preprocessCore","limma","sva","MMUPHin",
+  "limma","sva","MMUPHin",
   "TreeSummarizedExperiment","mixOmics",
   "scater","SummarizedExperiment","SingleCellExperiment","S4Vectors"
 )

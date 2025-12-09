@@ -348,11 +348,9 @@ _METHOD_DISPLAY_NAMES: Dict[str, str] = {
     "RUV": "RUV-III-NB",
     "ComBatSeq": "ComBat-seq",
     "FSQN": "FSQN",
-    "PN": "Percentile Normalization",
     "FAbatch": "FAbatch",
     "limma": "Limma",
     "ComBat": "ComBat",
-    "QN": "Quantile Normalization",
 }
 
 _METHOD_NAME_TO_CODE: Dict[str, str] = {display: code for code, display in _METHOD_DISPLAY_NAMES.items()}
@@ -480,7 +478,6 @@ MISSING_METHOD_SCRIPTS: Set[str] = {
 _FORMAL_MAP: Dict[str, str] = {code.lower(): display for code, display in SUPPORTED_METHODS}
 # Add common lowercase variants used by R outputs
 _FORMAL_ALIASES: Dict[str, str] = {
-    "qn": _FORMAL_MAP["qn"],
     "bmc": _FORMAL_MAP["bmc"],
     "limma": _FORMAL_MAP["limma"],
     "conqur": _FORMAL_MAP["conqur"],
@@ -494,8 +491,6 @@ _FORMAL_ALIASES: Dict[str, str] = {
     "ruviiinb": _FORMAL_MAP["ruv"],
     "metadict": _FORMAL_MAP["metadict"],
     "meta-dict": _FORMAL_MAP["metadict"],
-    "pn": _FORMAL_MAP["pn"],
-    "percentilenormalization": _FORMAL_MAP["pn"],
     "fabatch": _FORMAL_MAP["fabatch"],
     "combatseq": _FORMAL_MAP["combatseq"],
     "combat-seq": _FORMAL_MAP["combatseq"],
@@ -514,16 +509,14 @@ def method_formal_name(name: str) -> str:
     return _FORMAL_ALIASES.get(lk, _FORMAL_MAP.get(lk, key))
 
 # Default correction methods (codes corresponding to SUPPORTED_METHODS)
-# Quantile normalization, Batch mean centering, Limma removeBatchEffect,
-# Percentile normalization
-DEFAULT_METHODS: Sequence[str] = ("QN", "BMC", "limma", "PN")
+# Batch mean centering, Limma removeBatchEffect
+DEFAULT_METHODS: Sequence[str] = ("BMC", "limma")
 
 CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE_LOWER: Dict[str, str] = {display.lower(): code for code, display in SUPPORTED_METHODS}
 
 METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
-    _normalize_method_code("QN"): "normalized_qn",
     _normalize_method_code("BMC"): "normalized_bmc",
     _normalize_method_code("limma"): "normalized_limma",
     _normalize_method_code("ConQuR"): "normalized_conqur",
@@ -533,7 +526,6 @@ METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
     _normalize_method_code("MMUPHin"): "normalized_mmuphin",
     _normalize_method_code("RUV"): "normalized_ruv",
     _normalize_method_code("MetaDICT"): "normalized_metadict",
-    _normalize_method_code("PN"): "normalized_pn",
     _normalize_method_code("FAbatch"): "normalized_fabatch",
     _normalize_method_code("ComBatSeq"): "normalized_combatseq",
     _normalize_method_code("DEBIAS"): "normalized_debias",

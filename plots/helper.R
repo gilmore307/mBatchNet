@@ -15,7 +15,6 @@ create_png_thumbnail <- function(tif_path, width_px = 2000) {
 # Map method codes from filenames to short display labels for figures.
 method_short_label <- function(x) {
   map <- c(
-    qn = "Quantile Normalization",
     bmc = "BMC",
     limma = "Limma",
     conqur = "ConQuR",
@@ -25,7 +24,6 @@ method_short_label <- function(x) {
     mmuphin = "MMUPHin",
     ruv = "RUV-III-NB",
     metadict = "MetaDICT",
-    pn = "Percentile Normalization",
     fabatch = "FAbatch",
     combatseq = "ComBat-seq",
     debias = "DEBIAS-M"

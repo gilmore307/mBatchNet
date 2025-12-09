@@ -141,8 +141,8 @@ convert_target_to_binary <- function(metadata, label_col) {
 }
 
 record_methods <- c(
-  "QN","BMC","limma","ConQuR","PLSDA","ComBat","FSQN","MMUPHin",
-  "fastRUV-III-NB","RUV-III-NB","MetaDICT","PN","FAbatch","ComBat-Seq","DEBIAS"
+  "BMC","limma","ConQuR","PLSDA","ComBat","FSQN","MMUPHin",
+  "fastRUV-III-NB","RUV-III-NB","MetaDICT","FAbatch","ComBat-Seq","DEBIAS"
 )
 
 save_summary <- function(){
@@ -246,7 +246,6 @@ run_method <- function(name, expr, log_name = name){
 # Desired inputs per method (uses converters from preprocess.r)
 # ---------------------------
 expected_input <- list(
-  QN        = "tss",
   BMC       = "log",
   limma     = "log",
   ConQuR    = "counts",
@@ -256,7 +255,6 @@ expected_input <- list(
   MMUPHin   = "tss",
   RUV       = "counts",
   MetaDICT  = "tss",
-  PN        = "tss",
   FAbatch   = "log",
   ComBatSeq = "counts",
   DEBIAS    = "counts"
@@ -399,11 +397,11 @@ prepare_method <- function(method_code) {
 }
 
 expected_outputs <- list(
-  QN="normalized_qn.csv", BMC="normalized_bmc.csv", limma="normalized_limma.csv",
+  BMC="normalized_bmc.csv", limma="normalized_limma.csv",
   ConQuR="normalized_conqur.csv", PLSDA="normalized_plsda.csv", ComBat="normalized_combat.csv",
   FSQN="normalized_fsqn.csv", MMUPHin="normalized_mmuphin.csv",
   RUV="normalized_ruv.csv", MetaDICT="normalized_metadict.csv",
-  PN="normalized_pn.csv", FAbatch="normalized_fabatch.csv", ComBatSeq="normalized_combatseq.csv",
+  FAbatch="normalized_fabatch.csv", ComBatSeq="normalized_combatseq.csv",
   DEBIAS = "normalized_debias.csv"
 )
 
