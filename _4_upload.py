@@ -30,13 +30,12 @@ PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
 
 # Mapping presets for example datasets (case-insensitive keys)
-EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, str]] = {
-    "bladderbatch": {"batch": "batch", "target": "cancer"},
-    "conqur": {"batch": "batch", "target": "sex"},
-    "ibd_cmgd": {"batch": "batch", "target": "study_condition"},
-    "crc_cmgd": {"batch": "batch", "target": "study_condition"},
-    "metadict": {"batch": "batch", "target": "Y"},
-    "plsdabatch": {"batch": "batch", "target": "initial_phenol_concentration.regroup"},
+EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
+    "ad": {
+        "batch": "Batch",
+        "target": "Initial Phenol Concentration",
+        "covariates": ["Treatment Duration"],
+    },
 }
 
 
@@ -84,7 +83,7 @@ def _read_session_config(session_dir: Path) -> Dict[str, object]:
         return {}
 
 
-def _example_mapping_for(key: Optional[str]) -> Optional[Dict[str, str]]:
+def _example_mapping_for(key: Optional[str]) -> Optional[Dict[str, object]]:
     if not key:
         return None
     return EXAMPLE_COLUMN_MAP.get(key.lower())
@@ -180,10 +179,7 @@ def _generate_mosaic(session_dir: Path) -> Tuple[bool, Optional[str]]:
 def upload_layout(active_path: str):
     # Prepare example set options
     example_pairs = _scan_example_sets()
-    example_options = [
-        {"label": f"Example {k}", "value": k} for (k, _r, _m) in example_pairs
-    ]
-    default_example = example_options[0]["value"] if example_options else None
+    default_example = example_pairs[0][0] if example_pairs else None
     return html.Div(
         [
             build_navbar(active_path),
@@ -266,14 +262,23 @@ def upload_layout(active_path: str):
                                                         html.P(
                                                             "Load a curated example dataset to explore the workflow without uploading your own files."
                                                         ),
-                                                        dcc.Dropdown(
-                                                            id="example-select",
-                                                            options=example_options,
-                                                            value=default_example,
-                                                            placeholder="Select an example dataset",
-                                                            clearable=False,
-                                                            style={"maxWidth": "420px"},
-                                                            className="mb-3",
+                                                        html.Div(
+                                                            [
+                                                                html.Div(
+                                                                    "Example dataset: Anaerobic Digestion (ad)",
+                                                                    className="fw-semibold",
+                                                                ),
+                                                                html.Div(
+                                                                    "Columns mapped as Batch (batch), Initial Phenol Concentration (target), Treatment Duration (covariate).",
+                                                                    className="text-muted mb-2",
+                                                                ),
+                                                                dcc.Input(
+                                                                    id="example-select",
+                                                                    type="hidden",
+                                                                    value=default_example,
+                                                                    readOnly=True,
+                                                                ),
+                                                            ]
                                                         ),
                                                         dbc.Row(
                                                             [
@@ -751,6 +756,7 @@ def register_upload_callbacks(app):
             preset = _example_mapping_for(example_key)
             batch_label = preset.get("batch") if preset else "batch"
             target_label = preset.get("target") if preset else "phenotype"
+            covar_labels = preset.get("covariates") if preset else []
             mapping_display = dbc.Card([
                 dbc.CardHeader(html.Strong("Metadata mapping")),
                 dbc.CardBody([
@@ -758,6 +764,7 @@ def register_upload_callbacks(app):
                     html.Ul([
                         html.Li([html.Code(batch_label), " column -> batch"]),
                         html.Li([html.Code(target_label), " column -> target_binary (binary copy written for correction)"]),
+                        html.Li([html.Code(", ".join(map(str, covar_labels)) or "(none)"), " column(s) -> covariates"]),
                     ], className="mb-0"),
                 ]),
             ], className="mt-2")
