@@ -106,7 +106,10 @@ def _render_mosaic_card(session_dir: Path) -> html.Div:
     return dbc.Card(
         [
             dbc.CardHeader(html.Strong("Mosaic plot")),
-            dbc.CardBody(img),
+            dbc.CardBody(
+                html.Div(img, className="d-flex justify-content-center"),
+                className="text-center",
+            ),
         ],
         className="mt-3",
     )

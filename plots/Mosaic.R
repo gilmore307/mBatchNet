@@ -76,7 +76,12 @@ if (length(outcome_levels) != 2) {
 }
 
 metadata <- metadata %>% mutate(.outcome = factor(.data[[PHENO_COL]], levels = outcome_levels))
-OUTCOME_TITLE <- if (!is.null(PHENO_COL)) PHENO_COL else "Outcome"
+wrap_legend_title <- function(title, width = 16) {
+  if (is.null(title)) return(title)
+  paste(strwrap(title, width = width), collapse = "\n")
+}
+
+OUTCOME_TITLE <- if (!is.null(PHENO_COL)) wrap_legend_title(PHENO_COL) else "Outcome"
 
 # ==== Collect files (e.g., normalized files) ====
 file_paths <- list.files(output_folder, pattern = "^normalized_.*\\.csv$", full.names = TRUE)
@@ -226,4 +231,4 @@ mbecMosaicPlot <- function(study.summary, model.vars) {
 # ==== Plot the Mosaic Plot ====
 plot.mosaic <- mbecMosaicPlot(study.summary = mosaic_data, model.vars = c('batch', '.outcome'))
 tif_path <- file.path(output_folder, "mosaic_plot.tif")
-ggsave(tif_path, plot = plot.mosaic, width = 16, height = 8, dpi = 300, compression = "lzw")
+ggsave(tif_path, plot = plot.mosaic, width = 12, height = 8, dpi = 300, compression = "lzw")
