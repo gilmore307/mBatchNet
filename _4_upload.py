@@ -259,13 +259,10 @@ def upload_layout(active_path: str):
                                                 dbc.CardHeader(html.Strong("Quick Start: Example Data")),
                                                 dbc.CardBody(
                                                     [
-                                                        html.P(
-                                                            "Load a curated example dataset to explore the workflow without uploading your own files."
-                                                        ),
                                                         html.Div(
                                                             [
                                                                 html.Div(
-                                                                    "Example dataset: Anaerobic Digestion (ad)",
+                                                                    "Example dataset: Anaerobic Digestion",
                                                                     className="fw-semibold",
                                                                 ),
                                                                 html.Div(
