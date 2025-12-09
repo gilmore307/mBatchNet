@@ -61,7 +61,7 @@ def welcome_layout(active_path: str):
                                         dbc.CardBody(
                                             html.Ul(
                                                 [
-                                                    html.Li("Upload count matrices and metadata (or load the example dataset)."),
+                                                    html.Li("Upload microbiome feature matrices and metadata (or load the example dataset)."),
                                                     html.Li("Review pre-correction QC plots to spot batch effects early."),
                                                     html.Li("Run automated correction workflows with sensible defaults."),
                                                     html.Li("Compare post-correction diagnostics and download results."),
@@ -138,7 +138,8 @@ def welcome_layout(active_path: str):
                                                     [
                                                         html.H5("Upload"),
                                                         html.P(
-                                                            "Bring count matrices and metadata in common tabular formats. "
+                                                            "Bring microbiome feature matrices and metadata in common tabular formats. "
+                                                            "Map metadata columns to the predefined fields. "
                                                             "Use the provided example to explore the interface first."
                                                         ),
                                                     ],
@@ -211,7 +212,7 @@ def welcome_layout(active_path: str):
                                                 id={"type": "help-open-trigger", "source": "resources"},
                                                 color="primary",
                                                 outline=False,
-                                                className="mt-3",
+                                                className="mt-auto",
                                                 style={"width": "350px"},
                                             ),
                                         ]
@@ -253,6 +254,7 @@ def welcome_layout(active_path: str):
                                                 outline=False,
                                                 href="https://github.com/gilmore307/Batch-Effect-Correction",
                                                 target="_blank",
+                                                className="mt-auto",
                                                 style={"width": "350px"},
                                             ),
                                         ],
