@@ -277,7 +277,7 @@ def welcome_layout(active_path: str):
                     [
                         html.P(
                             "mBatchNet is an open-source tool designed to help researchers "
-                            "assess, correct, and interpret batch effects across omics datasets. All "
+                            "assess, correct, and interpret batch effects in microbiome studies. All "
                             "resources and tools on this website are freely accessible to the public.",
                             className="mb-1",
                         ),
