@@ -468,7 +468,8 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
         legend.direction = "horizontal",
         legend.box       = "vertical",
         plot.margin      = margin(8, 14, 8, 14)
-      )
+      ) +
+      plot_annotation(title = "Principal Component Analysis")
     w <- base_fig_width_in; h <- base_fig_height_in
   } else {
     panel_cols <- min(ncol_grid, n_panels)
@@ -481,6 +482,7 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
         legend.box       = "vertical",
         plot.margin      = margin(8, 14, 8, 14)
       )
+    combined <- combined + plot_annotation(title = "Principal Component Analysis")
     w <- base_col_width_in * panel_cols
     h <- base_row_height_in * panel_rows
   }

@@ -425,6 +425,7 @@ if (n_panels_ait == 1L) {
   w_ait <- base_col_width_in * panel_cols_ait
   h_ait <- base_row_height_in * panel_rows_ait
 }
+combined_ait <- combined_ait + plot_annotation(title = "Dissimilarity Heatmaps")
 fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
 tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
 ggsave(tif_path_ait,
@@ -449,6 +450,7 @@ if (n_panels_bc == 1L) {
   w_bc <- base_col_width_in * panel_cols_bc
   h_bc <- base_row_height_in * panel_rows_bc
 }
+combined_bc <- combined_bc + plot_annotation(title = "Dissimilarity Heatmaps")
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
 tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
 ggsave(tif_path_bc,
