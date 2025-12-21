@@ -396,7 +396,7 @@ CB
       labs(title = label) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
         plot.margin = margin(0, 16, 0, 16)
       )
     assembled <- (title_strip / assembled) +
@@ -468,6 +468,10 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
         legend.direction = "horizontal",
         legend.box       = "vertical",
         plot.margin      = margin(8, 14, 8, 14)
+      ) +
+      plot_annotation(
+        title = "Principal Component Analysis",
+        theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
       )
     w <- base_fig_width_in; h <- base_fig_height_in
   } else {
@@ -481,6 +485,10 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
         legend.box       = "vertical",
         plot.margin      = margin(8, 14, 8, 14)
       )
+    combined <- combined + plot_annotation(
+      title = "Principal Component Analysis",
+      theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+    )
     w <- base_col_width_in * panel_cols
     h <- base_row_height_in * panel_rows
   }
