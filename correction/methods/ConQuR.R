@@ -5,7 +5,15 @@ prepare_method("ConQuR")
 run_method("ConQuR", {
   suppressPackageStartupMessages({ library(ConQuR); library(doParallel) })
   X_cnt <- get_input_for("ConQuR", base_M, base_form)
-  covariates <- metadata[, colnames(covar), drop = FALSE]
+  metadata_conqur <- metadata
+  colnames(metadata_conqur) <- make.names(colnames(metadata_conqur), unique = TRUE)
+  covariate_names <- colnames(covar)
+  if (!length(covariate_names)) {
+    covariate_names <- NULL
+  } else {
+    covariate_names <- make.names(covariate_names, unique = TRUE)
+  }
+  covariates <- metadata_conqur[, covariate_names, drop = FALSE]
 
   lib_sizes <- rowSums(X_cnt)
   keep_lib <- !is.na(lib_sizes) & lib_sizes > 0
@@ -17,11 +25,11 @@ run_method("ConQuR", {
         sum(!keep_lib)
       )
     )
-    metadata <- metadata[keep_lib, , drop = FALSE]
+    metadata_conqur <- metadata_conqur[keep_lib, , drop = FALSE]
     X_cnt <- X_cnt[keep_lib, , drop = FALSE]
     covariates <- covariates[keep_lib, , drop = FALSE]
   }
-  complete_rows <- !is.na(metadata$batch)
+  complete_rows <- !is.na(metadata_conqur$batch)
   if (ncol(covariates)) {
     complete_rows <- complete_rows & stats::complete.cases(covariates)
   }
@@ -34,12 +42,12 @@ run_method("ConQuR", {
         sum(!complete_rows)
       )
     )
-    metadata <- metadata[complete_rows, , drop = FALSE]
+    metadata_conqur <- metadata_conqur[complete_rows, , drop = FALSE]
     X_cnt <- X_cnt[complete_rows, , drop = FALSE]
     covariates <- covariates[complete_rows, , drop = FALSE]
   }
 
-  batch_values <- unique(stats::na.omit(as.character(metadata$batch)))
+  batch_values <- unique(stats::na.omit(as.character(metadata_conqur$batch)))
   if (length(batch_values) < 2) {
     stop(
       sprintf(
@@ -82,7 +90,7 @@ run_method("ConQuR", {
     }
   }
   num_cores <- max(1, parallel::detectCores(TRUE) - 1)
-  batch <- droplevels(as.factor(metadata$batch))
+  batch <- droplevels(as.factor(metadata_conqur$batch))
   batch_counts <- table(batch)
 
   if (any(batch_counts < 1) || length(batch_counts) < 2) {
