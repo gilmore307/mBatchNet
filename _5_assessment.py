@@ -712,7 +712,7 @@ def register_pre_post_callbacks(app):
                 State(f"{sid}-param-fig-height", "value"),
                 State(f"{sid}-param-fig-dpi", "value"),
             ]
-        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity", "r2"}:
             param_state_ids.append(f"{sid}-param-fig-ncol")
             states.append(State(f"{sid}-param-fig-ncol", "value"))
             has_ncol_param = True
