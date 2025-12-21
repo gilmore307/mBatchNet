@@ -286,7 +286,11 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
   
   n_methods <- dplyr::n_distinct(r2_long_df$Method)
   if (n_methods > 1) {
-    p <- p + facet_grid(. ~ Method, scales = "free_x", space = "free_x")
+    ncol_grid <- n_methods
+    if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+      ncol_grid <- max(1, opt_fig_ncol)
+    }
+    p <- p + facet_wrap(~ Method, scales = "free_x", ncol = ncol_grid)
   }
   p
 }
