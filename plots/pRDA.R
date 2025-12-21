@@ -149,6 +149,7 @@ safe_adjR2 <- function(fit) {
 
 # --------- Core calculators (return named numeric: Treatment, Intersection, Batch, Residuals) ---------
 compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = label_col) {
+  fmt_col <- function(name) sprintf("`%s`", gsub("`", "``", name))
   # ensure sample_id present & align
   if (!"sample_id" %in% names(df)) {
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id
@@ -180,9 +181,11 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
   }
   
   Ymat <- Y
-  f_both   <- as.formula(paste("Ymat ~", treat_col, "+", batch_col))
-  f_t_pure <- as.formula(paste("Ymat ~", treat_col, "+ Condition(", batch_col, ")"))
-  f_b_pure <- as.formula(paste("Ymat ~", batch_col, "+ Condition(", treat_col, ")"))
+  treat_term <- fmt_col(treat_col)
+  batch_term <- fmt_col(batch_col)
+  f_both   <- as.formula(sprintf("Ymat ~ %s + %s", treat_term, batch_term))
+  f_t_pure <- as.formula(sprintf("Ymat ~ %s + Condition(%s)", treat_term, batch_term))
+  f_b_pure <- as.formula(sprintf("Ymat ~ %s + Condition(%s)", batch_term, treat_term))
   
   fit_both  <- vegan::rda(f_both,   data = dfx)
   fit_t     <- vegan::rda(f_t_pure, data = dfx)
