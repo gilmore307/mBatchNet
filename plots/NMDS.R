@@ -363,7 +363,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+      plot.title = element_text(size = 16, hjust = 0.5, face = "plain")
     )
   p
 }
@@ -459,7 +459,10 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
         legend.box = "vertical",
         plot.margin = margin(8, 14, 8, 14)
       ) +
-      plot_annotation(title = "Non-metric Multidimensional Scaling")
+      plot_annotation(
+        title = "Non-metric Multidimensional Scaling",
+        theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+      )
     w <- base_fig_width_in; h <- base_fig_height_in
   } else {
     panel_cols <- min(ncol_grid, n_panels)
@@ -472,7 +475,10 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
         legend.box = "vertical",
         plot.margin = margin(8, 14, 8, 14)
       )
-    combined <- combined + plot_annotation(title = "Non-metric Multidimensional Scaling")
+    combined <- combined + plot_annotation(
+      title = "Non-metric Multidimensional Scaling",
+      theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+    )
     w <- base_col_width_in * panel_cols
     h <- base_row_height_in * panel_rows
   }
