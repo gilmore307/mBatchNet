@@ -53,15 +53,20 @@ for (a in args[-1]) {
   }
 }
 
-apply_fig_overrides <- function(width_in, height_in, default_dpi = 300) {
+apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
+                                panel_cols = 1, panel_rows = 1) {
   dpi <- if (is.na(opt_fig_dpi) || opt_fig_dpi <= 0) default_dpi else opt_fig_dpi
-  w <- width_in
-  h <- height_in
+  panel_cols <- max(1, as.integer(panel_cols))
+  panel_rows <- max(1, as.integer(panel_rows))
+  w <- width_in * panel_cols
+  h <- height_in * panel_rows
   if (!is.na(opt_fig_width_px) && opt_fig_width_px > 0 && dpi > 0) {
-    w <- opt_fig_width_px / dpi
+    per_panel <- opt_fig_width_px / dpi
+    w <- per_panel * panel_cols
   }
   if (!is.na(opt_fig_height_px) && opt_fig_height_px > 0 && dpi > 0) {
-    h <- opt_fig_height_px / dpi
+    per_panel <- opt_fig_height_px / dpi
+    h <- per_panel * panel_rows
   }
   list(width = w, height = h, dpi = dpi)
 }
@@ -362,7 +367,14 @@ p_clr <- make_boxplot(
   expression("Feature-wise ANOVA " * R^2 )
 )
 if (!is.null(p_clr)) {
-  fig_dims_clr <- apply_fig_overrides(4800 / 300, 1200 / 300, 300)
+  n_methods <- dplyr::n_distinct(r2_long_clr$Method)
+  ncol_grid <- n_methods
+  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+    ncol_grid <- max(1, opt_fig_ncol)
+  }
+  panel_cols <- min(ncol_grid, n_methods)
+  panel_rows <- ceiling(n_methods / ncol_grid)
+  fig_dims_clr <- apply_fig_overrides(960 / 300, 1200 / 300, 300, panel_cols, panel_rows)
   tif_path <- file.path(output_folder, "anova_aitchison.tif")
   ggsave(tif_path, p_clr,
          width = fig_dims_clr$width, height = fig_dims_clr$height, dpi = fig_dims_clr$dpi, compression = "lzw")

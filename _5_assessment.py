@@ -44,7 +44,7 @@ FIGURE_DEFAULTS = {
     "nmds": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "dissimilarity": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "permanova": {"width": 2800, "height": 1800, "dpi": 300},
-    "r2": {"width": 4800, "height": 1200, "dpi": 300},
+    "r2": {"width": 960, "height": 1200, "dpi": 300, "ncol": 5},
     "prda": {"width": 3000, "height": 1500, "dpi": 300},
     "pvca": {"width": 3000, "height": 1500, "dpi": 300},
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
@@ -414,12 +414,12 @@ def _param_controls(stage: str, key: str):
                 tooltip=FIGURE_DPI_TOOLTIP,
             ),
         ])
-        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity"}:
+        if stage == "post" and key in {"pca", "pcoa", "nmds", "dissimilarity", "r2"}:
             figure_controls.append(
                 num_input(
                     f"{sid}-param-fig-ncol",
                     "Subplots per row",
-                    defaults.get("ncol", 2),
+                    defaults.get("ncol", 5),
                     step=1,
                     min_=1,
                     tooltip=FIGURE_SUBPLOTS_TOOLTIP,
@@ -1069,4 +1069,3 @@ def register_pre_post_callbacks(app):
     # Register post-stage groups (baseline pre groups plus post-only extras)
     for key, title, script in pre_groups + post_extra:
         _register_group("post", key, script, title)
-
