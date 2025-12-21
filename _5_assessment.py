@@ -44,7 +44,7 @@ FIGURE_DEFAULTS = {
     "nmds": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "dissimilarity": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
     "permanova": {"width": 2800, "height": 1800, "dpi": 300},
-    "r2": {"width": 960, "height": 1200, "dpi": 300, "ncol": 5},
+    "r2": {"width": 600, "height": 1200, "dpi": 300, "ncol": 6},
     "prda": {"width": 3000, "height": 1500, "dpi": 300},
     "pvca": {"width": 3000, "height": 1500, "dpi": 300},
     "ebm": {"width": 2550, "height": 1560, "dpi": 300},
