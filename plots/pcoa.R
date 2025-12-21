@@ -569,7 +569,7 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
       ) +
       plot_annotation(
         title = "Principal Coordinates Analysis",
-        theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+        theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
     w <- base_fig_width_in; h <- base_fig_height_in
   } else {
@@ -585,7 +585,7 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
       )
     combined <- combined + plot_annotation(
       title = "Principal Coordinates Analysis",
-      theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+      theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
     )
     w <- base_col_width_in * panel_cols
     h <- base_row_height_in * panel_rows

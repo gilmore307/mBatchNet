@@ -455,7 +455,7 @@ if (n_panels_bc == 1L) {
 }
 combined_bc <- combined_bc + plot_annotation(
   title = "Dissimilarity Heatmaps",
-  theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+  theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
 )
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
 tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
