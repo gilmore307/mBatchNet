@@ -574,8 +574,8 @@ save_pcoa_plot_set <- function(plot_list, filename_stub) {
     w <- base_fig_width_in; h <- base_fig_height_in
   } else {
     panel_cols <- min(ncol_grid, n_panels)
-    panel_rows <- ceiling(n_panels / ncol_grid)
-    combined <- wrap_plots(plot_list, ncol = ncol_grid) +
+    panel_rows <- ceiling(n_panels / panel_cols)
+    combined <- wrap_plots(plot_list, ncol = panel_cols) +
       plot_layout(guides = "collect") &
       theme(
         legend.position  = "bottom",
