@@ -418,8 +418,8 @@ if (n_panels_ait == 1L) {
   w_ait <- base_fig_width_in; h_ait <- base_fig_height_in
 } else {
   panel_cols_ait <- min(ncol_grid, n_panels_ait)
-  panel_rows_ait <- ceiling(n_panels_ait / ncol_grid)
-  combined_ait <- wrap_plots(plots_ait, ncol = ncol_grid) +
+  panel_rows_ait <- ceiling(n_panels_ait / panel_cols_ait)
+  combined_ait <- wrap_plots(plots_ait, ncol = panel_cols_ait) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
   w_ait <- base_col_width_in * panel_cols_ait
@@ -446,8 +446,8 @@ if (n_panels_bc == 1L) {
   w_bc <- base_fig_width_in; h_bc <- base_fig_height_in
 } else {
   panel_cols_bc <- min(ncol_grid, n_panels_bc)
-  panel_rows_bc <- ceiling(n_panels_bc / ncol_grid)
-  combined_bc <- wrap_plots(plots_bc, ncol = ncol_grid) +
+  panel_rows_bc <- ceiling(n_panels_bc / panel_cols_bc)
+  combined_bc <- wrap_plots(plots_bc, ncol = panel_cols_bc) +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom", legend.direction = "horizontal")
   w_bc <- base_col_width_in * panel_cols_bc
