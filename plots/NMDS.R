@@ -340,15 +340,16 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
   if (!is.null(ylim_override)) ylim <- ylim_override
   
   title_text <- if (is.null(label)) "NMDS" else label
+  pmar <- margin(10, 16, 10, 16)
 
-  p <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
+  pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
     scale_color_manual(values = mbecCols, name = palette_name) +
     guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
-    labs(title = title_text,
+    labs(title = NULL,
          x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
@@ -363,9 +364,66 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.title = element_text(size = 16, hjust = 0.5, face = "plain")
+      plot.margin = pmar
     )
-  p
+
+  pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
+    geom_density(aes(fill = !!sym(var.color)),
+                 linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
+    ylab("Density") +
+    scale_fill_manual(values = mbecCols, guide = "none") +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
+    theme_bw() +
+    theme(
+      panel.background = element_blank(),
+      axis.line = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      legend.position = 'none',
+      axis.title.y = element_text(size = 12, face = "plain"),
+      axis.title.x = element_blank(),
+      plot.margin = pmar
+    )
+
+  pRight <- ggplot(plot.df, aes(y = !!sym(ycol))) +
+    geom_density(
+      aes(x = after_stat(density), fill = !!sym(var.color)),
+      linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
+    ) +
+    xlab(NULL) + ylab("Density") +
+    scale_fill_manual(values = mbecCols, guide = "none") +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    theme_bw() +
+    theme(
+      panel.background = element_blank(),
+      axis.line = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      legend.position = "none",
+      axis.title.x = element_text(size = 12, face = "plain"),
+      axis.title.y = element_text(size = 12, face = "plain"),
+      plot.margin = margin(10, 16, 10, 16)
+    )
+
+  design <- "
+A#
+CB
+"
+  assembled <- (pTop + pRight + pMain) +
+    plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
+
+  if (!is.null(title_text) && nzchar(title_text)) {
+    title_strip <- ggplot() +
+      labs(title = title_text) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
+        plot.margin = margin(0, 16, 0, 16)
+      )
+    assembled <- (title_strip / assembled) + plot_layout(heights = c(0, 1))
+  }
+
+  assembled
 }
 
 # ==== Params ====
