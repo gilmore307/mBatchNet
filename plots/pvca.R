@@ -22,8 +22,8 @@ library(lme4)
 # --------- Helpers ---------
 pvca_zero <- function() {
   tibble(
-    Component = factor(c("Treatment","Intersection","Batch","Residuals"),
-                       levels = c("Treatment","Intersection","Batch","Residuals")),
+    Component = factor(c("Target","Intersection","Batch","Residuals"),
+                       levels = c("Target","Intersection","Batch","Residuals")),
     Fraction  = c(0,0,0,1)
   )
 }
@@ -175,7 +175,7 @@ compute_pvca <- function(df, meta, batch_col = "batch", treat_col = label_col,
   }
   
   # aggregate & renormalize - PRESERVE NAMES!
-  parts <- c(Treatment = w_treat, Intersection = w_inter, Batch = w_batch, Residuals = w_res)
+  parts <- c(Target = w_treat, Intersection = w_inter, Batch = w_batch, Residuals = w_res)
   parts[!is.finite(parts)] <- 0
   nm <- names(parts)
   parts <- pmax(parts, 0)  # pmax can drop names
@@ -185,16 +185,16 @@ compute_pvca <- function(df, meta, batch_col = "batch", treat_col = label_col,
   if (is.finite(s) && s > 0) {
     parts <- parts / s
   } else {
-    parts <- c(Treatment = 0, Intersection = 0, Batch = 0, Residuals = 1)
+    parts <- c(Target = 0, Intersection = 0, Batch = 0, Residuals = 1)
   }
   
-  Fraction <- as.numeric(parts[c("Treatment","Intersection","Batch","Residuals")])
+  Fraction <- as.numeric(parts[c("Target","Intersection","Batch","Residuals")])
   Fraction[!is.finite(Fraction)] <- 0
   Fraction <- pmin(pmax(Fraction, 0), 1)
   
   tibble(
-    Component = factor(c("Treatment","Intersection","Batch","Residuals"),
-                       levels = c("Treatment","Intersection","Batch","Residuals")),
+    Component = factor(c("Target","Intersection","Batch","Residuals"),
+                       levels = c("Target","Intersection","Batch","Residuals")),
     Fraction  = Fraction
   )
 }
@@ -310,7 +310,7 @@ pvca_df <- dplyr::bind_rows(pvca_list) %>%
   dplyr::mutate(Method = factor(Method, levels = names(file_list)))
 
 # --------- Plot PVCA in pRDA style: no on-bar labels, table below ----------
-component_order <- c("Treatment","Intersection","Batch","Residuals")
+component_order <- c("Target","Intersection","Batch","Residuals")
 pvca_plot_df <- pvca_df %>%
   dplyr::mutate(
     Method    = factor(Method, levels = names(file_list)),
@@ -324,17 +324,17 @@ pvca_plot_df <- pvca_df %>%
 stopifnot(all(dplyr::count(pvca_plot_df, Method)$n == 4))
 
 cols <- c(
-  "Residuals"    = "#1F77B4",
-  "Batch"        = "#FF7F0E",
-  "Intersection" = "#FFD54F",
-  "Treatment"    = "#BDBDBD"
+  "Residuals"    = "#BDBDBD",
+  "Batch"        = "#FFD54F",
+  "Intersection" = "#FF7F0E",
+  "Target"       = "#1F77B4"
 )
 
 p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
   geom_col(width = 0.72, color = "white", linewidth = 0.4) +
   scale_fill_manual(
     values = cols,
-    breaks = component_order,   # c("Treatment","Intersection","Batch","Residuals")
+    breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
     limits = component_order,
     name   = "Variance Components"
   )+
@@ -363,7 +363,7 @@ tbl <- pvca_plot_df %>%
   dplyr::select(-Fraction) %>%
   tidyr::pivot_wider(names_from = Component, values_from = `%`) %>%
   dplyr::arrange(Method) %>%
-  dplyr::select(Method, Treatment, Intersection, Batch, Residuals)
+  dplyr::select(Method, Target, Intersection, Batch, Residuals)
 
 nr <- nrow(tbl); nc <- ncol(tbl)
 stripe_rows <- rep(c("#FBFCFF", "#F7F8FC"), length.out = nr)
@@ -427,8 +427,8 @@ summarise_pvca_methods <- function(df_long) {
   summary_tbl <- df_long %>%
     group_by(Method) %>%
     summarise(
-      Treatment = sum(Fraction[Component == "Treatment"],   na.rm = TRUE),
-      Batch     = sum(Fraction[Component == "Batch"],       na.rm = TRUE),
+      Target    = sum(Fraction[Component == "Target"],   na.rm = TRUE),
+      Batch     = sum(Fraction[Component == "Batch"],    na.rm = TRUE),
       Intersection = sum(Fraction[Component == "Intersection"], na.rm = TRUE),
       Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
       .groups = "drop"

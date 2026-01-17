@@ -147,7 +147,7 @@ safe_adjR2 <- function(fit) {
   0
 }
 
-# --------- Core calculators (return named numeric: Treatment, Intersection, Batch, Residuals) ---------
+# --------- Core calculators (return named numeric: Target, Intersection, Batch, Residuals) ---------
 compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = label_col) {
   fmt_col <- function(name) sprintf("`%s`", gsub("`", "``", name))
   # ensure sample_id present & align
@@ -169,7 +169,7 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
   X <- dfx %>% select(all_of(feat_cols)) %>% select(where(is.numeric)) %>% as.matrix()
   keep <- apply(X, 2, function(z) all(is.finite(z)) && sd(z, na.rm = TRUE) > 0)
   X <- X[, keep, drop = FALSE]
-  if (!ncol(X)) return(c(Treatment=0, Intersection=0, Batch=0, Residuals=1))
+  if (!ncol(X)) return(c(Target=0, Intersection=0, Batch=0, Residuals=1))
   
   # Aitchison response (CLR; if already log-ratio, row-center)
   Y <- if (any(X < 0, na.rm = TRUE)) sweep(X, 1, rowMeans(X, na.rm = TRUE), "-") else clr_transform(X)
@@ -177,7 +177,7 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
   dfx[[batch_col]] <- factor(dfx[[batch_col]])
   dfx[[treat_col]] <- factor(dfx[[treat_col]])
   if (nlevels(dfx[[treat_col]]) < 2 || nlevels(dfx[[batch_col]]) < 2) {
-    return(c(Treatment=0, Intersection=0, Batch=0, Residuals=1))
+    return(c(Target=0, Intersection=0, Batch=0, Residuals=1))
   }
   
   Ymat <- Y
@@ -198,7 +198,7 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
   r2_inter  <- max(0, r2_both - r2_t_pure - r2_b_pure)
   r2_resid  <- max(0, 1 - (r2_t_pure + r2_b_pure + r2_inter))
   
-  parts <- c(Treatment = r2_t_pure, Intersection = r2_inter,
+  parts <- c(Target = r2_t_pure, Intersection = r2_inter,
              Batch = r2_b_pure, Residuals = r2_resid)
   parts[!is.finite(parts)] <- 0
   parts <- pmax(0, parts)
@@ -209,7 +209,7 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
 
 # --------- Plot + styled table (reusable) ---------
 plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_prefix) {
-  component_order <- c("Treatment","Intersection","Batch","Residuals")
+  component_order <- c("Target","Intersection","Batch","Residuals")
   stopifnot(all(dplyr::count(parts_df, Method)$n == 4))
   
   parts_df <- parts_df %>%
@@ -223,17 +223,17 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
     )
   
   cols <- c(
-    "Residuals"    = "#1F77B4",
-    "Batch"        = "#FF7F0E",
-    "Intersection" = "#FFD54F",
-    "Treatment"    = "#BDBDBD"
+    "Residuals"    = "#BDBDBD",
+    "Batch"        = "#FFD54F",
+    "Intersection" = "#FF7F0E",
+    "Target"       = "#1F77B4"
   )
   
   p <- ggplot(parts_df, aes(x = Method, y = Fraction, fill = Component)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4) +
     scale_fill_manual(
       values = cols,
-      breaks = component_order,   # c("Treatment","Intersection","Batch","Residuals")
+      breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
       limits = component_order,   # lock the scale order
       name   = "Variance Components"
     )+
@@ -345,9 +345,9 @@ if (length(file_list_clr)) {
 
 # ==== pRDA scoring (Aitchison) =========================
 # Per-method score (higher = better):
-#   Proportion = Treatment / (Treatment + Batch + 1e-12)
+#   Proportion = Target / (Target + Batch + 1e-12)
 
-component_order <- c("Treatment","Intersection","Batch","Residuals")
+component_order <- c("Target","Intersection","Batch","Residuals")
 
 ensure_components <- function(parts_df) {
   if (!"Component" %in% names(parts_df)) {
@@ -369,8 +369,8 @@ component_breakdown <- function(parts_df) {
     ensure_components() %>%
     group_by(Method) %>%
     summarise(
-      Treatment   = sum(Fraction[Component == "Treatment"],   na.rm = TRUE),
-      Batch       = sum(Fraction[Component == "Batch"],       na.rm = TRUE),
+      Target      = sum(Fraction[Component == "Target"],   na.rm = TRUE),
+      Batch       = sum(Fraction[Component == "Batch"],    na.rm = TRUE),
       Intersection = sum(Fraction[Component == "Intersection"], na.rm = TRUE),
       Residuals    = sum(Fraction[Component == "Residuals"],    na.rm = TRUE),
       .groups     = "drop"
@@ -390,13 +390,13 @@ if (only_baseline) {
 
   if (exists("parts_df_aitch")) {
     pf <- ensure_components(parts_df_aitch) %>% filter(Method == "Before correction")
-    tr <- sum(pf$Fraction[pf$Component == "Treatment"], na.rm = TRUE)
+    tr <- sum(pf$Fraction[pf$Component == "Target"], na.rm = TRUE)
     bt <- sum(pf$Fraction[pf$Component == "Batch"],     na.rm = TRUE)
     it <- sum(pf$Fraction[pf$Component == "Intersection"], na.rm = TRUE)
     rs <- sum(pf$Fraction[pf$Component == "Residuals"],    na.rm = TRUE)
     assess_rows[["Ait"]] <- tibble::tibble(
       Geometry = "Ait",
-      Treatment = tr, Batch = bt, Intersection = it, Residuals = rs
+      Target = tr, Batch = bt, Intersection = it, Residuals = rs
     )
   }
 

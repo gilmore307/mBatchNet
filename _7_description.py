@@ -396,7 +396,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "explains less feature-level variance."
                             ),
                             html.Li(
-                                "Median R² (Treatment): Higher values indicate preserved biological "
+                                "Median R² (Target): Higher values indicate preserved biological "
                                 "signal across features."
                             ),
                         ]
@@ -420,7 +420,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "segments."
                             ),
                             html.Li(
-                                "Treatment variance: Shows the fraction of constrained variance "
+                                "Target variance: Shows the fraction of constrained variance "
                                 "attributed to the target label—higher bars are preferred."
                             ),
                             html.Li(
@@ -453,7 +453,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "variance shrinks relative to treatment across corrected matrices."
                             ),
                             html.Li(
-                                "Treatment variance: PVCA-estimated fraction attributed to treatment."
+                                "Target variance: PVCA-estimated fraction attributed to target."
                             ),
                             html.Li(
                                 "Batch variance: PVCA-estimated batch contribution that should drop "
