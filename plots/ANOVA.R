@@ -1,4 +1,4 @@
-# ===================== One-way ANOVA R^2 boxplots (Batch vs Treatment) — CLR only =====================
+# ===================== One-way ANOVA R^2 boxplots (Batch vs Target) — CLR only =====================
 suppressPackageStartupMessages({
   library(ggplot2)
   library(readr)
@@ -162,7 +162,7 @@ anova_r2 <- function(y, g) {
   max(0, min(1, as.numeric(r2)))
 }
 
-# ----------------- Core: per-feature one-way ANOVA R^2 (Batch vs Treatment) -----------------
+# ----------------- Core: per-feature one-way ANOVA R^2 (Batch vs Target) -----------------
 compute_anova_r2_BT <- function(df, meta, batch_col = "batch", treat_col = label_col) {
   # align to metadata
   if (!"sample_id" %in% names(df)) {
@@ -176,7 +176,7 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch", treat_col = label
   message("after join rows: ", nrow(dfx))
   
   if (!(batch_col %in% names(dfx))) stop(sprintf("Batch column '%s' not in metadata/joined data.", batch_col))
-  if (!(treat_col %in% names(dfx))) stop(sprintf("Treatment column '%s' not in metadata/joined data.", treat_col))
+  if (!(treat_col %in% names(dfx))) stop(sprintf("Target column '%s' not in metadata/joined data.", treat_col))
   
   feat_cols <- setdiff(names(df), "sample_id")
   X0 <- dfx %>% select(all_of(feat_cols))
@@ -212,7 +212,7 @@ compute_anova_r2_BT <- function(df, meta, batch_col = "batch", treat_col = label
     r2_b <- anova_r2(y, dfx[[batch_col]])
     r2_t <- anova_r2(y, dfx[[treat_col]])
     tibble(Feature = colnames(Y)[j],
-           Effect  = c("Batch","Treatment"),
+           Effect  = c("Batch","Target"),
            R2      = as.numeric(c(r2_b, r2_t)))
   }) %>% bind_rows()
   
@@ -243,10 +243,10 @@ tidy_long <- function(df, method_levels) {
     mutate(
       Effect = case_when(
         tolower(Effect) %in% c("batch","batch") ~ "Batch",
-        tolower(Effect) %in% c("treatment","phenotype","group","trt") ~ "Treatment",
+        tolower(Effect) %in% c("treatment","phenotype","group","trt") ~ "Target",
         TRUE ~ Effect
       ),
-      Effect = factor(Effect, levels = c("Batch","Treatment")),
+      Effect = factor(Effect, levels = c("Batch","Target")),
       Method = factor(Method, levels = method_levels)
     ) %>%
     filter(!is.na(R2), is.finite(R2), R2 >= 0, R2 <= 1)
@@ -269,7 +269,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
                  geom = "errorbar", width = 0.35) +
     stat_boxplot(aes(ymin = after_stat(ymin), ymax = after_stat(ymin)),
                  geom = "errorbar", width = 0.35) +
-    scale_fill_manual(values = c(Batch = "#FF7F0E", Treatment = "#BDBDBD"),
+    scale_fill_manual(values = c(Batch = "#FF7F0E", Target = "#BDBDBD"),
                       name = "Effect", drop = FALSE) +
     scale_y_continuous(limits = c(0, 1)) +
     labs(y = expression("Feature-wise ANOVA "*R^2), x = NULL, title = title) +
@@ -279,9 +279,9 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
       panel.grid   = element_blank(),
       axis.text    = element_text(size = 10),
       axis.title   = element_text(size = 12),
-      strip.background = element_rect(fill = "grey90", colour = NA),
+      strip.background = element_blank(),
       strip.text   = element_text(size = 10),
-      plot.title   = element_text(hjust = 0.5, size = rel(1.2))
+      plot.title   = element_text(hjust = 0.5, size = rel(1.2), face = "bold")
     ) +
     geom_text(
       data = med_df,
@@ -312,13 +312,13 @@ format_assessment_tbl <- function(df) {
   df <- df %>% ungroup()
   if (!("Method" %in% names(df)))     df$Method <- character(nrow(df))
   if (!("Batch" %in% names(df)))      df$Batch <- numeric(nrow(df))
-  if (!("Treatment" %in% names(df)))  df$Treatment <- numeric(nrow(df))
+  if (!("Target" %in% names(df)))  df$Target <- numeric(nrow(df))
   df %>%
     mutate(
       `Median R2 (Batch)` = Batch,
-      `Median R2 (Treatment)` = Treatment
+      `Median R2 (Target)` = Target
     ) %>%
-    select(Method, `Median R2 (Batch)`, `Median R2 (Treatment)`) %>%
+    select(Method, `Median R2 (Batch)`, `Median R2 (Target)`) %>%
     arrange(Method)
 }
 
@@ -327,7 +327,7 @@ apply_R2_superscript_names <- function(df) {
   R2_SUP <- enc2utf8("\u00B2")  # 上标 ²
   nm <- names(df)
   nm[nm == "Median R2 (Batch)"]     <- paste0("Median R", R2_SUP, " (Batch)")
-  nm[nm == "Median R2 (Treatment)"] <- paste0("Median R", R2_SUP, " (Treatment)")
+  nm[nm == "Median R2 (Target)"] <- paste0("Median R", R2_SUP, " (Target)")
   names(df) <- nm
   df
 }
