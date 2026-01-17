@@ -430,9 +430,9 @@ if (n_panels_ait == 1L) {
   h_ait <- base_row_height_in * panel_rows_ait
 }
 fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
-spacer_w_ait_in <- fig_dims_ait$width / 100
-spacer_h_ait_in <- fig_dims_ait$height / 100
-bar_width_ait_in <- fig_dims_ait$width * 2
+spacer_w_ait_in <- fig_dims_ait$width / 1000
+spacer_h_ait_in <- fig_dims_ait$height / 1000
+bar_width_ait_in <- fig_dims_ait$width / 2
 plots_ait <- list()
 for (nm in names(mat_list_ait)) {
   nm_lbl <- unname(method_short_label(nm))
@@ -466,7 +466,7 @@ if (n_panels_ait == 1L) {
 }
 combined_ait <- combined_ait + plot_annotation(
   title = "Dissimilarity Heatmaps",
-  theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
+  theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
 )
 tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
 ggsave(tif_path_ait,
@@ -487,9 +487,9 @@ if (n_panels_bc == 1L) {
   h_bc <- base_row_height_in * panel_rows_bc
 }
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
-spacer_w_bc_in <- fig_dims_bc$width / 100
-spacer_h_bc_in <- fig_dims_bc$height / 100
-bar_width_bc_in <- fig_dims_bc$width * 2
+spacer_w_bc_in <- fig_dims_bc$width / 1000
+spacer_h_bc_in <- fig_dims_bc$height / 1000
+bar_width_bc_in <- fig_dims_bc$width / 2
 plots_bc <- list()
 for (nm in names(mat_list_bc)) {
   nm_lbl <- unname(method_short_label(nm))
