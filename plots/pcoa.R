@@ -594,8 +594,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
   } else {
-    panel_gap_x_in <- fig_dims$width / 10
-    panel_gap_y_in <- fig_dims$height / 10
+    panel_gap_x_in <- fig_dims$width / 100
+    panel_gap_y_in <- fig_dims$height / 100
     total_cols <- panel_cols * 2L - 1L
     total_rows <- panel_rows * 2L - 1L
     widths <- rep(grid::unit(1, "null"), total_cols)
@@ -628,7 +628,7 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain")
+        legend.title     = element_text(size = 14, face = "plain")
       )
     combined <- combined + plot_annotation(
       title = "Principal Coordinates Analysis",
