@@ -364,7 +364,7 @@ message("Saved CSV: anova_raw_assessment_pre.csv / anova_raw_assessment_post.csv
 # ----------------- Plot after CSVs are written -----------------
 p_clr <- make_boxplot(
   r2_long_clr, method_levels_clr,
-  expression("Feature-wise ANOVA " * R^2 )
+  "Feature-wise ANOVA R\u00B2"
 )
 if (!is.null(p_clr)) {
   n_methods <- dplyr::n_distinct(r2_long_clr$Method)
