@@ -281,7 +281,7 @@ make_boxplot <- function(r2_long_df, method_levels, title) {
       axis.title   = element_text(size = 12),
       strip.background = element_blank(),
       strip.text   = element_text(size = 10),
-      plot.title   = element_text(hjust = 0.5, size = rel(1.2), face = "bold")
+      plot.title   = element_text(hjust = 0.5, size = 16, face = "bold")
     ) +
     geom_text(
       data = med_df,
