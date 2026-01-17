@@ -456,10 +456,6 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  panel_margin_x_pt <- fig_dims$width * 72 / 5
-  panel_margin_y_pt <- fig_dims$height * 72 / 5
-  panel_margin <- margin(panel_margin_y_pt, panel_margin_x_pt,
-                         panel_margin_y_pt, panel_margin_x_pt, unit = "pt")
   plot_list <- lapply(valid_names, function(nm) {
     fr <- frames_cache[[nm]]
     label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
@@ -480,8 +476,7 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
         legend.title     = element_text(size = 13, face = "plain")
-      ) &
-      theme(plot.margin = panel_margin) +
+      ) +
       plot_annotation(
         title = "Principal Component Analysis",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
@@ -495,8 +490,7 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
         legend.title     = element_text(size = 13, face = "plain")
-      ) &
-      theme(plot.margin = panel_margin)
+      )
     combined <- combined + plot_annotation(
       title = "Principal Component Analysis",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
