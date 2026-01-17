@@ -419,8 +419,7 @@ CD
       labs(title = title_text) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
-        plot.margin = margin(0, 16, 0, 16)
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16)
       )
     assembled <- (title_strip / assembled) + plot_layout(heights = c(0, 1))
   }
@@ -538,8 +537,7 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box = "vertical",
         legend.text = element_text(size = 12, face = "plain"),
-        legend.title = element_text(size = 13, face = "plain"),
-        plot.margin = margin(8, 14, 8, 14)
+        legend.title = element_text(size = 13, face = "plain")
       ) +
       plot_annotation(
         title = "Non-metric Multidimensional Scaling",
@@ -553,8 +551,7 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box = "vertical",
         legend.text = element_text(size = 12, face = "plain"),
-        legend.title = element_text(size = 13, face = "plain"),
-        plot.margin = margin(8, 14, 8, 14)
+        legend.title = element_text(size = 13, face = "plain")
       )
     combined <- combined + plot_annotation(
       title = "Non-metric Multidimensional Scaling",
