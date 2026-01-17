@@ -340,8 +340,6 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
   if (!is.null(ylim_override)) ylim <- ylim_override
   
   title_text <- if (is.null(label)) "NMDS" else label
-  pmar <- margin(10, 16, 10, 16)
-
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
@@ -351,8 +349,8 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
     guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
     labs(title = NULL,
          x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -364,15 +362,15 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.margin = pmar
+      legend.text = element_text(size = 12, face = "plain"),
+      legend.title = element_text(size = 13, face = "plain")
     )
 
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
     geom_density(aes(fill = !!sym(var.color)),
                  linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
-    ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -380,9 +378,8 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = 'none',
-      axis.title.y = element_text(size = 12, face = "plain"),
-      axis.title.x = element_blank(),
-      plot.margin = pmar
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank()
     )
 
   pRight <- ggplot(plot.df, aes(y = !!sym(ycol))) +
@@ -390,9 +387,9 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       aes(x = after_stat(density), fill = !!sym(var.color)),
       linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
     ) +
-    xlab(NULL) + ylab("Density") +
+    xlab(NULL) + ylab(NULL) +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -400,16 +397,21 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = "none",
-      axis.title.x = element_text(size = 12, face = "plain"),
-      axis.title.y = element_text(size = 12, face = "plain"),
-      plot.margin = margin(10, 16, 10, 16)
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
     )
 
+  pDensityLabel <- ggplot() +
+    annotate("text", x = 0.5, y = 0, label = "Density",
+             hjust = 0.5, vjust = 0, size = 4) +
+    xlim(0, 1) + ylim(0, 1) +
+    theme_void()
+
   design <- "
-A#
-CB
+AB
+CD
 "
-  assembled <- (pTop + pRight + pMain) +
+  assembled <- (pTop + pDensityLabel + pMain + pRight) +
     plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
 
   if (!is.null(title_text) && nzchar(title_text)) {
@@ -417,8 +419,7 @@ CB
       labs(title = title_text) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
-        plot.margin = margin(0, 16, 0, 16)
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16)
       )
     assembled <- (title_strip / assembled) + plot_layout(heights = c(0, 1))
   }
@@ -499,10 +500,14 @@ build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palett
   Filter(function(x) !is.null(x), plots)
 }
 
-save_nmds_plot_set <- function(plot_list, filename_stub) {
-  plot_list <- Filter(function(x) !is.null(x), plot_list)
-  if (!length(plot_list)) return(invisible(NULL))
-  n_panels <- length(plot_list)
+save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_label, filename_stub) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(invisible(NULL))
+  valid_names <- Filter(function(nm) {
+    fr <- frames_cache[[nm]]
+    !is.null(fr) && nrow(fr$plot.df) && (color_var %in% names(fr$plot.df))
+  }, names(frames_cache))
+  n_panels <- length(valid_names)
+  if (!n_panels) return(invisible(NULL))
   panel_cols <- 1L
   panel_rows <- 1L
   base_fig_width_in  <- 1800 / 300
@@ -510,37 +515,49 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
   base_col_width_in  <- base_fig_width_in / 3
   base_row_height_in <- base_fig_height_in
   if (n_panels == 1L) {
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / panel_cols)
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  plot_list <- build_nmds_plot_list(
+    frames_cache,
+    geometry_label,
+    color_var,
+    palette_label
+  )
+  if (!length(plot_list)) return(invisible(NULL))
+  if (n_panels == 1L) {
     combined <- plot_list[[1]] +
       theme(
         legend.position = "bottom",
         legend.direction = "horizontal",
         legend.box = "vertical",
-        plot.margin = margin(8, 14, 8, 14)
+        legend.text = element_text(size = 12, face = "plain"),
+        legend.title = element_text(size = 13, face = "plain")
       ) +
       plot_annotation(
         title = "Non-metric Multidimensional Scaling",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
-    w <- base_fig_width_in; h <- base_fig_height_in
   } else {
-    panel_cols <- min(ncol_grid, n_panels)
-    panel_rows <- ceiling(n_panels / panel_cols)
     combined <- wrap_plots(plot_list, ncol = panel_cols) +
       plot_layout(guides = "collect") &
       theme(
         legend.position = "bottom",
         legend.direction = "horizontal",
         legend.box = "vertical",
-        plot.margin = margin(8, 14, 8, 14)
+        legend.text = element_text(size = 12, face = "plain"),
+        legend.title = element_text(size = 13, face = "plain")
       )
     combined <- combined + plot_annotation(
       title = "Non-metric Multidimensional Scaling",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
     )
-    w <- base_col_width_in * panel_cols
-    h <- base_row_height_in * panel_rows
   }
-  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
@@ -551,10 +568,10 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
 render_geometry_plots <- function(frames_cache, geometry_label, filename_prefix) {
   if (!length(frames_cache)) return()
   message(sprintf("Rendering NMDS plots for %s geometry", geometry_label))
-  batch_plots <- build_nmds_plot_list(frames_cache, geometry_label, batch_var, "Batch")
-  save_nmds_plot_set(batch_plots, paste0("nmds_", filename_prefix, "_batch"))
-  target_plots <- build_nmds_plot_list(frames_cache, geometry_label, target_var, "Target")
-  save_nmds_plot_set(target_plots, paste0("nmds_", filename_prefix, "_target"))
+  save_nmds_plot_set(frames_cache, geometry_label, batch_var, "Batch",
+                     paste0("nmds_", filename_prefix, "_batch"))
+  save_nmds_plot_set(frames_cache, geometry_label, target_var, "Target",
+                     paste0("nmds_", filename_prefix, "_target"))
 }
 
 # =========================

@@ -314,8 +314,6 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
   xlim <- limits$xlim
   ylim <- limits$ylim
 
-  pmar <- margin(10, 16, 10, 16)
-
   # main scatter (legend source)
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
@@ -327,8 +325,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +
     labs(title = NULL) +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     xlab(x.label) + ylab(y.label) + theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -340,16 +338,16 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
-      plot.margin = pmar
+      legend.text = element_text(size = 12, face = "plain"),
+      legend.title = element_text(size = 13, face = "plain")
     )
   
   # top density (PC1) — no legend
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
     geom_density(aes(fill = !!sym(var.color)),
                  linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
-    ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -357,9 +355,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = 'none',
-      axis.title.y = element_text(size = 12, face = "plain"),
-      axis.title.x = element_blank(),
-      plot.margin = pmar
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank()
     )
   
   # right density (PC2)
@@ -368,9 +365,9 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       aes(x = after_stat(density), fill = !!sym(var.color)),
       linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
     ) +
-    xlab(NULL) + ylab("Density") +
+    xlab(NULL) + ylab(NULL) +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -378,17 +375,22 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = "none",
-      axis.title.x = element_text(size = 12, face = "plain"),
-      axis.title.y = element_text(size = 12, face = "plain"),
-      plot.margin = margin(10, 16, 10, 16)
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
     )
   
+  pDensityLabel <- ggplot() +
+    annotate("text", x = 0.5, y = 0, label = "Density",
+             hjust = 0.5, vjust = 0, size = 4) +
+    xlim(0, 1) + ylim(0, 1) +
+    theme_void()
+
   # assemble (DON'T collect here; we'll collect once globally)
   design <- "
-A#
-CB
+AB
+CD
 "
-  assembled <- (pTop + pRight + pMain) +
+  assembled <- (pTop + pDensityLabel + pMain + pRight) +
     plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
 
   if (!is.null(label) && nzchar(label)) {
@@ -396,8 +398,7 @@ CB
       labs(title = label) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
-        plot.margin = margin(0, 16, 0, 16)
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16)
       )
     assembled <- (title_strip / assembled) +
       plot_layout(heights = c(0, 1))
@@ -428,12 +429,35 @@ for (nm in names(file_list)) {
 
 }
 
-build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
-  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
-  plots <- lapply(names(frames_cache), function(nm) {
+save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_stub) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(invisible(NULL))
+  valid_names <- Filter(function(nm) {
     fr <- frames_cache[[nm]]
-    if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
-    if (!(color_var %in% names(fr$plot.df))) return(NULL)
+    !is.null(fr) && nrow(fr$plot.df) && (color_var %in% names(fr$plot.df))
+  }, names(frames_cache))
+  n_panels <- length(valid_names)
+  if (!n_panels) return(invisible(NULL))
+  ncol_grid <- 3
+  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+    ncol_grid <- max(1, opt_fig_ncol)
+  }
+  panel_cols <- 1L
+  panel_rows <- 1L
+  base_fig_width_in  <- 1800 / 300
+  base_fig_height_in <- 1200 / 300
+  base_col_width_in  <- base_fig_width_in / 3
+  base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / panel_cols)
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  plot_list <- lapply(valid_names, function(nm) {
+    fr <- frames_cache[[nm]]
     label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
     mbecPCAPlot(
       plot.df   = fr$plot.df,
@@ -444,55 +468,34 @@ build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
       palette_name = palette_label
     )
   })
-  Filter(function(x) !is.null(x), plots)
-}
-
-save_pca_plot_set <- function(plot_list, filename_stub) {
-  plot_list <- Filter(function(x) !is.null(x), plot_list)
-  if (!length(plot_list)) return(invisible(NULL))
-  ncol_grid <- 3
-  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
-    ncol_grid <- max(1, opt_fig_ncol)
-  }
-  n_panels <- length(plot_list)
-  panel_cols <- 1L
-  panel_rows <- 1L
-  base_fig_width_in  <- 1800 / 300
-  base_fig_height_in <- 1200 / 300
-  base_col_width_in  <- base_fig_width_in / 3
-  base_row_height_in <- base_fig_height_in
   if (n_panels == 1L) {
     combined <- plot_list[[1]] +
       theme(
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
-        plot.margin      = margin(8, 14, 8, 14)
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain")
       ) +
       plot_annotation(
         title = "Principal Component Analysis",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
-    w <- base_fig_width_in; h <- base_fig_height_in
   } else {
-    panel_cols <- min(ncol_grid, n_panels)
-    panel_rows <- ceiling(n_panels / panel_cols)
     combined <- wrap_plots(plot_list, ncol = panel_cols) +
       plot_layout(guides = "collect") &
       theme(
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
-        plot.margin      = margin(8, 14, 8, 14)
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain")
       )
     combined <- combined + plot_annotation(
       title = "Principal Component Analysis",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
     )
-    w <- base_col_width_in * panel_cols
-    h <- base_row_height_in * panel_rows
   }
-  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
@@ -672,7 +675,5 @@ message("Skipping PCA assessment table generation (plots only).")
 # Plot rendering (after CSVs are written)
 # =========================
 
-batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
-save_pca_plot_set(batch_plots, "pca_batch")
-target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
-save_pca_plot_set(target_plots, "pca_target")
+save_pca_plot_set(frames_cache, batch_var, "Batch", "pca_batch")
+save_pca_plot_set(frames_cache, target_var, "Target", "pca_target")
