@@ -523,21 +523,12 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  panel_gap_x_in <- fig_dims$width / 10
-  panel_gap_y_in <- fig_dims$height / 10
   plot_list <- build_nmds_plot_list(
     frames_cache,
     geometry_label,
     color_var,
     palette_label
   )
-  if (n_panels > 1L && length(plot_list)) {
-    plot_list <- lapply(plot_list, function(p) {
-      p + theme(plot.margin = margin(panel_gap_y_in / 2, panel_gap_x_in / 2,
-                                     panel_gap_y_in / 2, panel_gap_x_in / 2,
-                                     unit = "in"))
-    })
-  }
   if (!length(plot_list)) return(invisible(NULL))
   if (n_panels == 1L) {
     combined <- plot_list[[1]] +
@@ -553,8 +544,35 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
   } else {
-    combined <- wrap_plots(plot_list, ncol = panel_cols) +
-      plot_layout(guides = "collect") &
+    panel_gap_x_in <- fig_dims$width / 10
+    panel_gap_y_in <- fig_dims$height / 10
+    total_cols <- panel_cols * 2L - 1L
+    total_rows <- panel_rows * 2L - 1L
+    widths <- rep(grid::unit(1, "null"), total_cols)
+    heights <- rep(grid::unit(1, "null"), total_rows)
+    if (total_cols > 1L) {
+      widths[seq(2, total_cols - 1L, by = 2L)] <- grid::unit(panel_gap_x_in, "in")
+    }
+    if (total_rows > 1L) {
+      heights[seq(2, total_rows - 1L, by = 2L)] <- grid::unit(panel_gap_y_in, "in")
+    }
+    grid_plots <- vector("list", total_cols * total_rows)
+    plot_idx <- 1L
+    for (row in seq_len(total_rows)) {
+      for (col in seq_len(total_cols)) {
+        list_idx <- (row - 1L) * total_cols + col
+        if (row %% 2L == 0L || col %% 2L == 0L) {
+          grid_plots[[list_idx]] <- plot_spacer()
+        } else if (plot_idx <= length(plot_list)) {
+          grid_plots[[list_idx]] <- plot_list[[plot_idx]]
+          plot_idx <- plot_idx + 1L
+        } else {
+          grid_plots[[list_idx]] <- plot_spacer()
+        }
+      }
+    }
+    combined <- wrap_plots(grid_plots, ncol = total_cols) +
+      plot_layout(guides = "collect", widths = widths, heights = heights) &
       theme(
         legend.position = "bottom",
         legend.direction = "horizontal",
