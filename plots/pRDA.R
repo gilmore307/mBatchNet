@@ -209,7 +209,7 @@ compute_prda_parts_aitch <- function(df, meta, batch_col = "batch", treat_col = 
 
 # --------- Plot + styled table (reusable) ---------
 plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_prefix) {
-  component_order <- c("Residuals","Batch","Intersection","Target")
+  component_order <- c("Target","Intersection","Batch","Residuals")
   stopifnot(all(dplyr::count(parts_df, Method)$n == 4))
   
   parts_df <- parts_df %>%
@@ -230,11 +230,10 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   )
   
   p <- ggplot(parts_df, aes(x = Method, y = Fraction, fill = Component)) +
-    geom_col(width = 0.72, color = "white", linewidth = 0.4,
-             position = position_stack(reverse = TRUE)) +
+    geom_col(width = 0.72, color = "white", linewidth = 0.4) +
     scale_fill_manual(
       values = cols,
-      breaks = rev(component_order),   # c("Target","Intersection","Batch","Residuals")
+      breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
       limits = component_order,   # lock the scale order
       name   = "Variance Components"
     )+
@@ -348,7 +347,7 @@ if (length(file_list_clr)) {
 # Per-method score (higher = better):
 #   Proportion = Target / (Target + Batch + 1e-12)
 
-component_order <- c("Residuals","Batch","Intersection","Target")
+component_order <- c("Target","Intersection","Batch","Residuals")
 
 ensure_components <- function(parts_df) {
   if (!"Component" %in% names(parts_df)) {
