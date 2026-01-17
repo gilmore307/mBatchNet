@@ -310,7 +310,7 @@ pvca_df <- dplyr::bind_rows(pvca_list) %>%
   dplyr::mutate(Method = factor(Method, levels = names(file_list)))
 
 # --------- Plot PVCA in pRDA style: no on-bar labels, table below ----------
-component_order <- c("Target","Intersection","Batch","Residuals")
+component_order <- c("Residuals","Batch","Intersection","Target")
 pvca_plot_df <- pvca_df %>%
   dplyr::mutate(
     Method    = factor(Method, levels = names(file_list)),
@@ -331,10 +331,11 @@ cols <- c(
 )
 
 p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
-  geom_col(width = 0.72, color = "white", linewidth = 0.4) +
+  geom_col(width = 0.72, color = "white", linewidth = 0.4,
+           position = position_stack(reverse = TRUE)) +
   scale_fill_manual(
     values = cols,
-    breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
+    breaks = rev(component_order),   # c("Target","Intersection","Batch","Residuals")
     limits = component_order,
     name   = "Variance Components"
   )+
