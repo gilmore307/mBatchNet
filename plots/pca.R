@@ -352,6 +352,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
+      legend.text = element_text(size = 12, face = "plain"),
+      legend.title = element_text(size = 13, face = "plain"),
       plot.margin = pmar
     )
   
@@ -491,6 +493,8 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain"),
         plot.margin      = margin(8, 14, 8, 14)
       ) +
       plot_annotation(
@@ -504,6 +508,8 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain"),
         plot.margin      = margin(8, 14, 8, 14)
       )
     combined <- combined + plot_annotation(

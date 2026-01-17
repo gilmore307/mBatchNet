@@ -420,6 +420,8 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
       legend.position = 'bottom',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
+      legend.text = element_text(size = 12, face = "plain"),
+      legend.title = element_text(size = 13, face = "plain"),
       plot.margin = pmar
     )
   
@@ -605,6 +607,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain"),
         plot.margin      = margin(8, 14, 8, 14)
       ) +
       plot_annotation(
@@ -618,6 +622,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.position  = "bottom",
         legend.direction = "horizontal",
         legend.box       = "vertical",
+        legend.text      = element_text(size = 12, face = "plain"),
+        legend.title     = element_text(size = 13, face = "plain"),
         plot.margin      = margin(8, 14, 8, 14)
       )
     combined <- combined + plot_annotation(
