@@ -263,7 +263,7 @@ if (only_baseline) {
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "plain")
+      plot.title         = element_text(hjust = 0.5, face = "bold")
     )
 
   fig_dims <- apply_fig_overrides(2800 / 300, 1800 / 300, 300)

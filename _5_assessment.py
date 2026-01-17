@@ -38,17 +38,17 @@ from _2_utils import (
 
 
 FIGURE_DEFAULTS = {
-    "alignment": {"width": 2800, "height": 1800, "dpi": 300},
-    "pca": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
-    "pcoa": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
-    "nmds": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
-    "dissimilarity": {"width": 1800, "height": 1200, "dpi": 300, "ncol": 3},
-    "permanova": {"width": 2800, "height": 1800, "dpi": 300},
+    "alignment": {"width": 2000, "height": 1500, "dpi": 300},
+    "pca": {"width": 1200, "height": 1000, "dpi": 300, "ncol": 3},
+    "pcoa": {"width": 1200, "height": 1000, "dpi": 300, "ncol": 3},
+    "nmds": {"width": 1200, "height": 1000, "dpi": 300, "ncol": 3},
+    "dissimilarity": {"width": 800, "height": 1000, "dpi": 300, "ncol": 3},
+    "permanova": {"width": 2000, "height": 1500, "dpi": 300},
     "r2": {"width": 600, "height": 1200, "dpi": 300, "ncol": 6},
     "prda": {"width": 3000, "height": 1500, "dpi": 300},
     "pvca": {"width": 3000, "height": 1500, "dpi": 300},
-    "ebm": {"width": 2550, "height": 1560, "dpi": 300},
-    "silhouette": {"width": 2800, "height": 1800, "dpi": 300},
+    "ebm": {"width": 2000, "height": 1500, "dpi": 300},
+    "silhouette": {"width": 2000, "height": 1500, "dpi": 300},
 }
 
 
