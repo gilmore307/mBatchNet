@@ -249,7 +249,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
       axis.text.x        = element_text(angle = 45, hjust = 1),
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
-      plot.title         = element_text(hjust = 0.5, face = "plain")
+      plot.title         = element_text(hjust = 0.5, face = "bold")
     )
   
   # Values table
