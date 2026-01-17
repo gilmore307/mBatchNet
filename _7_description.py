@@ -73,7 +73,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "The matrix must use features as rows, samples as columns, and omit row/column names. Use consistent feature order between the matrix and metadata to avoid mismatches."
                             ),
                             html.Li(
-                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as treatment/phenotype), and optional covariance columns (keep the count modest to avoid slow runs)."
+                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariance columns (keep the count modest to avoid slow runs)."
                             ),
                             html.Li(
                                 "Use the dropdowns below each table preview to map the batch, target, and covariance columns."
@@ -385,18 +385,18 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Summarises how much of each feature's variance is explained "
-                                "by batch vs. treatment using per-feature ANOVA."
+                                "by batch vs. target using per-feature ANOVA."
                             ),
                             html.Li(
-                                "Figure: Dual bars show the competing batch and treatment medians per "
-                                "method so you can aim for high treatment signal and low batch signal."
+                                "Figure: Dual bars show the competing batch and target medians per "
+                                "method so you can aim for high target signal and low batch signal."
                             ),
                             html.Li(
                                 "Median R² (Batch): Should shrink after correction to show that batch "
                                 "explains less feature-level variance."
                             ),
                             html.Li(
-                                "Median R² (Treatment): Higher values indicate preserved biological "
+                                "Median R² (Target): Higher values indicate preserved biological "
                                 "signal across features."
                             ),
                         ]
@@ -409,18 +409,18 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Purpose: Decomposes constrained variance into treatment, batch, and "
+                                "Purpose: Decomposes constrained variance into target, batch, and "
                                 "shared components to check whether correction prioritises the target "
                                 "label. The analysis partials out covariates so you can attribute "
                                 "changes to the chosen label."
                             ),
                             html.Li(
                                 "Figure: Stacked bars show how much partial RDA variance is assigned "
-                                "to each component—seek taller treatment segments and shrunken batch "
+                                "to each component—seek taller target segments and shrunken batch "
                                 "segments."
                             ),
                             html.Li(
-                                "Treatment variance: Shows the fraction of constrained variance "
+                                "Target variance: Shows the fraction of constrained variance "
                                 "attributed to the target label—higher bars are preferred."
                             ),
                             html.Li(
@@ -428,12 +428,12 @@ HELP_MODAL_SECTIONS: List = [
                                 "Lower fractions suggest better correction."
                             ),
                             html.Li(
-                                "Intersection variance: Captures overlap between batch and treatment "
+                                "Intersection variance: Captures overlap between batch and target "
                                 "effects; large intersections imply residual confounding."
                             ),
                             html.Li(
                                 "Residual variance: Reflects unexplained variance so you can assess "
-                                "model fit when treatment and batch effects are small."
+                                "model fit when target and batch effects are small."
                             ),
                         ]
                     ),
@@ -446,21 +446,21 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Applies Principal Variance Component Analysis to apportion "
-                                "variance across batch, treatment, and residual sources."
+                                "variance across batch, target, and residual sources."
                             ),
                             html.Li(
                                 "Figure: Similar to partial RDA, stacked bars reveal whether batch "
-                                "variance shrinks relative to treatment across corrected matrices."
+                                "variance shrinks relative to target across corrected matrices."
                             ),
                             html.Li(
-                                "Treatment variance: PVCA-estimated fraction attributed to treatment."
+                                "Target variance: PVCA-estimated fraction attributed to target."
                             ),
                             html.Li(
                                 "Batch variance: PVCA-estimated batch contribution that should drop "
                                 "after correction."
                             ),
                             html.Li(
-                                "Intersection variance: PVCA overlap between batch and treatment "
+                                "Intersection variance: PVCA overlap between batch and target "
                                 "effects, highlighting confounding."
                             ),
                             html.Li(
@@ -571,17 +571,17 @@ RANKING_SCORE_DESCRIPTIONS: Dict[str, str] = {
     ),
     "r2": (
         "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\tilde{R}^2_{\\text{treat}} \\times \\big(1 - \\tilde{R}^2_{\\text{batch}}\\big)$\n\n"
-        "**Symbols:** $\\tilde{R}^2_{\\text{treat}}$ = median per-feature ANOVA $R^2$ for the treatment effect; $\\tilde{R}^2_{\\text{batch}}$ = median $R^2$ for the batch effect.\n\n"
-        "Uses median per-feature ANOVA $R^2$ to encourage treatment signal and suppress batch signal."
+        "**Symbols:** $\\tilde{R}^2_{\\text{target}}$ = median per-feature ANOVA $R^2$ for the target effect; $\\tilde{R}^2_{\\text{batch}}$ = median $R^2$ for the batch effect.\n\n"
+        "Uses median per-feature ANOVA $R^2$ to encourage target signal and suppress batch signal."
     ),
     "prda": (
         "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\frac{T}{T + B}$\n\n"
-        "**Symbols:** $T$ = fraction of variance attributed to treatment; $B$ = fraction attributed to batch in the partial RDA decomposition.\n\n"
-        "Compares treatment vs batch variance fractions from partial RDA."
+        "**Symbols:** $T$ = fraction of variance attributed to target; $B$ = fraction attributed to batch in the partial RDA decomposition.\n\n"
+        "Compares target vs batch variance fractions from partial RDA."
     ),
     "pvca": (
         "**Score formula:** $S = \\big(S_{\\text{CLR}} S_{\\text{TSS}}\\big)^{1/2}$, $S_{\\text{geom}} = \\frac{T}{T + B}$\n\n"
-        "**Symbols:** $T$ = PVCA-estimated treatment variance fraction; $B$ = PVCA-estimated batch variance fraction.\n\nLeverages PVCA variance components to favour low batch contribution."
+        "**Symbols:** $T$ = PVCA-estimated target variance fraction; $B$ = PVCA-estimated batch variance fraction.\n\nLeverages PVCA variance components to favour low batch contribution."
     ),
     "ebm": (
         "**Score formula:** $S = \\frac{1}{P} \\sum_{p=1}^{P} H_{\\text{batch}}(p)$\n\n"
