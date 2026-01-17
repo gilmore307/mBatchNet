@@ -523,12 +523,21 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  panel_gap_x_in <- fig_dims$width / 10
+  panel_gap_y_in <- fig_dims$height / 10
   plot_list <- build_nmds_plot_list(
     frames_cache,
     geometry_label,
     color_var,
     palette_label
   )
+  if (n_panels > 1L && length(plot_list)) {
+    plot_list <- lapply(plot_list, function(p) {
+      p + theme(plot.margin = margin(panel_gap_y_in / 2, panel_gap_x_in / 2,
+                                     panel_gap_y_in / 2, panel_gap_x_in / 2,
+                                     unit = "in"))
+    })
+  }
   if (!length(plot_list)) return(invisible(NULL))
   if (n_panels == 1L) {
     combined <- plot_list[[1]] +
