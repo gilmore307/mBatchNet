@@ -395,8 +395,7 @@ CB
       labs(title = label) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
-        plot.margin = margin(0, 16, 0, 16)
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16)
       )
     assembled <- (title_strip / assembled) +
       plot_layout(heights = c(0, 1))
@@ -473,8 +472,7 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.direction = "horizontal",
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain"),
-        plot.margin      = margin(8, 14, 8, 14)
+        legend.title     = element_text(size = 13, face = "plain")
       ) +
       plot_annotation(
         title = "Principal Component Analysis",
@@ -488,8 +486,7 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.direction = "horizontal",
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain"),
-        plot.margin      = margin(8, 14, 8, 14)
+        legend.title     = element_text(size = 13, face = "plain")
       )
     combined <- combined + plot_annotation(
       title = "Principal Component Analysis",
