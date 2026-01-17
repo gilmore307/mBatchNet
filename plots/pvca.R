@@ -371,18 +371,19 @@ fill_core <- matrix(rep(stripe_rows, each = nc), nrow = nr, ncol = nc)
 
 tbl_theme <- gridExtra::ttheme_minimal(
   core = list(
-    fg_params = list(cex = 0.9),
+    fg_params = list(fontsize = 9),
     bg_params = list(fill = fill_core, col = "#D0D7DE"),  # light inner borders
     padding   = unit(c(6, 4), "mm")
   ),
   colhead = list(
-    fg_params = list(cex = 1.0, fontface = 2),
+    fg_params = list(fontsize = 10, fontface = 2),
     bg_params = list(fill = "#ECEFF4", col = "#D0D7DE"),
     padding   = unit(c(7, 4), "mm")
   )
 )
 
 tbl_grob <- gridExtra::tableGrob(tbl, rows = NULL, theme = tbl_theme)
+tbl_grob$widths <- grid::unit(rep(1, length(tbl_grob$widths)), "null")
 
 # Add a clean outer border around the table
 tbl_grob <- gtable::gtable_add_grob(
@@ -417,8 +418,7 @@ combined <- gridExtra::arrangeGrob(
 
 hist_dims <- apply_fig_overrides(10, 5, 300)
 table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
-table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
-final_width  <- max(hist_dims$width, table_width_in)
+final_width  <- hist_dims$width
 final_height <- hist_dims$height + table_height_in +
   grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 

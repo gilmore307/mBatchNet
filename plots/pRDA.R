@@ -266,19 +266,19 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   
   tbl_theme <- gridExtra::ttheme_minimal(
     core = list(
-      fg_params = list(cex = 0.9),
+      fg_params = list(fontsize = 9),
       bg_params = list(fill = fill_core, col = "#D0D7DE"),
       padding   = grid::unit(c(6, 4), "mm")
     ),
     colhead = list(
-      fg_params = list(cex = 1.0, fontface = 2),
+      fg_params = list(fontsize = 10, fontface = 2),
       bg_params = list(fill = "#ECEFF4", col = "#D0D7DE"),
       padding   = grid::unit(c(7, 4), "mm")
     )
   )
   
-  # Just build the table — no header rule (prevents the diagonal slash)
   tbl_grob <- gridExtra::tableGrob(tbl, rows = NULL, theme = tbl_theme)
+  tbl_grob$widths <- grid::unit(rep(1, length(tbl_grob$widths)), "null")
   
   header_rows <- grep("^colhead", tbl_grob$layout$name)
   if (length(header_rows)) {
@@ -317,8 +317,7 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
 
   hist_dims <- apply_fig_overrides(10, 5, 300)
   table_height_in <- grid::convertHeight(sum(tbl_grob$heights), "in", valueOnly = TRUE)
-  table_width_in  <- grid::convertWidth(sum(tbl_grob$widths), "in", valueOnly = TRUE)
-  final_width  <- max(hist_dims$width, table_width_in)
+  final_width  <- hist_dims$width
   final_height <- hist_dims$height + table_height_in +
     grid::convertHeight(spacer_height, "in", valueOnly = TRUE)
 
