@@ -21,7 +21,14 @@ finite_range <- function(...) { v <- unlist(list(...)); v <- v[is.finite(v)]; if
 safe_pad <- function(r, frac = 0.06) { dx <- diff(r); if (!is.finite(dx) || dx <= 0) 1e-6 else dx * frac }
 
 calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
-  margin(0, 0, 0, 0)
+  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
+    return(margin(10, 10, 10, 10))
+  }
+  margin_x_px <- panel_width_px / 10
+  margin_y_px <- panel_height_px / 10
+  margin_x_pt <- margin_x_px * 72 / dpi
+  margin_y_pt <- margin_y_px * 72 / dpi
+  margin(margin_y_pt, margin_x_pt, margin_y_pt, margin_x_pt, unit = "pt")
 }
 
 # ==== Ellipse union bounds (falls back to point ranges if needed) ====
