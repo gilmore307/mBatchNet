@@ -27,12 +27,7 @@ safe_pad <- function(r, frac = 0.06) {
 }
 
 calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
-  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
-    return(margin(2, 2, 2, 2))
-  }
-  margin_px <- 2
-  margin_pt <- margin_px * 72 / dpi
-  margin(margin_pt, margin_pt, margin_pt, margin_pt, unit = "pt")
+  margin(0, 0, 0, 0)
 }
 
 # ==== Ellipse union bounds (falls back to point ranges if needed) ====
