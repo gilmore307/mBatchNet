@@ -573,6 +573,10 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  panel_margin_x_pt <- fig_dims$width * 72 / 5
+  panel_margin_y_pt <- fig_dims$height * 72 / 5
+  panel_margin <- margin(panel_margin_y_pt, panel_margin_x_pt,
+                         panel_margin_y_pt, panel_margin_x_pt, unit = "pt")
   plot_list <- build_pcoa_plot_list(
     frames_cache,
     geometry_label,
@@ -588,7 +592,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
         legend.title     = element_text(size = 13, face = "plain")
-      ) +
+      ) &
+      theme(plot.margin = panel_margin) +
       plot_annotation(
         title = "Principal Coordinates Analysis",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
@@ -602,7 +607,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
         legend.title     = element_text(size = 13, face = "plain")
-      )
+      ) &
+      theme(plot.margin = panel_margin)
     combined <- combined + plot_annotation(
       title = "Principal Coordinates Analysis",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
