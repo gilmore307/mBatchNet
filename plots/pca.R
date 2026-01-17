@@ -347,7 +347,6 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
     geom_density(aes(fill = !!sym(var.color)),
                  linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
-    ylab("Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
     theme_bw() +
@@ -357,7 +356,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = 'none',
-      axis.title.y = element_text(size = 12, face = "plain"),
+      axis.title.y = element_blank(),
       axis.title.x = element_blank(),
       plot.margin = pmar
     )
@@ -368,7 +367,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       aes(x = after_stat(density), fill = !!sym(var.color)),
       linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
     ) +
-    xlab(NULL) + ylab("Density") +
+    xlab(NULL) + ylab(NULL) +
+    labs(title = "Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
     theme_bw() +
@@ -378,8 +378,10 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.text = element_blank(),
       axis.ticks = element_blank(),
       legend.position = "none",
-      axis.title.x = element_text(size = 12, face = "plain"),
-      axis.title.y = element_text(size = 12, face = "plain"),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
+      plot.title.position = "plot",
       plot.margin = margin(10, 16, 10, 16)
     )
   
