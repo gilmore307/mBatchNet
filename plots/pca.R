@@ -75,17 +75,6 @@ safe_pad <- function(r, frac = 0.12) {
   if (!is.finite(dx) || dx <= 0) return(1e-6) else dx * frac
 }
 
-calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
-  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
-    return(margin(10, 10, 10, 10))
-  }
-  margin_x_px <- panel_width_px / 10
-  margin_y_px <- panel_height_px / 10
-  margin_x_pt <- margin_x_px * 72 / dpi
-  margin_y_pt <- margin_y_px * 72 / dpi
-  margin(margin_y_pt, margin_x_pt, margin_y_pt, margin_x_pt, unit = "pt")
-}
-
 panel_limits_for_scores <- function(scores, group_var = "batch", level = 0.95) {
   ell_bounds <- ellipse_union_bounds(scores, group_var, level = level, n = 240)
   xr <- safe_range(scores$PCX)
@@ -300,8 +289,7 @@ compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_
 }
 
 # ==== panel: scatter + marginal densities; legend kept (not collected here) ====
-mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch",
-                        panel_margin = NULL) {
+mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch") {
   
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
@@ -326,8 +314,6 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
   xlim <- limits$xlim
   ylim <- limits$ylim
 
-  pmar <- if (is.null(panel_margin)) margin(10, 16, 10, 16) else panel_margin
-
   # main scatter (legend source)
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
@@ -339,8 +325,8 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +
     labs(title = NULL) +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     xlab(x.label) + ylab(y.label) + theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -353,8 +339,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       legend.direction = 'horizontal',
       legend.box = 'vertical',
       legend.text = element_text(size = 12, face = "plain"),
-      legend.title = element_text(size = 13, face = "plain"),
-      plot.margin = pmar
+      legend.title = element_text(size = 13, face = "plain")
     )
   
   # top density (PC1) — no legend
@@ -362,7 +347,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
     geom_density(aes(fill = !!sym(var.color)),
                  linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -371,8 +356,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.ticks = element_blank(),
       legend.position = 'none',
       axis.title.y = element_blank(),
-      axis.title.x = element_blank(),
-      plot.margin = pmar
+      axis.title.x = element_blank()
     )
   
   # right density (PC2)
@@ -384,7 +368,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
     xlab(NULL) + ylab(NULL) +
     labs(title = "Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -395,8 +379,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
-      plot.title.position = "plot",
-      plot.margin = pmar
+      plot.title.position = "plot"
     )
   
   # assemble (DON'T collect here; we'll collect once globally)
@@ -471,9 +454,6 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  panel_width_px <- (fig_dims$width * fig_dims$dpi) / panel_cols
-  panel_height_px <- (fig_dims$height * fig_dims$dpi) / panel_rows
-  panel_margin <- calc_panel_margin(panel_width_px, panel_height_px, fig_dims$dpi)
   plot_list <- lapply(valid_names, function(nm) {
     fr <- frames_cache[[nm]]
     label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
@@ -483,8 +463,7 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
       model.vars = c(color_var),
       pca.axes  = pcs_to_plot,
       label     = label_nm,
-      palette_name = palette_label,
-      panel_margin = panel_margin
+      palette_name = palette_label
     )
   })
   if (n_panels == 1L) {

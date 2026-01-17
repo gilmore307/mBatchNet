@@ -20,17 +20,6 @@ safe_range <- function(v) { v <- v[is.finite(v)]; if (!length(v)) c(0,0) else ra
 finite_range <- function(...) { v <- unlist(list(...)); v <- v[is.finite(v)]; if (!length(v)) c(0,0) else range(v, na.rm = TRUE) }
 safe_pad <- function(r, frac = 0.06) { dx <- diff(r); if (!is.finite(dx) || dx <= 0) 1e-6 else dx * frac }
 
-calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
-  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
-    return(margin(10, 10, 10, 10))
-  }
-  margin_x_px <- panel_width_px / 10
-  margin_y_px <- panel_height_px / 10
-  margin_x_pt <- margin_x_px * 72 / dpi
-  margin_y_pt <- margin_y_px * 72 / dpi
-  margin(margin_y_pt, margin_x_pt, margin_y_pt, margin_x_pt, unit = "pt")
-}
-
 # ==== Ellipse union bounds (falls back to point ranges if needed) ====
 ellipse_union_bounds <- function(df_scores, group_var, level = 0.95, n = 240) {
   if (!nrow(df_scores)) return(list(x = c(0,0), y = c(0,0)))
@@ -326,7 +315,7 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch", label
 # ==== NMDS panel (scatter with ellipses) with per-panel limits ====
 nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
                        label = NULL, xlim_override = NULL, ylim_override = NULL,
-                       palette_name = "Batch", panel_margin = NULL) {
+                       palette_name = "Batch") {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
                 "#8C564B","#C49C94","#F7B6D2","#7F7F7F","#C7C7C7","#DBDB8D",
@@ -351,8 +340,6 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
   if (!is.null(ylim_override)) ylim <- ylim_override
   
   title_text <- if (is.null(label)) "NMDS" else label
-  pmar <- if (is.null(panel_margin)) margin(10, 16, 10, 16) else panel_margin
-
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
     stat_ellipse(aes(group = !!sym(var.color)),
@@ -362,8 +349,8 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
     guides(colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)) +
     labs(title = NULL,
          x = paste0("NMDS", axes[1]), y = paste0("NMDS", axes[2])) +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -376,15 +363,14 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       legend.direction = 'horizontal',
       legend.box = 'vertical',
       legend.text = element_text(size = 12, face = "plain"),
-      legend.title = element_text(size = 13, face = "plain"),
-      plot.margin = pmar
+      legend.title = element_text(size = 13, face = "plain")
     )
 
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
     geom_density(aes(fill = !!sym(var.color)),
                  linewidth = 0.3, alpha = 0.5, show.legend = FALSE) +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_x_continuous(limits = xlim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -393,8 +379,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.ticks = element_blank(),
       legend.position = 'none',
       axis.title.y = element_blank(),
-      axis.title.x = element_blank(),
-      plot.margin = pmar
+      axis.title.x = element_blank()
     )
 
   pRight <- ggplot(plot.df, aes(y = !!sym(ycol))) +
@@ -405,7 +390,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
     xlab(NULL) + ylab(NULL) +
     labs(title = "Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
-    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
     theme(
       panel.background = element_blank(),
@@ -416,8 +401,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
-      plot.title.position = "plot",
-      plot.margin = pmar
+      plot.title.position = "plot"
     )
 
   design <- "
@@ -477,8 +461,7 @@ for (nm in names(file_list_tss)) {
   frames_cache_tss[[nm]] <- fr
 }
 
-build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palette_label,
-                                 panel_margin = NULL) {
+build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palette_label) {
   if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
   plots <- lapply(names(frames_cache), function(nm) {
     fr <- frames_cache[[nm]]
@@ -510,8 +493,7 @@ build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palett
     nmds_panel(fr$plot.df, c(color_var),
                axes = axes_to_plot, label = label_nm,
                xlim_override = x_override, ylim_override = y_override,
-               palette_name = palette_label,
-               panel_margin = panel_margin)
+               palette_name = palette_label)
   })
   Filter(function(x) !is.null(x), plots)
 }
@@ -539,15 +521,11 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
     h <- base_row_height_in * panel_rows
   }
   fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
-  panel_width_px <- (fig_dims$width * fig_dims$dpi) / panel_cols
-  panel_height_px <- (fig_dims$height * fig_dims$dpi) / panel_rows
-  panel_margin <- calc_panel_margin(panel_width_px, panel_height_px, fig_dims$dpi)
   plot_list <- build_nmds_plot_list(
     frames_cache,
     geometry_label,
     color_var,
-    palette_label,
-    panel_margin = panel_margin
+    palette_label
   )
   if (!length(plot_list)) return(invisible(NULL))
   if (n_panels == 1L) {
