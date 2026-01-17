@@ -224,8 +224,8 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   
   cols <- c(
     "Residuals"    = "#BDBDBD",
-    "Batch"        = "#FFD54F",
-    "Intersection" = "#FF7F0E",
+    "Batch"        = "#FF7F0E",
+    "Intersection" = "#FFD54F",
     "Target"       = "#1F77B4"
   )
   

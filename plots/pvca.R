@@ -325,8 +325,8 @@ stopifnot(all(dplyr::count(pvca_plot_df, Method)$n == 4))
 
 cols <- c(
   "Residuals"    = "#BDBDBD",
-  "Batch"        = "#FFD54F",
-  "Intersection" = "#FF7F0E",
+  "Batch"        = "#FF7F0E",
+  "Intersection" = "#FFD54F",
   "Target"       = "#1F77B4"
 )
 
