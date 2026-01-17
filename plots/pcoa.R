@@ -432,7 +432,6 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
       linewidth = 0.3, alpha = 0.5, orientation = "y", show.legend = FALSE
     ) +
     xlab(NULL) + ylab(NULL) +
-    labs(title = "Density") +
     scale_fill_manual(values = mbecCols, guide = "none") +
     scale_y_continuous(limits = ylim, expand = expansion(mult = c(0, 0))) +
     theme_bw() +
@@ -443,16 +442,20 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
       axis.ticks = element_blank(),
       legend.position = "none",
       axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
-      plot.title.position = "plot"
+      axis.title.y = element_blank()
     )
   
+  pDensityLabel <- ggplot() +
+    annotate("text", x = 0.5, y = 0, label = "Density",
+             hjust = 0.5, vjust = 0, size = 4) +
+    xlim(0, 1) + ylim(0, 1) +
+    theme_void()
+
   design <- "
-A#
-CB
+AB
+CD
 "
-  assembled <- (pTop + pRight + pMain) +
+  assembled <- (pTop + pDensityLabel + pMain + pRight) +
     plot_layout(design = design, widths = c(3, 1), heights = c(1.6, 3.2))
 
   if (!is.null(label) && nzchar(label)) {
@@ -460,7 +463,8 @@ CB
       labs(title = label) +
       theme_void() +
       theme(
-        plot.title = element_text(hjust = 0.5, face = "plain", size = 16)
+        plot.title = element_text(hjust = 0.5, face = "plain", size = 16),
+        plot.margin = margin(0, 16, 0, 16)
       )
     assembled <- (title_strip / assembled) +
       plot_layout(heights = c(0, 1))
@@ -584,7 +588,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain")
+        legend.title     = element_text(size = 13, face = "plain"),
+        plot.margin      = margin(8, 14, 8, 14)
       ) +
       plot_annotation(
         title = "Principal Coordinates Analysis",
@@ -598,7 +603,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box       = "vertical",
         legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain")
+        legend.title     = element_text(size = 13, face = "plain"),
+        plot.margin      = margin(8, 14, 8, 14)
       )
     combined <- combined + plot_annotation(
       title = "Principal Coordinates Analysis",
