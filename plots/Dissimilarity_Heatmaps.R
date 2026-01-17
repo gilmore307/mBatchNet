@@ -92,6 +92,49 @@ apply_fig_overrides <- function(width_in, height_in, default_dpi = 300,
   list(width = w, height = h, dpi = dpi)
 }
 
+build_spaced_layout <- function(plots, panel_cols, panel_rows,
+                                total_width_in, total_height_in,
+                                spacer_fraction = 0.01) {
+  panel_cols <- max(1L, as.integer(panel_cols))
+  panel_rows <- max(1L, as.integer(panel_rows))
+  if (panel_cols == 1L && panel_rows == 1L) {
+    return(plots[[1]])
+  }
+  n_panels <- length(plots)
+  spacer_width_in <- total_width_in * spacer_fraction
+  spacer_height_in <- total_height_in * spacer_fraction
+  plot_width_in <- (total_width_in - spacer_width_in * (panel_cols - 1L)) / panel_cols
+  plot_height_in <- (total_height_in - spacer_height_in * (panel_rows - 1L)) / panel_rows
+  ncol_total <- panel_cols * 2L - 1L
+  nrow_total <- panel_rows * 2L - 1L
+
+  layout_plots <- vector("list", ncol_total * nrow_total)
+  plot_idx <- 1L
+  for (r in seq_len(nrow_total)) {
+    for (c in seq_len(ncol_total)) {
+      pos <- (r - 1L) * ncol_total + c
+      if (r %% 2L == 1L && c %% 2L == 1L && plot_idx <= n_panels) {
+        layout_plots[[pos]] <- plots[[plot_idx]]
+        plot_idx <- plot_idx + 1L
+      } else {
+        layout_plots[[pos]] <- plot_spacer()
+      }
+    }
+  }
+
+  widths_values <- rep(plot_width_in, ncol_total)
+  widths_values[seq(2, ncol_total, by = 2)] <- spacer_width_in
+  heights_values <- rep(plot_height_in, nrow_total)
+  heights_values[seq(2, nrow_total, by = 2)] <- spacer_height_in
+
+  wrap_plots(layout_plots, ncol = ncol_total, nrow = nrow_total) +
+    plot_layout(
+      widths = grid::unit(widths_values, "in"),
+      heights = grid::unit(heights_values, "in"),
+      guides = "collect"
+    )
+}
+
 # ==== Metadata ====
 meta_path <- if (file.exists(file.path(output_folder, "metadata_origin.csv"))) {
   file.path(output_folder, "metadata_origin.csv")
@@ -419,17 +462,30 @@ if (n_panels_ait == 1L) {
 } else {
   panel_cols_ait <- min(ncol_grid, n_panels_ait)
   panel_rows_ait <- ceiling(n_panels_ait / panel_cols_ait)
-  combined_ait <- wrap_plots(plots_ait, ncol = panel_cols_ait) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
   w_ait <- base_col_width_in * panel_cols_ait
   h_ait <- base_row_height_in * panel_rows_ait
+}
+fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
+if (n_panels_ait > 1L) {
+  combined_ait <- build_spaced_layout(
+    plots_ait,
+    panel_cols = panel_cols_ait,
+    panel_rows = panel_rows_ait,
+    total_width_in = fig_dims_ait$width,
+    total_height_in = fig_dims_ait$height,
+    spacer_fraction = 1 / 100
+  ) &
+    theme(legend.position = "bottom", legend.direction = "horizontal")
 }
 combined_ait <- combined_ait + plot_annotation(
   title = "Dissimilarity Heatmaps",
   theme = theme(plot.title = element_text(hjust = 0.5, size = 20))
 )
-fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
+combined_ait <- combined_ait &
+  guides(fill = guide_colourbar(
+    title.position = "top",
+    barwidth = grid::unit(fig_dims_ait$width * 2, "in")
+  ))
 tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
 ggsave(tif_path_ait,
        plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
@@ -447,17 +503,30 @@ if (n_panels_bc == 1L) {
 } else {
   panel_cols_bc <- min(ncol_grid, n_panels_bc)
   panel_rows_bc <- ceiling(n_panels_bc / panel_cols_bc)
-  combined_bc <- wrap_plots(plots_bc, ncol = panel_cols_bc) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
   w_bc <- base_col_width_in * panel_cols_bc
   h_bc <- base_row_height_in * panel_rows_bc
+}
+fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
+if (n_panels_bc > 1L) {
+  combined_bc <- build_spaced_layout(
+    plots_bc,
+    panel_cols = panel_cols_bc,
+    panel_rows = panel_rows_bc,
+    total_width_in = fig_dims_bc$width,
+    total_height_in = fig_dims_bc$height,
+    spacer_fraction = 1 / 100
+  ) &
+    theme(legend.position = "bottom", legend.direction = "horizontal")
 }
 combined_bc <- combined_bc + plot_annotation(
   title = "Dissimilarity Heatmaps",
   theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
 )
-fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
+combined_bc <- combined_bc &
+  guides(fill = guide_colourbar(
+    title.position = "top",
+    barwidth = grid::unit(fig_dims_bc$width * 2, "in")
+  ))
 tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
 ggsave(tif_path_bc,
        plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
