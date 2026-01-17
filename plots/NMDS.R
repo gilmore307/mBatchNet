@@ -20,6 +20,17 @@ safe_range <- function(v) { v <- v[is.finite(v)]; if (!length(v)) c(0,0) else ra
 finite_range <- function(...) { v <- unlist(list(...)); v <- v[is.finite(v)]; if (!length(v)) c(0,0) else range(v, na.rm = TRUE) }
 safe_pad <- function(r, frac = 0.06) { dx <- diff(r); if (!is.finite(dx) || dx <= 0) 1e-6 else dx * frac }
 
+calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
+  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
+    return(margin(10, 16, 10, 16))
+  }
+  margin_x_px <- panel_width_px / 20
+  margin_y_px <- panel_height_px / 20
+  margin_x_pt <- margin_x_px * 72 / dpi
+  margin_y_pt <- margin_y_px * 72 / dpi
+  margin(margin_y_pt, margin_x_pt, margin_y_pt, margin_x_pt, unit = "pt")
+}
+
 # ==== Ellipse union bounds (falls back to point ranges if needed) ====
 ellipse_union_bounds <- function(df_scores, group_var, level = 0.95, n = 240) {
   if (!nrow(df_scores)) return(list(x = c(0,0), y = c(0,0)))
@@ -315,7 +326,7 @@ compute_nmds_frames_bray <- function(df, metadata, model.vars = c("batch", label
 # ==== NMDS panel (scatter with ellipses) with per-panel limits ====
 nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
                        label = NULL, xlim_override = NULL, ylim_override = NULL,
-                       palette_name = "Batch") {
+                       palette_name = "Batch", panel_margin = NULL) {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
                 "#8C564B","#C49C94","#F7B6D2","#7F7F7F","#C7C7C7","#DBDB8D",
@@ -340,7 +351,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
   if (!is.null(ylim_override)) ylim <- ylim_override
   
   title_text <- if (is.null(label)) "NMDS" else label
-  pmar <- margin(10, 16, 10, 16)
+  pmar <- if (is.null(panel_margin)) margin(10, 16, 10, 16) else panel_margin
 
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
     geom_point(shape = 16, size = 1.3, alpha = 0.85) +
@@ -404,7 +415,7 @@ nmds_panel <- function(plot.df, model.vars, axes = c(1,2),
       axis.title.y = element_blank(),
       plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
       plot.title.position = "plot",
-      plot.margin = margin(10, 16, 10, 16)
+      plot.margin = pmar
     )
 
   design <- "
@@ -464,7 +475,8 @@ for (nm in names(file_list_tss)) {
   frames_cache_tss[[nm]] <- fr
 }
 
-build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palette_label) {
+build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palette_label,
+                                 panel_margin = NULL) {
   if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
   plots <- lapply(names(frames_cache), function(nm) {
     fr <- frames_cache[[nm]]
@@ -496,21 +508,46 @@ build_nmds_plot_list <- function(frames_cache, geometry_label, color_var, palett
     nmds_panel(fr$plot.df, c(color_var),
                axes = axes_to_plot, label = label_nm,
                xlim_override = x_override, ylim_override = y_override,
-               palette_name = palette_label)
+               palette_name = palette_label,
+               panel_margin = panel_margin)
   })
   Filter(function(x) !is.null(x), plots)
 }
 
-save_nmds_plot_set <- function(plot_list, filename_stub) {
-  plot_list <- Filter(function(x) !is.null(x), plot_list)
-  if (!length(plot_list)) return(invisible(NULL))
-  n_panels <- length(plot_list)
+save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_label, filename_stub) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(invisible(NULL))
+  valid_names <- Filter(function(nm) {
+    fr <- frames_cache[[nm]]
+    !is.null(fr) && nrow(fr$plot.df) && (color_var %in% names(fr$plot.df))
+  }, names(frames_cache))
+  n_panels <- length(valid_names)
+  if (!n_panels) return(invisible(NULL))
   panel_cols <- 1L
   panel_rows <- 1L
   base_fig_width_in  <- 1800 / 300
   base_fig_height_in <- 1200 / 300
   base_col_width_in  <- base_fig_width_in / 3
   base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / panel_cols)
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  panel_width_px <- (fig_dims$width * fig_dims$dpi) / panel_cols
+  panel_height_px <- (fig_dims$height * fig_dims$dpi) / panel_rows
+  panel_margin <- calc_panel_margin(panel_width_px, panel_height_px, fig_dims$dpi)
+  plot_list <- build_nmds_plot_list(
+    frames_cache,
+    geometry_label,
+    color_var,
+    palette_label,
+    panel_margin = panel_margin
+  )
+  if (!length(plot_list)) return(invisible(NULL))
   if (n_panels == 1L) {
     combined <- plot_list[[1]] +
       theme(
@@ -523,10 +560,7 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
         title = "Non-metric Multidimensional Scaling",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
-    w <- base_fig_width_in; h <- base_fig_height_in
   } else {
-    panel_cols <- min(ncol_grid, n_panels)
-    panel_rows <- ceiling(n_panels / panel_cols)
     combined <- wrap_plots(plot_list, ncol = panel_cols) +
       plot_layout(guides = "collect") &
       theme(
@@ -539,10 +573,7 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
       title = "Non-metric Multidimensional Scaling",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
     )
-    w <- base_col_width_in * panel_cols
-    h <- base_row_height_in * panel_rows
   }
-  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
@@ -553,10 +584,10 @@ save_nmds_plot_set <- function(plot_list, filename_stub) {
 render_geometry_plots <- function(frames_cache, geometry_label, filename_prefix) {
   if (!length(frames_cache)) return()
   message(sprintf("Rendering NMDS plots for %s geometry", geometry_label))
-  batch_plots <- build_nmds_plot_list(frames_cache, geometry_label, batch_var, "Batch")
-  save_nmds_plot_set(batch_plots, paste0("nmds_", filename_prefix, "_batch"))
-  target_plots <- build_nmds_plot_list(frames_cache, geometry_label, target_var, "Target")
-  save_nmds_plot_set(target_plots, paste0("nmds_", filename_prefix, "_target"))
+  save_nmds_plot_set(frames_cache, geometry_label, batch_var, "Batch",
+                     paste0("nmds_", filename_prefix, "_batch"))
+  save_nmds_plot_set(frames_cache, geometry_label, target_var, "Target",
+                     paste0("nmds_", filename_prefix, "_target"))
 }
 
 # =========================

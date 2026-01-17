@@ -75,6 +75,17 @@ safe_pad <- function(r, frac = 0.12) {
   if (!is.finite(dx) || dx <= 0) return(1e-6) else dx * frac
 }
 
+calc_panel_margin <- function(panel_width_px, panel_height_px, dpi) {
+  if (!is.finite(panel_width_px) || !is.finite(panel_height_px) || !is.finite(dpi) || dpi <= 0) {
+    return(margin(10, 16, 10, 16))
+  }
+  margin_x_px <- panel_width_px / 20
+  margin_y_px <- panel_height_px / 20
+  margin_x_pt <- margin_x_px * 72 / dpi
+  margin_y_pt <- margin_y_px * 72 / dpi
+  margin(margin_y_pt, margin_x_pt, margin_y_pt, margin_x_pt, unit = "pt")
+}
+
 panel_limits_for_scores <- function(scores, group_var = "batch", level = 0.95) {
   ell_bounds <- ellipse_union_bounds(scores, group_var, level = level, n = 240)
   xr <- safe_range(scores$PCX)
@@ -289,7 +300,8 @@ compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_
 }
 
 # ==== panel: scatter + marginal densities; legend kept (not collected here) ====
-mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch") {
+mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch",
+                        panel_margin = NULL) {
   
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
@@ -314,7 +326,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
   xlim <- limits$xlim
   ylim <- limits$ylim
 
-  pmar <- margin(10, 16, 10, 16)
+  pmar <- if (is.null(panel_margin)) margin(10, 16, 10, 16) else panel_margin
 
   # main scatter (legend source)
   pMain <- ggplot(plot.df, aes(x = !!sym(xcol), y = !!sym(ycol), colour = !!sym(var.color))) +
@@ -382,7 +394,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.title.y = element_blank(),
       plot.title = element_text(hjust = 0.5, size = 12, face = "plain"),
       plot.title.position = "plot",
-      plot.margin = margin(10, 16, 10, 16)
+      plot.margin = pmar
     )
   
   # assemble (DON'T collect here; we'll collect once globally)
@@ -430,12 +442,38 @@ for (nm in names(file_list)) {
 
 }
 
-build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
-  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
-  plots <- lapply(names(frames_cache), function(nm) {
+save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_stub) {
+  if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(invisible(NULL))
+  valid_names <- Filter(function(nm) {
     fr <- frames_cache[[nm]]
-    if (is.null(fr) || !nrow(fr$plot.df)) return(NULL)
-    if (!(color_var %in% names(fr$plot.df))) return(NULL)
+    !is.null(fr) && nrow(fr$plot.df) && (color_var %in% names(fr$plot.df))
+  }, names(frames_cache))
+  n_panels <- length(valid_names)
+  if (!n_panels) return(invisible(NULL))
+  ncol_grid <- 3
+  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
+    ncol_grid <- max(1, opt_fig_ncol)
+  }
+  panel_cols <- 1L
+  panel_rows <- 1L
+  base_fig_width_in  <- 1800 / 300
+  base_fig_height_in <- 1200 / 300
+  base_col_width_in  <- base_fig_width_in / 3
+  base_row_height_in <- base_fig_height_in
+  if (n_panels == 1L) {
+    w <- base_fig_width_in; h <- base_fig_height_in
+  } else {
+    panel_cols <- min(ncol_grid, n_panels)
+    panel_rows <- ceiling(n_panels / panel_cols)
+    w <- base_col_width_in * panel_cols
+    h <- base_row_height_in * panel_rows
+  }
+  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
+  panel_width_px <- (fig_dims$width * fig_dims$dpi) / panel_cols
+  panel_height_px <- (fig_dims$height * fig_dims$dpi) / panel_rows
+  panel_margin <- calc_panel_margin(panel_width_px, panel_height_px, fig_dims$dpi)
+  plot_list <- lapply(valid_names, function(nm) {
+    fr <- frames_cache[[nm]]
     label_nm <- paste(nm, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
     mbecPCAPlot(
       plot.df   = fr$plot.df,
@@ -443,26 +481,10 @@ build_pca_plot_list <- function(frames_cache, color_var, palette_label) {
       model.vars = c(color_var),
       pca.axes  = pcs_to_plot,
       label     = label_nm,
-      palette_name = palette_label
+      palette_name = palette_label,
+      panel_margin = panel_margin
     )
   })
-  Filter(function(x) !is.null(x), plots)
-}
-
-save_pca_plot_set <- function(plot_list, filename_stub) {
-  plot_list <- Filter(function(x) !is.null(x), plot_list)
-  if (!length(plot_list)) return(invisible(NULL))
-  ncol_grid <- 3
-  if (!is.na(opt_fig_ncol) && opt_fig_ncol >= 1) {
-    ncol_grid <- max(1, opt_fig_ncol)
-  }
-  n_panels <- length(plot_list)
-  panel_cols <- 1L
-  panel_rows <- 1L
-  base_fig_width_in  <- 1800 / 300
-  base_fig_height_in <- 1200 / 300
-  base_col_width_in  <- base_fig_width_in / 3
-  base_row_height_in <- base_fig_height_in
   if (n_panels == 1L) {
     combined <- plot_list[[1]] +
       theme(
@@ -475,10 +497,7 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
         title = "Principal Component Analysis",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
-    w <- base_fig_width_in; h <- base_fig_height_in
   } else {
-    panel_cols <- min(ncol_grid, n_panels)
-    panel_rows <- ceiling(n_panels / panel_cols)
     combined <- wrap_plots(plot_list, ncol = panel_cols) +
       plot_layout(guides = "collect") &
       theme(
@@ -491,10 +510,7 @@ save_pca_plot_set <- function(plot_list, filename_stub) {
       title = "Principal Component Analysis",
       theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
     )
-    w <- base_col_width_in * panel_cols
-    h <- base_row_height_in * panel_rows
   }
-  fig_dims <- apply_fig_overrides(w, h, 300, panel_cols, panel_rows)
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
          plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
@@ -674,7 +690,5 @@ message("Skipping PCA assessment table generation (plots only).")
 # Plot rendering (after CSVs are written)
 # =========================
 
-batch_plots <- build_pca_plot_list(frames_cache, batch_var, "Batch")
-save_pca_plot_set(batch_plots, "pca_batch")
-target_plots <- build_pca_plot_list(frames_cache, target_var, "Target")
-save_pca_plot_set(target_plots, "pca_target")
+save_pca_plot_set(frames_cache, batch_var, "Batch", "pca_batch")
+save_pca_plot_set(frames_cache, target_var, "Target", "pca_target")
