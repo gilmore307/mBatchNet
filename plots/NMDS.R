@@ -537,15 +537,42 @@ save_nmds_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.direction = "horizontal",
         legend.box = "vertical",
         legend.text = element_text(size = 12, face = "plain"),
-        legend.title = element_text(size = 13, face = "plain")
+        legend.title = element_text(size = 14, face = "plain")
       ) +
       plot_annotation(
         title = "Non-metric Multidimensional Scaling",
         theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
   } else {
-    combined <- wrap_plots(plot_list, ncol = panel_cols) +
-      plot_layout(guides = "collect") &
+    panel_gap_x_in <- fig_dims$width / 100
+    panel_gap_y_in <- fig_dims$height / 100
+    total_cols <- panel_cols * 2L - 1L
+    total_rows <- panel_rows * 2L - 1L
+    widths <- rep(grid::unit(1, "null"), total_cols)
+    heights <- rep(grid::unit(1, "null"), total_rows)
+    if (total_cols > 1L) {
+      widths[seq(2, total_cols - 1L, by = 2L)] <- grid::unit(panel_gap_x_in, "in")
+    }
+    if (total_rows > 1L) {
+      heights[seq(2, total_rows - 1L, by = 2L)] <- grid::unit(panel_gap_y_in, "in")
+    }
+    grid_plots <- vector("list", total_cols * total_rows)
+    plot_idx <- 1L
+    for (row in seq_len(total_rows)) {
+      for (col in seq_len(total_cols)) {
+        list_idx <- (row - 1L) * total_cols + col
+        if (row %% 2L == 0L || col %% 2L == 0L) {
+          grid_plots[[list_idx]] <- plot_spacer()
+        } else if (plot_idx <= length(plot_list)) {
+          grid_plots[[list_idx]] <- plot_list[[plot_idx]]
+          plot_idx <- plot_idx + 1L
+        } else {
+          grid_plots[[list_idx]] <- plot_spacer()
+        }
+      }
+    }
+    combined <- wrap_plots(grid_plots, ncol = total_cols) +
+      plot_layout(guides = "collect", widths = widths, heights = heights) &
       theme(
         legend.position = "bottom",
         legend.direction = "horizontal",
