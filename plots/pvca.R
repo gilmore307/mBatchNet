@@ -331,13 +331,15 @@ cols <- c(
 )
 
 p <- ggplot(pvca_plot_df, aes(x = Method, y = Fraction, fill = Component)) +
-  geom_col(width = 0.72, color = "white", linewidth = 0.4) +
+  geom_col(width = 0.72, color = "white", linewidth = 0.4,
+           position = position_stack(reverse = TRUE)) +
   scale_fill_manual(
     values = cols,
     breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
     limits = component_order,
     name   = "Variance Components"
   )+
+  guides(fill = guide_legend(reverse = TRUE)) +
   scale_y_continuous(
     labels = scales::percent_format(accuracy = 1),
     limits = c(0, 1.05),             # 105% headroom

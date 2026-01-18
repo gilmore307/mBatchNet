@@ -230,13 +230,15 @@ plot_prda_with_table <- function(parts_df, file_list, title_prefix, outfile_pref
   )
   
   p <- ggplot(parts_df, aes(x = Method, y = Fraction, fill = Component)) +
-    geom_col(width = 0.72, color = "white", linewidth = 0.4) +
+    geom_col(width = 0.72, color = "white", linewidth = 0.4,
+             position = position_stack(reverse = TRUE)) +
     scale_fill_manual(
       values = cols,
       breaks = component_order,   # c("Target","Intersection","Batch","Residuals")
       limits = component_order,   # lock the scale order
       name   = "Variance Components"
     )+
+    guides(fill = guide_legend(reverse = TRUE)) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                        limits = c(0, 1.05), expand = expansion(mult = c(0, 0))) +
     labs(x = "Methods", y = "Explained variance (%)",
