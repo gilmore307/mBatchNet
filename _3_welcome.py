@@ -20,7 +20,7 @@ def welcome_layout(active_path: str):
                                         dbc.Badge("Welcome", color="primary", className="text-uppercase mb-2"),
                                         html.H1("mBatchNet", className="display-5 mb-2"),
                                         html.P(
-                                            "Assess, correct, and visualise technical batch effects across omics datasets "
+                                            "Assess, correct, and visualise technical batch effects across microbial datasets "
                                             "in a streamlined, browser-based workspace.",
                                             className="lead text-muted",
                                         ),
