@@ -445,6 +445,105 @@ _MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "dissimilarity", "permanova", "
 _AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
 _BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
 
+_DETAILS_INTERPRETATION: Dict[str, Dict[str, object]] = {
+    "alignment": {
+        "title": "Alignment score",
+        "points": (
+            "Higher values indicate better mixing of batches after correction.",
+            "Compare methods by favoring alignment gains that do not conflict with biological separation in other assessments.",
+        ),
+    },
+    "pca": {
+        "title": "PCA ordination",
+        "points": (
+            "Use PC1/PC2 scatter and ellipses to check if batch clusters overlap more after correction.",
+            "Good results usually show smaller batch centroid distances while target separation remains visible.",
+        ),
+    },
+    "pcoa": {
+        "title": "PCoA ordination",
+        "points": (
+            "Review both Aitchison and Bray-Curtis views because corrections can behave differently by geometry.",
+            "Prefer methods where batch overlap increases consistently without collapsing target structure.",
+        ),
+    },
+    "nmds": {
+        "title": "NMDS ordination",
+        "points": (
+            "Lower NMDS stress means the embedding better represents dissimilarities.",
+            "Interpret batch/target overlap together with stress to avoid selecting visually good but unstable embeddings.",
+        ),
+    },
+    "dissimilarity": {
+        "title": "Dissimilarity heatmaps",
+        "points": (
+            "Check whether within-batch block patterns weaken after correction.",
+            "Lower batch-driven structure with retained target-related contrast indicates improved correction quality.",
+        ),
+    },
+    "permanova": {
+        "title": "PERMANOVA",
+        "points": (
+            "Lower batch-associated R² generally indicates reduced technical variation.",
+            "Interpret alongside target-associated patterns to ensure biology is not over-corrected.",
+        ),
+    },
+    "r2": {
+        "title": "Per-feature ANOVA",
+        "points": (
+            "Prefer methods that reduce median Batch R² while preserving or improving Treatment R².",
+            "Use this table to detect methods that remove signal globally but also suppress biology.",
+        ),
+    },
+    "prda": {
+        "title": "Partial RDA",
+        "points": (
+            "Treatment-explained variance should remain meaningful after correction.",
+            "Batch and interaction fractions should generally decrease when correction is effective.",
+        ),
+    },
+    "pvca": {
+        "title": "PVCA",
+        "points": (
+            "Compare the fraction of variance attributed to batch, treatment, and interaction components.",
+            "A favorable result lowers batch contribution while retaining treatment-related variance.",
+        ),
+    },
+    "ebm": {
+        "title": "Entropy batch mixing",
+        "points": (
+            "Higher entropy suggests stronger local batch mixing.",
+            "Confirm with other metrics to avoid choosing methods that mix batches but blur biological labels.",
+        ),
+    },
+    "silhouette": {
+        "title": "UMAP silhouette",
+        "points": (
+            "Silhouette reflects cluster separation in the UMAP embedding.",
+            "Interpret with caution and together with ordination/variance metrics rather than in isolation.",
+        ),
+    },
+}
+
+
+def _build_details_help_note(key: str) -> html.Div:
+    meta = _DETAILS_INTERPRETATION.get((key or "").lower())
+    if not meta:
+        return html.Div()
+
+    title = str(meta.get("title", "Assessment"))
+    points = meta.get("points") or ()
+    point_items = [html.Li(str(point)) for point in points]
+
+    return html.Div(
+        [
+            html.Hr(),
+            html.H6(f"How to interpret: {title}"),
+            html.Ul(point_items, className="mb-0") if point_items else html.P("No interpretation notes available.", className="mb-0 text-muted"),
+        ],
+        className="mt-3",
+    )
+
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
@@ -1524,8 +1623,21 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         # Third sub-tab: informational summary table (no scoring)
         third_label = "Details"
         third_content = _load_info_table_for_key(session_dir, stage, key, rep)
+        help_note = _build_details_help_note(key)
         if third_content is not None:
-            sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
+            details_body = html.Div([third_content, help_note], style={"width": "100%"})
+        else:
+            details_body = html.Div(
+                [
+                    html.P(
+                        "No summary table is available for this assessment in the current session.",
+                        className="text-muted",
+                    ),
+                    help_note,
+                ],
+                style={"width": "100%"},
+            )
+        sub_defs.append((third_label, f"{key}-third", details_body))
 
         # Create sub-tabs with fixed width; allow horizontal scrolling in container
         SUBTAB_STYLE = dict(SUBTAB_STYLE_BASE)
@@ -1776,8 +1888,21 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     if third_content is None and key_lower == "r2":
         third_content = _load_info_table_for_key(session_dir, stage, key, "anova.tif")
 
+    help_note = _build_details_help_note(key)
     if third_content is not None:
-        sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
+        details_body = html.Div([third_content, help_note], style={"width": "100%"})
+    else:
+        details_body = html.Div(
+            [
+                html.P(
+                    "No summary table is available for this assessment in the current session.",
+                    className="text-muted",
+                ),
+                help_note,
+            ],
+            style={"width": "100%"},
+        )
+    sub_defs.append((third_label, f"{key}-third", details_body))
 
     return sub_defs
 

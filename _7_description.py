@@ -212,6 +212,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("Alignment score", className="mb-2 mt-4", id="help-assessment-alignment"),
+                    html.Img(
+                        src="/assets/Figure/alignment_score.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -232,6 +241,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("PCA ordination", className="mb-2 mt-4", id="help-assessment-pca"),
+                    html.Img(
+                        src="/assets/Figure/pca_batch.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -267,6 +285,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("PCoA ordination", className="mb-2 mt-4", id="help-assessment-pcoa"),
+                    html.Img(
+                        src="/assets/Figure/pcoa_aitchison_batch.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -300,6 +327,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("NMDS ordination", className="mb-2 mt-4", id="help-assessment-nmds"),
+                    html.Img(
+                        src="/assets/Figure/nmds_aitchison_batch.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -336,6 +372,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("Dissimilarity heatmaps", className="mb-2 mt-4", id="help-assessment-heatmap"),
+                    html.Img(
+                        src="/assets/Figure/dissimilarity_heatmaps_aitchison.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -360,6 +405,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("PERMANOVA", className="mb-2 mt-4", id="help-assessment-permanova"),
+                    html.Img(
+                        src="/assets/Figure/permanova_aitchison.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -381,6 +435,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("Per-feature ANOVA (Median R²)", className="mb-2 mt-4", id="help-assessment-anova"),
+                    html.Img(
+                        src="/assets/Figure/anova_aitchison.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -406,6 +469,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("Partial RDA", className="mb-2 mt-4", id="help-assessment-rda"),
+                    html.Img(
+                        src="/assets/Figure/pRDA_aitchison.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -442,6 +514,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("PVCA", className="mb-2 mt-4", id="help-assessment-pvca"),
+                    html.Img(
+                        src="/assets/Figure/PVCA.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -474,6 +555,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("Entropy batch mixing (EBM)", className="mb-2 mt-4", id="help-assessment-ebm"),
+                    html.Img(
+                        src="/assets/Figure/ebm.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(
@@ -491,6 +581,15 @@ HELP_MODAL_SECTIONS: List = [
             html.Div(
                 [
                     html.H5("UMAP silhouette", className="mb-2 mt-4", id="help-assessment-silhouette"),
+                    html.Img(
+                        src="/assets/Figure/silhouette.png",
+                        style={
+                            "maxWidth": "100%",
+                            "height": "auto",
+                            "display": "block",
+                            "margin": "10px 0 15px 0",
+                        },
+                    ),
                     html.Ul(
                         [
                             html.Li(

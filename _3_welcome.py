@@ -71,56 +71,8 @@ def welcome_layout(active_path: str):
                                     ],
                                     className="h-100 shadow-sm",
                                 ),
-                                md=6,
-                                lg=4,
-                                className="mb-4",
-                            ),
-                            dbc.Col(
-                                dbc.Card(
-                                    [
-                                        dbc.CardHeader([html.I(className="bi bi-stars me-2"), "Why researchers use it"]),
-                                        dbc.CardBody(
-                                            html.Ul(
-                                                [
-                                                    html.Li("No installation required; everything runs in the browser."),
-                                                    html.Li("Multiple correction methods with transparent defaults."),
-                                                    html.Li("Exportable figures and tables ready to drop into manuscripts or reports."),
-                                                    html.Li("Download harmonised matrices, diagnostics, and run logs as a shareable bundle."),
-                                                ]
-                                            )
-                                        ),
-                                    ],
-                                    className="h-100 shadow-sm",
-                                ),
-                                md=6,
-                                lg=4,
-                                className="mb-4",
-                            ),
-                            dbc.Col(
-                                dbc.Card(
-                                    [
-                                        dbc.CardHeader([html.I(className="bi bi-shield-check me-2"), "Best practices"]),
-                                        dbc.CardBody(
-                                            [
-                                                html.Li(
-                                                    "All traffic is served over HTTPS (port 443) with no third-party cookies."
-                                                ),
-                                                html.Li(
-                                                    "Uploads stay in your live session and are discarded when you finish working."
-                                                ),
-                                                html.Li(
-                                                    "We avoid cross-origin data sharing; nothing is shared outside your browser."
-                                                ),
-                                                html.Li(
-                                                    "All resources and tools on this website are freely accessible to the public."
-                                                ),
-                                            ],
-                                        ),
-                                    ],
-                                    className="h-100 shadow-sm",
-                                ),
                                 md=12,
-                                lg=4,
+                                lg=12,
                                 className="mb-4",
                             ),
                         ],
@@ -205,6 +157,9 @@ def welcome_layout(active_path: str):
                                                         "Help pages and tutorials link to interactive examples so you can "
                                                         "see how to interpret outputs."
                                                     ),
+                                                    html.Li(
+                                                        "All website resources and tools are free to use, including for commercial and non-commercial purposes."
+                                                    ),
                                                 ]
                                             ),
                                             dbc.Button(
@@ -278,7 +233,7 @@ def welcome_layout(active_path: str):
                         html.P(
                             "mBatchNet is an open-source tool designed to help researchers "
                             "assess, correct, and interpret batch effects in microbiome studies. All "
-                            "resources and tools on this website are freely accessible to the public.",
+                            "resources and tools on this website are free to use for both commercial and non-commercial purposes.",
                             className="mb-1",
                         ),
                         html.P(
