@@ -125,7 +125,7 @@ def welcome_layout(active_path: str):
                                                 "mBatchNet",
                                                 className="fw-bold text-white mb-3",
                                                 style={
-                                                    "fontSize": "4rem",
+                                                    "fontSize": "3.4rem",
                                                     "letterSpacing": "-0.03em",
                                                 },
                                             ),
@@ -136,7 +136,6 @@ def welcome_layout(active_path: str):
                                                 style={
                                                     "fontSize": "1.35rem",
                                                     "color": "rgba(255,255,255,0.88)",
-                                                    "maxWidth": "840px",
                                                     "lineHeight": "1.6",
                                                 },
                                             ),
@@ -147,7 +146,6 @@ def welcome_layout(active_path: str):
                                                 style={
                                                     "fontSize": "1.03rem",
                                                     "color": "rgba(255,255,255,0.68)",
-                                                    "maxWidth": "840px",
                                                     "lineHeight": "1.9",
                                                 },
                                             ),
