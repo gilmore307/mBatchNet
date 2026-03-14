@@ -445,6 +445,44 @@ _MULTI_GEOMETRY_DETAIL_KEYS: Set[str] = {"pcoa", "dissimilarity", "permanova", "
 _AITCHISON_GEOMETRY_TOKENS: Set[str] = {"aitchison"}
 _BRAY_GEOMETRY_TOKENS: Set[str] = {"braycurtis"}
 
+_DETAILS_HELP_SECTIONS: Dict[str, Dict[str, str]] = {
+    "alignment": {"anchor": "help-assessment-alignment", "title": "Alignment score"},
+    "pca": {"anchor": "help-assessment-pca", "title": "PCA ordination"},
+    "pcoa": {"anchor": "help-assessment-pcoa", "title": "PCoA ordination"},
+    "nmds": {"anchor": "help-assessment-nmds", "title": "NMDS ordination"},
+    "dissimilarity": {"anchor": "help-assessment-heatmap", "title": "Dissimilarity heatmaps"},
+    "permanova": {"anchor": "help-assessment-permanova", "title": "PERMANOVA"},
+    "r2": {"anchor": "help-assessment-anova", "title": "Per-feature ANOVA"},
+    "prda": {"anchor": "help-assessment-rda", "title": "Partial RDA"},
+    "pvca": {"anchor": "help-assessment-pvca", "title": "PVCA"},
+    "ebm": {"anchor": "help-assessment-ebm", "title": "Entropy batch mixing"},
+    "silhouette": {"anchor": "help-assessment-silhouette", "title": "UMAP silhouette"},
+}
+
+
+def _build_details_help_note(key: str) -> html.Div:
+    meta = _DETAILS_HELP_SECTIONS.get((key or "").lower())
+    if not meta:
+        return html.Div()
+    anchor = f"#{meta['anchor']}"
+    return html.Div(
+        [
+            html.Hr(),
+            html.H6("How to interpret this assessment"),
+            html.P(
+                [
+                    "See the Help page section ",
+                    html.Code(meta["title"]),
+                    " for metric definitions and interpretation guidance. ",
+                    html.A("Jump to section", href=anchor),
+                    ".",
+                ],
+                className="mb-0",
+            ),
+        ],
+        className="mt-3",
+    )
+
 def _normalize_method_code(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
@@ -1524,8 +1562,21 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
         # Third sub-tab: informational summary table (no scoring)
         third_label = "Details"
         third_content = _load_info_table_for_key(session_dir, stage, key, rep)
+        help_note = _build_details_help_note(key)
         if third_content is not None:
-            sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
+            details_body = html.Div([third_content, help_note], style={"width": "100%"})
+        else:
+            details_body = html.Div(
+                [
+                    html.P(
+                        "No summary table is available for this assessment in the current session.",
+                        className="text-muted",
+                    ),
+                    help_note,
+                ],
+                style={"width": "100%"},
+            )
+        sub_defs.append((third_label, f"{key}-third", details_body))
 
         # Create sub-tabs with fixed width; allow horizontal scrolling in container
         SUBTAB_STYLE = dict(SUBTAB_STYLE_BASE)
@@ -1776,8 +1827,21 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     if third_content is None and key_lower == "r2":
         third_content = _load_info_table_for_key(session_dir, stage, key, "anova.tif")
 
+    help_note = _build_details_help_note(key)
     if third_content is not None:
-        sub_defs.append((third_label, f"{key}-third", html.Div(third_content, style={"width": "100%"})))
+        details_body = html.Div([third_content, help_note], style={"width": "100%"})
+    else:
+        details_body = html.Div(
+            [
+                html.P(
+                    "No summary table is available for this assessment in the current session.",
+                    className="text-muted",
+                ),
+                help_note,
+            ],
+            style={"width": "100%"},
+        )
+    sub_defs.append((third_label, f"{key}-third", details_body))
 
     return sub_defs
 
