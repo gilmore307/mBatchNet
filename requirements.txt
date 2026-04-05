@@ -1,0 +1,16 @@
+# Web framework
+dash>=2.14.0
+dash-bootstrap-components>=1.6.0
+dash-ag-grid>=2.4.0
+
+# Server / websocket
+gunicorn>=21.2.0
+flask-sock>=0.7.0
+
+# Data / image
+numpy>=1.23
+pandas>=1.5
+Pillow>=10.0.0
+
+# Algorithm dependency used by DEBIAS method through reticulate
+DEBIAS-M>=0.1.6
