@@ -29,12 +29,12 @@ from _2_utils import (
 EXAMPLE_DIR = BASE_DIR / "assets" / "example"
 PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024
-WARN_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_SAMPLES = 5000
-MAX_FEATURES = 20000
-MAX_MATRIX_CELLS = 5_000_000
-WARN_MATRIX_CELLS = 1_000_000
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+WARN_UPLOAD_BYTES = 3 * 1024 * 1024
+MAX_SAMPLES = 1000
+MAX_FEATURES = 5000
+MAX_MATRIX_CELLS = 1_000_000
+WARN_MATRIX_CELLS = 250_000
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.85
 
@@ -495,6 +495,9 @@ def upload_layout(active_path: str):
                                         html.Li(
                                             f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, "
                                             f"{human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells."
+                                        ),
+                                        html.Li(
+                                            "For larger studies, run mBatchNet locally or split the feature table before upload."
                                         ),
                                     ],
                                     className="mb-0",
