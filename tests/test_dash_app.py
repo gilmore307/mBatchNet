@@ -15,7 +15,9 @@ from _0_main import _download_bundle_kind_from_click
 from _2_utils import _DETAILS_INTERPRETATION
 from _2_utils import write_session_manifests
 from _2_utils import METHOD_REFERENCE_BY_CODE
+from _2_utils import archive_assessment_figure_outputs
 from _1_components import build_navbar
+from _5_assessment import _expected_figure_files
 from _6_correction import _PARAMETER_CONFIG
 from _6_correction import _build_parameter_layout
 from _6_correction import _header_with_tooltip
@@ -189,6 +191,35 @@ class DashAppTests(unittest.TestCase):
             self.assertGreaterEqual(len(description), 180, method_code)
             self.assertGreaterEqual(description.count("."), 3, method_code)
             self.assertIn("In mBatchNet", description, method_code)
+
+    def test_pre_post_assessment_figures_use_distinct_stage_outputs(self):
+        pre_outputs = set(_expected_figure_files("pre", "pca"))
+        post_outputs = set(_expected_figure_files("post", "pca"))
+
+        self.assertIn("pca_batch_pre.tif", pre_outputs)
+        self.assertIn("pca_target_pre.tif", pre_outputs)
+        self.assertIn("pca_batch_post.tif", post_outputs)
+        self.assertIn("pca_target_post.tif", post_outputs)
+        self.assertNotIn("pca_batch.tif", pre_outputs)
+        self.assertNotIn("pca_batch.tif", post_outputs)
+        self.assertTrue(pre_outputs.isdisjoint(post_outputs))
+
+    def test_archiving_post_assessment_figure_preserves_pre_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "pca_batch_pre.tif").write_text("pre", encoding="utf-8")
+            (session_dir / "pca_batch.tif").write_text("post", encoding="utf-8")
+
+            archived = archive_assessment_figure_outputs(
+                session_dir,
+                "post",
+                ["pca_batch.tif"],
+            )
+
+            self.assertEqual(archived, 1)
+            self.assertEqual((session_dir / "pca_batch_pre.tif").read_text(encoding="utf-8"), "pre")
+            self.assertEqual((session_dir / "pca_batch_post.tif").read_text(encoding="utf-8"), "post")
+            self.assertFalse((session_dir / "pca_batch.tif").exists())
 
     def test_no_parameter_methods_use_objective_session_settings_message(self):
         text = _component_text(_build_parameter_layout("ZINBWaVE"))

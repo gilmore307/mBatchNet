@@ -26,6 +26,8 @@ from _2_utils import (
     PRE_FIGURES,
     POST_FIGURES,
     PREVIEW_SENTINEL,
+    archive_assessment_figure_outputs,
+    assessment_base_output_name,
     ensure_png_previews,
     render_assessment_tabs,
     render_group_tabset,
@@ -34,6 +36,7 @@ from _2_utils import (
     build_raw_assessments_tab,
     append_run_log,
     log_file_meta,
+    stage_assessment_figure_specs,
 )
 
 
@@ -86,7 +89,8 @@ def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
 def _expected_figure_files(stage: str, key: str) -> List[str]:
     """Return expected output filenames (figures + assessment tables) for a group."""
 
-    figures: Sequence = PRE_FIGURES if stage == "pre" else POST_FIGURES
+    base_figures: Sequence = PRE_FIGURES if stage == "pre" else POST_FIGURES
+    figures: Sequence = stage_assessment_figure_specs(base_figures, stage)
     key = key.lower()
     expected: List[Optional[str]] = []
 
@@ -110,7 +114,7 @@ def _expected_figure_files(stage: str, key: str) -> List[str]:
 
     for spec in figures:
         low = spec.filename.lower()
-        stem = Path(low).stem
+        stem = Path(assessment_base_output_name(low)).stem
         if key == "pcoa":
             add_if(low.startswith("pcoa_aitchison_batch"), spec.filename)
             add_if(low.startswith("pcoa_aitchison_target"), spec.filename)
@@ -853,9 +857,14 @@ def register_pre_post_callbacks(app):
             if trigger_id == run_id:
                 # Build CLI flags from parameters
                 flags = []
+                base_figure_files = [
+                    assessment_base_output_name(fname)
+                    for fname in expected_files
+                    if Path(fname).suffix.lower() in {".png", ".tif", ".tiff"}
+                ]
 
                 _reset_found_logs(log_path)
-                _clear_outputs(session_dir, expected_files)
+                _clear_outputs(session_dir, [*expected_files, *base_figure_files])
 
                 def _add(flag, val, cast=str):
                     if val is None or val == "":
@@ -915,7 +924,19 @@ def register_pre_post_callbacks(app):
                         flags.append("--fig-per-panel=true")
 
                 def _worker():
-                    run_r_scripts((_script,), session_dir, log_path=log_path, extra_args=flags)
+                    success, _log = run_r_scripts(
+                        (_script,),
+                        session_dir,
+                        log_path=log_path,
+                        extra_args=flags,
+                    )
+                    if success:
+                        archive_assessment_figure_outputs(
+                            session_dir,
+                            _stage,
+                            base_figure_files,
+                            log_path=log_path,
+                        )
 
                 threading.Thread(target=_worker, daemon=True).start()
                 stage_flag = True if _stage == "pre" else dash.no_update

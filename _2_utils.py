@@ -198,6 +198,90 @@ class FigureSpec:
     filename: str
 
 
+ASSESSMENT_STAGES: Set[str] = {"pre", "post"}
+ASSESSMENT_IMAGE_SUFFIXES: Set[str] = {".png", ".tif", ".tiff"}
+
+
+def assessment_stage_output_name(filename: str, stage: str) -> str:
+    """Return the stage-specific image filename for assessment figures."""
+
+    path = Path(filename)
+    normalized_stage = str(stage).lower()
+    if normalized_stage not in ASSESSMENT_STAGES or path.suffix.lower() not in ASSESSMENT_IMAGE_SUFFIXES:
+        return filename
+    lower_stem = path.stem.lower()
+    if lower_stem.endswith(f"_{normalized_stage}"):
+        return filename
+    return f"{path.stem}_{normalized_stage}{path.suffix}"
+
+
+def assessment_base_output_name(filename: str) -> str:
+    """Strip a pre/post suffix from an assessment image filename."""
+
+    path = Path(filename)
+    if path.suffix.lower() not in ASSESSMENT_IMAGE_SUFFIXES:
+        return filename
+    lower_stem = path.stem.lower()
+    for stage in ASSESSMENT_STAGES:
+        suffix = f"_{stage}"
+        if lower_stem.endswith(suffix):
+            return f"{path.stem[:-len(suffix)]}{path.suffix}"
+    return filename
+
+
+def assessment_base_stem(filename: str) -> str:
+    return Path(assessment_base_output_name(filename)).stem
+
+
+def stage_assessment_figure_specs(figures: Sequence[FigureSpec], stage: str) -> Tuple[FigureSpec, ...]:
+    """Return figure specs with pre/post-specific filenames."""
+
+    return tuple(
+        FigureSpec(spec.label, assessment_stage_output_name(spec.filename, stage))
+        for spec in figures
+    )
+
+
+def archive_assessment_figure_outputs(
+    session_dir: Path,
+    stage: str,
+    base_filenames: Sequence[str],
+    log_path: Optional[Path] = None,
+) -> int:
+    """Move freshly generated assessment figures into pre/post-specific filenames."""
+
+    archived = 0
+    session_dir = Path(session_dir)
+    for filename in base_filenames:
+        base_name = assessment_base_output_name(filename)
+        base_path = session_dir / base_name
+        staged_path = session_dir / assessment_stage_output_name(base_name, stage)
+        if base_path.exists():
+            try:
+                staged_path.unlink(missing_ok=True)
+                shutil.move(str(base_path), str(staged_path))
+                archived += 1
+            except OSError:
+                pass
+
+        if Path(base_name).suffix.lower() in {".tif", ".tiff"}:
+            base_png = (session_dir / base_name).with_suffix(".png")
+            staged_png = staged_path.with_suffix(".png")
+            if base_png.exists():
+                try:
+                    staged_png.unlink(missing_ok=True)
+                    shutil.move(str(base_png), str(staged_png))
+                except OSError:
+                    pass
+    if archived:
+        append_run_log(
+            log_path,
+            f"Archived {archived} assessment figure(s) as {stage}-stage outputs.",
+            icon="📁",
+        )
+    return archived
+
+
 PRE_FIGURES: Sequence[FigureSpec] = (
     FigureSpec("PCA (Batch grouping)", "pca_batch.tif"),
     FigureSpec("PCA (Target grouping)", "pca_target.tif"),
@@ -1299,7 +1383,7 @@ def _find_file_case_insensitive(directory: Path, target_name: str) -> Path | Non
 
 
 def _candidate_csvs_for_image(filename: str) -> List[str]:
-    stem = Path(filename).stem
+    stem = assessment_base_stem(filename)
     s = stem.lower()
     bases: List[str] = []
     # image families with shared tables
@@ -1558,6 +1642,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     "Details" sub-tab containing contextual tables without scores or ranks.
     Single-geometry plots also include the third sub-tab accordingly.
     """
+    figures = stage_assessment_figure_specs(figures, stage)
 
     # Consistent styles for top-level and inner tabs (keeps size stable)
     TOP_TAB_STYLE = {
@@ -1671,7 +1756,7 @@ def render_assessment_tabs(session_dir: Path, figures: Sequence[FigureSpec], sta
     for spec in figures:
         fn = spec.filename
         low = fn.lower()
-        stem = Path(low).stem
+        stem = assessment_base_stem(low)
         if low.startswith("pcoa_aitchison"):
             add_group_item("pcoa", "PCoA", "ait", fn)
         elif low.startswith("pcoa_braycurtis"):
@@ -1793,7 +1878,8 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
 
     Used by both the renderer and the subtab content switch callback.
     """
-    figures = PRE_FIGURES if stage == "pre" else POST_FIGURES
+    base_figures = PRE_FIGURES if stage == "pre" else POST_FIGURES
+    figures = stage_assessment_figure_specs(base_figures, stage)
 
     def content_for_image(filename: str) -> html.Div:
         img_path = session_dir / filename
@@ -1844,7 +1930,7 @@ def build_group_subtab_definitions(session_dir: Path, stage: str, key: str):
     g: Dict[str, Optional[str]] = _init_group_config(key)
     for spec in figures:
         low = spec.filename.lower()
-        stem = Path(low).stem
+        stem = assessment_base_stem(low)
         if key == "pcoa":
             if low.startswith("pcoa_aitchison_batch"):
                 g["ait_batch"] = spec.filename
