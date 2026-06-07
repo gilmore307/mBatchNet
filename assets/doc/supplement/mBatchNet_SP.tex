@@ -97,6 +97,12 @@ We quantify local mixing using a $k$-nearest neighbor ($k$-NN) alignment score, 
 In the anaerobic digestion case study, these diagnostics were interpreted jointly rather than as a single ranking criterion. Ordination and distance-based tests summarize residual batch separation, variance-partitioning analyses describe how variation is attributed to batch, target and their overlap, and neighborhood metrics summarize local cross-batch mixing and target-label separation. Together, these outputs allow users to identify whether a correction output mainly reduces batch-associated structure, preserves target-associated structure, or changes both.
 
 
+\subsection*{Supplementary Note 2. Input validation and data-cleaning boundary}
+\label{sec:supp-validation}
+
+mBatchNet is designed for processed microbiome abundance or count tables with matching sample metadata. It is not intended to replace upstream quality control, feature filtering, missing-value handling, or outlier review. During upload, the server validates core input requirements before preprocessing and writes a validation report for the session. Blocking errors include missing upload files, malformed numeric matrices, blank, non-numeric, NA, NaN or Inf matrix values, metadata row-count mismatch, missing selected batch or target metadata variables, insufficient batch or target levels, identical batch and target selections, all-zero sample rows, and matrices exceeding the public-server size limits. The server also reports warnings for large uploads, all-zero feature columns, high sparsity, negative or transformed-looking values, and strong batch-target association. mBatchNet does not impute missing values, remove outliers, or automatically decide which samples or features should be excluded; users should perform those data-cleaning steps before upload when they are needed.
+
+
 \newpage
 \section*{Supplementary Figures}
 \label{sec:supp-figures}
