@@ -287,9 +287,8 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Figure: Each panel plots PC1 vs PC2 with ellipses around batch and "
-                                "target groups. Balanced overlap and short batch-to-batch centroid "
-                                "distances indicate effective correction. Watch whether ellipses "
-                                "retain the target label ordering even after batches overlap."
+                                "target groups. The panels show batch-to-batch centroid distances, "
+                                "ellipse overlap, and target-label ordering after correction."
                             ),
                             html.Li(
                                 "Centroid Distance: Captures between-group spacing; smaller batch "
@@ -298,13 +297,11 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Ellipse Overlap: Summarises how much batch or target clusters "
-                                "overlap. More overlap for batches and less overlap for targets "
-                                "indicate good correction."
+                                "overlap."
                             ),
                             html.Li(
                                 "Target vs Batch Centroid Delta: Highlights how far apart target "
-                                "centroids remain relative to batch centroids so you can prioritise "
-                                "methods that preserve target structure."
+                                "centroids remain relative to batch centroids."
                             ),
                         ]
                     ),
@@ -331,9 +328,8 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Figure: Use the Aitchison vs Bray-Curtis sub-tabs to see how "
-                                "batches overlap on each geometry; tighter batch ellipses and clear "
-                                "target separation imply successful corrections. Pay attention to "
-                                "axes that flip order when corrections change the distance rankings."
+                                "batches overlap on each geometry. The axes can change order when "
+                                "corrections change the distance rankings."
                             ),
                             html.Li(
                                 "Centroid Distance: Interpreted the same way as PCA but applied to "
@@ -480,11 +476,11 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Figure: Dual bars show the competing batch and target medians per "
-                                "method so you can aim for high target signal and low batch signal."
+                                "method."
                             ),
                             html.Li(
-                                "Median R² (Batch): Should shrink after correction to show that batch "
-                                "explains less feature-level variance."
+                                "Median R² (Batch): Reports how much feature-level variance is "
+                                "explained by batch."
                             ),
                             html.Li(
                                 "Median R² (Target): Higher values indicate preserved biological "
@@ -510,22 +506,20 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Decomposes constrained variance into target, batch, and "
-                                "shared components to check whether correction prioritises the target "
-                                "label. The analysis partials out covariates so you can attribute "
-                                "changes to the chosen label."
+                                "shared components. The analysis partials out covariates so changes "
+                                "can be attributed to the chosen label."
                             ),
                             html.Li(
                                 "Figure: Stacked bars show how much partial RDA variance is assigned "
-                                "to each component—seek taller target segments and shrunken batch "
-                                "segments."
+                                "to each component across target, batch, intersection, and residual terms."
                             ),
                             html.Li(
                                 "Target variance: Shows the fraction of constrained variance "
-                                "attributed to the target label—higher bars are preferred."
+                                "attributed to the target label."
                             ),
                             html.Li(
                                 "Batch variance: Reports how much variance batch still explains. "
-                                "Lower fractions suggest better correction."
+                                "Lower fractions indicate a smaller batch-associated component."
                             ),
                             html.Li(
                                 "Intersection variance: Captures overlap between batch and target "
@@ -565,8 +559,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Target variance: PVCA-estimated fraction attributed to target."
                             ),
                             html.Li(
-                                "Batch variance: PVCA-estimated batch contribution that should drop "
-                                "after correction."
+                                "Batch variance: PVCA-estimated batch contribution after correction."
                             ),
                             html.Li(
                                 "Intersection variance: PVCA overlap between batch and target "
@@ -596,11 +589,11 @@ HELP_MODAL_SECTIONS: List = [
                         [
                             html.Li(
                                 "Purpose: Measures k-NN batch entropy within UMAP embeddings (higher "
-                                "entropy = better batch mixing)."
+                                "entropy = more even local batch composition)."
                             ),
                             html.Li(
                                 "EBM column: Exposes the average entropy value across anchor pools "
-                                "used for ranking. Values above 0.8 suggest near-perfect mixing."
+                                "used for ranking."
                             ),
                         ]
                     ),

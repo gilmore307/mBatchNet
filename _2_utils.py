@@ -555,36 +555,36 @@ _DETAILS_INTERPRETATION: Dict[str, Dict[str, object]] = {
     "alignment": {
         "title": "Alignment score",
         "points": (
-            "Higher values indicate better mixing of batches after correction.",
-            "Compare methods by favoring alignment gains that do not conflict with biological separation in other assessments.",
+            "Higher values indicate more local mixing of batches after correction.",
+            "Compare alignment values together with biological-separation assessments.",
         ),
     },
     "pca": {
         "title": "PCA ordination",
         "points": (
             "Use PC1/PC2 scatter and ellipses to check if batch clusters overlap more after correction.",
-            "Good results usually show smaller batch centroid distances while target separation remains visible.",
+            "Batch centroid distances and target separation can be inspected in the same ordination view.",
         ),
     },
     "pcoa": {
         "title": "PCoA ordination",
         "points": (
             "Review both Aitchison and Bray-Curtis views because corrections can behave differently by geometry.",
-            "Prefer methods where batch overlap increases consistently without collapsing target structure.",
+            "Inspect batch overlap and target structure in each geometry.",
         ),
     },
     "nmds": {
         "title": "NMDS ordination",
         "points": (
-            "Lower NMDS stress means the embedding better represents dissimilarities.",
-            "Interpret batch/target overlap together with stress to avoid selecting visually good but unstable embeddings.",
+            "Lower NMDS stress means the embedding has lower mismatch with the dissimilarity matrix.",
+            "Interpret batch/target overlap together with stress.",
         ),
     },
     "dissimilarity": {
         "title": "Dissimilarity heatmaps",
         "points": (
             "Check whether within-batch block patterns weaken after correction.",
-            "Lower batch-driven structure with retained target-related contrast indicates improved correction quality.",
+            "Inspect batch-driven structure together with target-related contrast.",
         ),
     },
     "permanova": {
@@ -597,29 +597,29 @@ _DETAILS_INTERPRETATION: Dict[str, Dict[str, object]] = {
     "r2": {
         "title": "Per-feature ANOVA",
         "points": (
-            "Prefer methods that reduce median Batch R² while preserving or improving Treatment R².",
-            "Use this table to detect methods that remove signal globally but also suppress biology.",
+            "Compare median Batch R² and Treatment R² across methods.",
+            "Use this table to inspect whether changes affect batch-associated and treatment-associated variance.",
         ),
     },
     "prda": {
         "title": "Partial RDA",
         "points": (
-            "Treatment-explained variance should remain meaningful after correction.",
-            "Batch and interaction fractions should generally decrease when correction is effective.",
+            "Treatment-explained variance is reported after correction.",
+            "Batch and interaction fractions are reported alongside the treatment fraction.",
         ),
     },
     "pvca": {
         "title": "PVCA",
         "points": (
             "Compare the fraction of variance attributed to batch, treatment, and interaction components.",
-            "A favorable result lowers batch contribution while retaining treatment-related variance.",
+            "Batch contribution and treatment-related variance are reported in the same table.",
         ),
     },
     "ebm": {
         "title": "Entropy batch mixing",
         "points": (
-            "Higher entropy suggests stronger local batch mixing.",
-            "Confirm with other metrics to avoid choosing methods that mix batches but blur biological labels.",
+            "Higher entropy indicates more even local batch composition.",
+            "Interpret entropy together with metrics that report biological-label structure.",
         ),
     },
     "silhouette": {

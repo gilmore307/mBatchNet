@@ -12,6 +12,7 @@ from dash import Dash, html
 import server
 from _0_main import _build_download_bundle
 from _0_main import _download_bundle_kind_from_click
+from _2_utils import _DETAILS_INTERPRETATION
 from _2_utils import write_session_manifests
 from _2_utils import METHOD_REFERENCE_BY_CODE
 from _1_components import build_navbar
@@ -101,6 +102,40 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Download results", text)
         self.assertNotIn("recommended Batch", text)
         self.assertNotIn("best balances", text)
+
+    def test_user_facing_descriptions_avoid_subjective_method_guidance(self):
+        banned_terms = (
+            "recommend",
+            "suggest",
+            "suitable",
+            "best",
+            "better",
+            "advantage",
+            "should",
+            "prefer",
+            "preferred",
+            "useful",
+            "may help",
+            "favorable",
+        )
+        method_text = " ".join(
+            str(metadata.get("description", "")) for metadata in METHOD_REFERENCE_BY_CODE.values()
+        )
+        parameter_text = " ".join(
+            str(spec.get("description", ""))
+            for specs in _PARAMETER_CONFIG.values()
+            for spec in specs
+        )
+        help_text = _component_text(html.Div(HELP_MODAL_SECTIONS))
+        interpretation_text = " ".join(
+            point
+            for payload in _DETAILS_INTERPRETATION.values()
+            for point in payload.get("points", ())
+        )
+        visible_text = " ".join([method_text, parameter_text, help_text, interpretation_text]).lower()
+
+        for term in banned_terms:
+            self.assertNotIn(term, visible_text)
 
     def test_time_header_explains_elapsed_time_source(self):
         text = _component_text(
