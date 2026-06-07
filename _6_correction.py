@@ -162,6 +162,7 @@ def _build_parameter_layout(code: str) -> object | None:
 _LABEL_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 _ACTION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 _CONFIG_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
+_EXPLANATION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
 
 
 _PARAMETER_CONFIG = {
@@ -462,59 +463,63 @@ _PARAMETER_CONFIG = {
 }
 
 
-_METHOD_GUIDE_ROWS = (
-    ("Count tables with known batch labels", "ComBat-seq, ConQuR, MMUPHin, DEBIAS-M", "Use when values are non-negative counts or count-like profiled features."),
-    ("Continuous/log/CLR abundance tables", "ComBat, limma, FSQN, BMC", "Use when input has already been transformed or normalized."),
-    ("Phenotype-aware correction", "PLSDA-batch, FAbatch, DEBIAS-M", "Requires a binary target column; avoid over-interpreting results when target and batch are strongly confounded."),
-    ("Sparse microbiome feature tables", "ConQuR, MMUPHin, MetaDICT", "Prefer microbiome-aware methods and inspect warnings for all-zero samples or features."),
-    ("Exploratory public-server runs", "Run 2-4 methods first", "Large tables and machine-learning methods can be slow; download a bundle after each successful method set."),
-)
+def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> object:
+    package_url = (metadata.get("package") or "").strip()
+    citation_text = (metadata.get("citation") or "").strip()
+    citation_url = (metadata.get("url") or "").strip()
 
-
-def _method_guide_card() -> object:
-    rows = [
-        html.Tr(
-            [
-                html.Td(scenario),
-                html.Td(methods),
-                html.Td(note),
-            ]
-        )
-        for scenario, methods, note in _METHOD_GUIDE_ROWS
+    rows: List[html.Tr] = [
+        html.Tr([html.Th("Method"), html.Td(display)]),
     ]
-    return dbc.Card(
-        [
-            dbc.CardHeader(html.Strong("Method guide")),
-            dbc.CardBody(
+    if package_url:
+        rows.append(
+            html.Tr(
                 [
-                    html.P(
-                        "Select methods according to the data scale and study design before launching correction. "
-                        "Parameter controls stay under each method row and are written into the reproducibility bundle.",
-                        className="text-muted",
-                    ),
-                    dbc.Table(
-                        [
-                            html.Thead(
-                                html.Tr(
-                                    [
-                                        html.Th("Use case"),
-                                        html.Th("Suggested methods"),
-                                        html.Th("Caution"),
-                                    ]
-                                )
-                            ),
-                            html.Tbody(rows),
-                        ],
-                        bordered=True,
-                        hover=True,
-                        responsive=True,
-                        size="sm",
-                        className="mb-0",
+                    html.Th("Package"),
+                    html.Td(
+                        html.A(
+                            package_url,
+                            href=package_url,
+                            target="_blank",
+                            rel="noopener noreferrer",
+                        )
                     ),
                 ]
+            )
+        )
+    if citation_text:
+        rows.append(html.Tr([html.Th("Citation"), html.Td(_parse_italic_text(citation_text))]))
+    if citation_url:
+        rows.append(
+            html.Tr(
+                [
+                    html.Th("Reference"),
+                    html.Td(
+                        html.A(
+                            citation_url,
+                            href=citation_url,
+                            target="_blank",
+                            rel="noopener noreferrer",
+                        )
+                    ),
+                ]
+            )
+        )
+    return html.Div(
+        [
+            html.Div([html.H6("Method Explanation", className="mb-0 p-3 bg-light border-bottom")]),
+            html.Div(
+                dbc.Table(
+                    html.Tbody(rows),
+                    bordered=True,
+                    responsive=True,
+                    size="sm",
+                    className="mb-0",
+                ),
+                className="p-3",
             ),
         ],
-        className="mb-3",
+        className="method-config-wrapper border-top",
     )
 
 
@@ -531,9 +536,8 @@ def correction_layout(active_path: str):
                         "Review available correction methods along with their runtime for this session and citation details."
                     ),
                     html.P(
-                        "Click a method name to open its package source, where you can read the manual or download the package version."
+                        "Click a method name to open its package or source reference."
                     ),
-                    _method_guide_card(),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
                 ],
@@ -615,6 +619,7 @@ def register_correction_callbacks(app):
             html.Tr(
                 [
                     html.Th("Config", className="text-center", style=_CONFIG_COLUMN_WIDTH),
+                    html.Th("Explanation", className="text-center", style=_EXPLANATION_COLUMN_WIDTH),
                     html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Th("Time (s)", className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
@@ -739,9 +744,23 @@ def register_correction_callbacks(app):
                 className="text-center",
                 style=_CONFIG_COLUMN_WIDTH,
             )
+            explanation_button = dbc.Button(
+                "Show",
+                id={"type": "method-explanation-toggle", "code": code},
+                color=button_color(False),
+                size="sm",
+                style={"width": "200px"},
+                n_clicks=0,
+            )
+            explanation_cell = html.Td(
+                html.Div(explanation_button, className="d-flex justify-content-center"),
+                className="text-center",
+                style=_EXPLANATION_COLUMN_WIDTH,
+            )
             row = html.Tr(
                 [
                     toggle_cell,
+                    explanation_cell,
                     html.Td(method_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Td(time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     status_cell,
@@ -761,11 +780,25 @@ def register_correction_callbacks(app):
                                 id={"type": "method-config-collapse", "code": code},
                                 is_open=False,
                             ),
-                            colSpan=7,
+                            colSpan=8,
                             className="p-0",
                         )
                     )
                 )
+            explanation_layout = _build_method_explanation_layout(display, metadata)
+            body_rows.append(
+                html.Tr(
+                    html.Td(
+                        dbc.Collapse(
+                            explanation_layout,
+                            id={"type": "method-explanation-collapse", "code": code},
+                            is_open=False,
+                        ),
+                        colSpan=8,
+                        className="p-0",
+                    )
+                )
+            )
             row_extras.append(
                 dcc.Store(id={"type": "method-operation-result", "code": code}, data=None)
             )
@@ -791,6 +824,19 @@ def register_correction_callbacks(app):
         prevent_initial_call=False,
     )
     def toggle_method_config(n_clicks: int | None, is_open: bool | None):
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        next_state = not bool(is_open)
+        return next_state, ("Hide" if next_state else "Show")
+
+    @app.callback(
+        Output({"type": "method-explanation-collapse", "code": MATCH}, "is_open"),
+        Output({"type": "method-explanation-toggle", "code": MATCH}, "children"),
+        Input({"type": "method-explanation-toggle", "code": MATCH}, "n_clicks"),
+        State({"type": "method-explanation-collapse", "code": MATCH}, "is_open"),
+        prevent_initial_call=False,
+    )
+    def toggle_method_explanation(n_clicks: int | None, is_open: bool | None):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         next_state = not bool(is_open)

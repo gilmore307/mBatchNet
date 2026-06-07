@@ -15,6 +15,7 @@ from _0_main import _download_bundle_kind_from_click
 from _2_utils import write_session_manifests
 from _1_components import build_navbar
 from _6_correction import _PARAMETER_CONFIG
+from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
 from _6_correction import correction_layout
 from _4_upload import upload_layout
@@ -78,11 +79,31 @@ class DashAppTests(unittest.TestCase):
             "reproducibility",
         )
 
-    def test_correction_layout_contains_method_guide(self):
+    def test_correction_layout_omits_method_guide(self):
         text = _component_text(correction_layout("/correction"))
 
-        self.assertIn("Method guide", text)
-        self.assertIn("Phenotype-aware correction", text)
+        self.assertNotIn("Method guide", text)
+        self.assertNotIn("Phenotype-aware correction", text)
+        self.assertIn("package or source reference", text)
+
+    def test_method_explanation_uses_reference_fields(self):
+        text = _component_text(
+            _build_method_explanation_layout(
+                "ComBat",
+                {
+                    "package": "https://rdrr.io/bioc/sva/man/ComBat.html",
+                    "citation": "Johnson WE, Li C, Rabinovic A. <i>Biostatistics.</i> 2007;8(1):118-127.",
+                    "url": "https://academic.oup.com/nargab/article/2/3/lqaa078/5909519",
+                },
+            )
+        )
+
+        self.assertIn("Method Explanation", text)
+        self.assertIn("Package", text)
+        self.assertIn("Citation", text)
+        self.assertIn("Reference", text)
+        self.assertIn("Johnson WE", text)
+        self.assertNotIn("Suggested methods", text)
 
     def test_correction_parameters_match_r_scripts_and_have_tooltips(self):
         method_files = {
