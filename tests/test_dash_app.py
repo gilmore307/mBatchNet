@@ -36,6 +36,7 @@ from _4_upload import _restore_repro_bundle
 from _4_upload import _first_non_empty_level
 from _4_upload import MAX_FEATURES
 from _4_upload import MAX_MATRIX_CELLS
+from _4_upload import MAX_METADATA_COLUMNS
 from _4_upload import MAX_SAMPLES
 from _4_upload import MAX_UPLOAD_BYTES
 
@@ -85,15 +86,17 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("shotgun metagenomics", text)
         self.assertIn("samples in rows", text)
         self.assertIn("1000 samples", text)
-        self.assertIn("5000 features", text)
+        self.assertIn("1000 features", text)
         self.assertIn("10.0 MB per CSV", text)
         self.assertIn("1,000,000 matrix cells", text)
+        self.assertIn("Metadata limit: 5 columns or fewer", text)
 
     def test_public_upload_limits_match_server_contract(self):
         self.assertEqual(MAX_SAMPLES, 1000)
-        self.assertEqual(MAX_FEATURES, 5000)
+        self.assertEqual(MAX_FEATURES, 1000)
         self.assertEqual(MAX_UPLOAD_BYTES, 10 * 1024 * 1024)
         self.assertEqual(MAX_MATRIX_CELLS, 1_000_000)
+        self.assertEqual(MAX_METADATA_COLUMNS, 5)
 
     def test_navbar_exposes_two_download_entries(self):
         text = _component_text(build_navbar("/post"))
@@ -423,6 +426,38 @@ class DashAppTests(unittest.TestCase):
 
             self.assertFalse(report["valid"])
             self.assertTrue(any("row count" in err for err in report["errors"]))
+
+    def test_metadata_column_limit_is_enforced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("f1,f2\n1,2\n3,4\n", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype,Cov1,Cov2,Cov3,Cov4\nA,case,1,2,3,4\nB,control,1,2,3,4\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertFalse(report["valid"])
+            self.assertTrue(any("5 columns or fewer" in err for err in report["errors"]))
+
+    def test_strong_batch_target_confounding_is_warned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2\n1,2\n2,3\n3,4\n4,5\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,case\nB,control\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 1.0)
+            self.assertTrue(any("strongly associated" in warning for warning in report["warnings"]))
 
     def test_shotgun_profile_table_contract_is_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:

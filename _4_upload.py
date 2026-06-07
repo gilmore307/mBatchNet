@@ -37,8 +37,9 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_REPRO_BUNDLE_BYTES = 25 * 1024 * 1024
 WARN_UPLOAD_BYTES = 3 * 1024 * 1024
 MAX_SAMPLES = 1000
-MAX_FEATURES = 5000
+MAX_FEATURES = 1000
 MAX_MATRIX_CELLS = 1_000_000
+MAX_METADATA_COLUMNS = 5
 WARN_MATRIX_CELLS = 250_000
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.85
@@ -256,6 +257,8 @@ def validate_session_inputs(
         errors.append(f"Could not read metadata_origin.csv: {exc}")
     dimensions["metadata_rows"] = len(metadata_rows)
     dimensions["metadata_columns"] = len(metadata_header)
+    if len(metadata_header) > MAX_METADATA_COLUMNS:
+        errors.append(f"Metadata must contain {MAX_METADATA_COLUMNS} columns or fewer for the public server.")
     if matrix and metadata_rows and len(metadata_rows) != len(matrix):
         errors.append(
             "Metadata row count must match matrix sample rows "
@@ -305,6 +308,7 @@ def validate_session_inputs(
             "max_samples": MAX_SAMPLES,
             "max_features": MAX_FEATURES,
             "max_matrix_cells": MAX_MATRIX_CELLS,
+            "max_metadata_columns": MAX_METADATA_COLUMNS,
         },
         "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
     }
@@ -635,6 +639,9 @@ def upload_layout(active_path: str):
                                         html.Li(
                                             f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, "
                                             f"{human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells."
+                                        ),
+                                        html.Li(
+                                            f"Metadata limit: {MAX_METADATA_COLUMNS} columns or fewer, including batch, target, and optional covariates."
                                         ),
                                         html.Li(
                                             "For larger studies, run mBatchNet locally or split the feature table before upload."

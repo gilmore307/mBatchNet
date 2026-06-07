@@ -120,8 +120,9 @@ After upload, map batch/target/covariate columns in the UI.
 Public server limits:
 - CSV size: 10.0 MB per uploaded CSV
 - Samples: 1,000
-- Features: 5,000
+- Features: 1,000
 - Matrix cells: 1,000,000
+- Metadata columns: 5 or fewer, including batch, target, and optional covariates
 
 ## Correction Methods and Parameters
 
