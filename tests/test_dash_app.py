@@ -71,11 +71,8 @@ class DashAppTests(unittest.TestCase):
     def test_upload_layout_contains_original_example_flow(self):
         text = _component_text(upload_layout("/upload"))
 
-        self.assertIn("Input requirements", text)
-        self.assertIn("Basic requirements", text)
         self.assertIn("Matrix", text)
         self.assertIn("Metadata", text)
-        self.assertIn("Validation warnings", text)
         self.assertIn("Quick Start: Example Data", text)
         self.assertIn("Preview rows", text)
         self.assertIn("Preview columns", text)
@@ -87,7 +84,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
-        self.assertIn("sample-by-feature numeric table", text)
+        self.assertIn("processed sample-by-feature numeric CSV table", text)
         self.assertIn("FASTQ", text)
         self.assertNotIn("shotgun metagenomics", text)
         self.assertIn("Samples in rows", text)

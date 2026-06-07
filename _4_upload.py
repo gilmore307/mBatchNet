@@ -615,112 +615,62 @@ def upload_layout(active_path: str):
                 [
                     html.H2("Upload Data"),
                     html.P("Choose manual upload or example dataset."),
-                    dbc.Card(
+                    dbc.Row(
                         [
-                            dbc.CardHeader(html.Strong("Input requirements")),
-                            dbc.CardBody(
-                                dbc.Row(
+                            dbc.Col(
+                                dbc.Card(
                                     [
-                                        dbc.Col(
-                                            dbc.Card(
+                                        dbc.CardHeader(html.Strong("Matrix")),
+                                        dbc.CardBody(
+                                            html.Ul(
                                                 [
-                                                    dbc.CardHeader(html.Strong("Basic requirements")),
-                                                    dbc.CardBody(
-                                                        html.Ul(
-                                                            [
-                                                                html.Li("Upload CSV files only."),
-                                                                html.Li(
-                                                                    "Use a sample-by-feature numeric table with matched sample metadata."
-                                                                ),
-                                                                html.Li(
-                                                                    "Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table."
-                                                                ),
-                                                            ],
-                                                            className="mb-0",
-                                                        )
-                                                    ),
+                                                    html.Li("Upload a processed sample-by-feature numeric CSV table."),
+                                                    html.Li("Raw sequencing files such as FASTQ are not accepted."),
+                                                    html.Li("Samples in rows and profiled features in columns."),
+                                                    html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
+                                                    html.Li(f"Features: {MAX_FEATURES} or fewer."),
+                                                    html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
+                                                    html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                    html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
+                                                    html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
                                                 ],
-                                                className="h-100",
-                                            ),
-                                            md=6,
-                                            className="mb-3",
-                                        ),
-                                        dbc.Col(
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader(html.Strong("Matrix")),
-                                                    dbc.CardBody(
-                                                        html.Ul(
-                                                            [
-                                                                html.Li("Samples in rows and profiled features in columns."),
-                                                                html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
-                                                                html.Li(f"Features: {MAX_FEATURES} or fewer."),
-                                                                html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
-                                                                html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
-                                                                html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
-                                                                html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
-                                                            ],
-                                                            className="mb-0",
-                                                        )
-                                                    ),
-                                                ],
-                                                className="h-100",
-                                            ),
-                                            md=6,
-                                            className="mb-3",
-                                        ),
-                                        dbc.Col(
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader(html.Strong("Metadata")),
-                                                    dbc.CardBody(
-                                                        html.Ul(
-                                                            [
-                                                                html.Li("One row per sample, in the same sample order as the matrix."),
-                                                                html.Li("Required: one batch column and one binary target/phenotype column."),
-                                                                html.Li(
-                                                                    f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
-                                                                ),
-                                                                html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
-                                                            ],
-                                                            className="mb-0",
-                                                        )
-                                                    ),
-                                                ],
-                                                className="h-100",
-                                            ),
-                                            md=6,
-                                            className="mb-3 mb-md-0",
-                                        ),
-                                        dbc.Col(
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader(html.Strong("Validation warnings")),
-                                                    dbc.CardBody(
-                                                        html.Ul(
-                                                            [
-                                                                html.Li(
-                                                                    "mBatchNet reports a warning when batch and target are strongly associated."
-                                                                ),
-                                                                html.Li(
-                                                                    "For larger studies, run mBatchNet locally or split the feature table before upload."
-                                                                ),
-                                                            ],
-                                                            className="mb-0",
-                                                        )
-                                                    ),
-                                                ],
-                                                className="h-100",
-                                            ),
-                                            md=6,
-                                            className="mb-0",
+                                                className="mb-0",
+                                            )
                                         ),
                                     ],
-                                    className="g-3",
-                                )
+                                    className="h-100",
+                                ),
+                                md=6,
+                                className="mb-3",
+                            ),
+                            dbc.Col(
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader(html.Strong("Metadata")),
+                                        dbc.CardBody(
+                                            html.Ul(
+                                                [
+                                                    html.Li("One row per sample, in the same sample order as the matrix."),
+                                                    html.Li("Required: one batch column and one binary target/phenotype column."),
+                                                    html.Li(
+                                                        f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
+                                                    ),
+                                                    html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                    html.Li(
+                                                        "mBatchNet reports a warning when batch and target are strongly associated."
+                                                    ),
+                                                ],
+                                                className="mb-0",
+                                            )
+                                        ),
+                                    ],
+                                    className="h-100",
+                                ),
+                                md=6,
+                                className="mb-3",
                             ),
                         ],
-                        className="mb-3",
+                        className="g-3 mb-3",
                     ),
                     dcc.Tabs(
                         id="upload-tabs",
