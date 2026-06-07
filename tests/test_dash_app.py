@@ -47,12 +47,12 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("shotgun metagenomics", text)
         self.assertIn("samples in rows", text)
 
-    def test_navbar_exposes_three_download_entries(self):
+    def test_navbar_exposes_two_download_entries(self):
         text = _component_text(build_navbar("/post"))
 
         self.assertIn("Download outputs", text)
         self.assertIn("Repro bundle", text)
-        self.assertIn("Full session", text)
+        self.assertNotIn("Full " + "session", text)
 
     def test_correction_layout_contains_method_guide(self):
         text = _component_text(correction_layout("/correction"))
@@ -138,22 +138,17 @@ class DashAppTests(unittest.TestCase):
 
             output_zip = _build_download_bundle(session_dir, "outputs")
             repro_zip = _build_download_bundle(session_dir, "reproducibility")
-            session_zip = _build_download_bundle(session_dir, "session")
 
             import zipfile
             with zipfile.ZipFile(output_zip) as zf:
                 output_names = set(zf.namelist())
             with zipfile.ZipFile(repro_zip) as zf:
                 repro_names = set(zf.namelist())
-            with zipfile.ZipFile(session_zip) as zf:
-                session_names = set(zf.namelist())
 
             self.assertIn("normalized_limma_tss.csv", output_names)
             self.assertNotIn("raw.csv", output_names)
             self.assertIn("raw.csv", repro_names)
             self.assertIn("reproducibility_manifest.json", repro_names)
-            self.assertIn("normalized_limma_tss.csv", session_names)
-            self.assertIn("raw.csv", session_names)
 
 
 if __name__ == "__main__":

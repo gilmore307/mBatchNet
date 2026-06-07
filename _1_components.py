@@ -129,16 +129,6 @@ def build_navbar(active_path: str) -> dbc.Navbar:
             disabled=True,
             style={"width": "175px"},
         ),
-        dbc.Button(
-            [html.I(className="bi bi-download me-1"), "Full session"],
-            id="download-session-btn",
-            color="light",
-            outline=True,
-            className="mb-2 ms-2",
-            size="sm",
-            disabled=True,
-            style={"width": "175px"},
-        ),
     ]
 
     # First row layout: left group anchored left, right group anchored right,

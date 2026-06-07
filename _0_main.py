@@ -378,18 +378,13 @@ def handle_restart(confirm_yes: int, confirm_no: int, current_session: str, rest
 def _bundle_filename(bundle_kind: str) -> str:
     if bundle_kind == "outputs":
         return "output_bundle.zip"
-    if bundle_kind == "reproducibility":
-        return "reproducibility_bundle.zip"
-    return "session_bundle.zip"
+    return "reproducibility_bundle.zip"
 
 
 def _include_in_bundle(relative_path: Path, bundle_kind: str) -> bool:
     name = relative_path.name
     if name.lower().endswith(".zip"):
         return False
-    if bundle_kind == "session":
-        return True
-
     manifest_names = {
         "output_summary.json",
         "runtime_summary.json",
@@ -448,14 +443,12 @@ def _build_download_bundle(session_dir: Path, bundle_kind: str) -> Path:
     Output("download-results", "data"),
     Input("download-results-btn", "n_clicks"),
     Input("download-reproducibility-btn", "n_clicks"),
-    Input("download-session-btn", "n_clicks"),
     State("session-id", "data"),
     prevent_initial_call=True,
 )
 def download_results(
     output_clicks: int,
     reproducibility_clicks: int,
-    session_clicks: int,
     session_id: str,
 ):
     ctx = dash.callback_context
@@ -472,7 +465,6 @@ def download_results(
     bundle_kind = {
         "download-results-btn": "outputs",
         "download-reproducibility-btn": "reproducibility",
-        "download-session-btn": "session",
     }.get(triggered_id)
     if not bundle_kind:
         raise dash.exceptions.PreventUpdate
@@ -489,7 +481,6 @@ register_correction_callbacks(app)
 @app.callback(
     Output("download-results-btn", "disabled"),
     Output("download-reproducibility-btn", "disabled"),
-    Output("download-session-btn", "disabled"),
     Input("session-id", "data"),
     Input("upload-complete", "data"),
     Input("preprocess-complete", "data"),
@@ -501,10 +492,10 @@ register_correction_callbacks(app)
 def enable_download(session_id: str, *_stage_flags):
     # Disabled if no session or folder doesn't exist yet
     if not session_id:
-        return True, True, True
+        return True, True
     session_dir = OUTPUT_ROOT / session_id
     disabled = not (session_dir.exists() and session_dir.is_dir())
-    return disabled, disabled, disabled
+    return disabled, disabled
 
 
 @app.callback(
