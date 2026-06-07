@@ -84,7 +84,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
-        self.assertIn("processed sample-by-feature numeric CSV table", text)
+        self.assertIn("Processed sample-by-feature numeric CSV table", text)
         self.assertIn("FASTQ", text)
         self.assertNotIn("shotgun metagenomics", text)
         self.assertIn("Samples in rows", text)

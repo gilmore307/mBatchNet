@@ -615,63 +615,6 @@ def upload_layout(active_path: str):
                 [
                     html.H2("Upload Data"),
                     html.P("Choose manual upload or example dataset."),
-                    dbc.Row(
-                        [
-                            dbc.Col(
-                                dbc.Card(
-                                    [
-                                        dbc.CardHeader(html.Strong("Matrix")),
-                                        dbc.CardBody(
-                                            html.Ul(
-                                                [
-                                                    html.Li("Upload a processed sample-by-feature numeric CSV table."),
-                                                    html.Li("Raw sequencing files such as FASTQ are not accepted."),
-                                                    html.Li("Samples in rows and profiled features in columns."),
-                                                    html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
-                                                    html.Li(f"Features: {MAX_FEATURES} or fewer."),
-                                                    html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
-                                                    html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
-                                                    html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
-                                                    html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
-                                                ],
-                                                className="mb-0",
-                                            )
-                                        ),
-                                    ],
-                                    className="h-100",
-                                ),
-                                md=6,
-                                className="mb-3",
-                            ),
-                            dbc.Col(
-                                dbc.Card(
-                                    [
-                                        dbc.CardHeader(html.Strong("Metadata")),
-                                        dbc.CardBody(
-                                            html.Ul(
-                                                [
-                                                    html.Li("One row per sample, in the same sample order as the matrix."),
-                                                    html.Li("Required: one batch column and one binary target/phenotype column."),
-                                                    html.Li(
-                                                        f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
-                                                    ),
-                                                    html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
-                                                    html.Li(
-                                                        "mBatchNet reports a warning when batch and target are strongly associated."
-                                                    ),
-                                                ],
-                                                className="mb-0",
-                                            )
-                                        ),
-                                    ],
-                                    className="h-100",
-                                ),
-                                md=6,
-                                className="mb-3",
-                            ),
-                        ],
-                        className="g-3 mb-3",
-                    ),
                     dcc.Tabs(
                         id="upload-tabs",
                         value="manual",
@@ -688,13 +631,29 @@ def upload_layout(active_path: str):
                                                         [
                                                             dbc.CardHeader(html.Strong("Count matrix (CSV)")),
                                                             dbc.CardBody(
-                                                                dcc.Upload(
-                                                                    id="upload-matrix",
-                                                                    children=html.Div(["Drag & drop or click to upload count matrix"]),
-                                                                    multiple=False,
-                                                                    className="border border-secondary rounded p-4 text-center bg-light",
-                                                                    accept=".csv,text/csv",
-                                                                )
+                                                                [
+                                                                    html.Ul(
+                                                                        [
+                                                                            html.Li("Processed sample-by-feature numeric CSV table."),
+                                                                            html.Li("Raw sequencing files such as FASTQ are not accepted."),
+                                                                            html.Li("Samples in rows and profiled features in columns."),
+                                                                            html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
+                                                                            html.Li(f"Features: {MAX_FEATURES} or fewer."),
+                                                                            html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
+                                                                            html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                            html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
+                                                                            html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
+                                                                        ],
+                                                                        className="mb-3",
+                                                                    ),
+                                                                    dcc.Upload(
+                                                                        id="upload-matrix",
+                                                                        children=html.Div(["Drag & drop or click to upload count matrix"]),
+                                                                        multiple=False,
+                                                                        className="border border-secondary rounded p-4 text-center bg-light",
+                                                                        accept=".csv,text/csv",
+                                                                    ),
+                                                                ]
                                                             ),
                                                             dbc.CardFooter(
                                                                 html.Div(id="matrix-file-info", className="text-muted", children="No file uploaded yet.")
@@ -710,13 +669,29 @@ def upload_layout(active_path: str):
                                                         [
                                                             dbc.CardHeader(html.Strong("Metadata (CSV)")),
                                                             dbc.CardBody(
-                                                                dcc.Upload(
-                                                                    id="upload-metadata",
-                                                                    children=html.Div(["Drag & drop or click to upload metadata"]),
-                                                                    multiple=False,
-                                                                    className="border border-secondary rounded p-4 text-center bg-light",
-                                                                    accept=".csv,text/csv",
-                                                                )
+                                                                [
+                                                                    html.Ul(
+                                                                        [
+                                                                            html.Li("One row per sample, in the same sample order as the matrix."),
+                                                                            html.Li("Required: one batch column and one binary target/phenotype column."),
+                                                                            html.Li(
+                                                                                f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
+                                                                            ),
+                                                                            html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                            html.Li(
+                                                                                "mBatchNet reports a warning when batch and target are strongly associated."
+                                                                            ),
+                                                                        ],
+                                                                        className="mb-3",
+                                                                    ),
+                                                                    dcc.Upload(
+                                                                        id="upload-metadata",
+                                                                        children=html.Div(["Drag & drop or click to upload metadata"]),
+                                                                        multiple=False,
+                                                                        className="border border-secondary rounded p-4 text-center bg-light",
+                                                                        accept=".csv,text/csv",
+                                                                    ),
+                                                                ]
                                                             ),
                                                             dbc.CardFooter(
                                                                 html.Div(id="metadata-file-info", className="text-muted", children="No file uploaded yet.")
