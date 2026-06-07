@@ -652,7 +652,6 @@ def register_correction_callbacks(app):
                     html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
                     html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),
-                    html.Th("Citation", className="text-center"),
                 ]
             )
         )
@@ -732,8 +731,6 @@ def register_correction_callbacks(app):
             )
             metadata = METHOD_REFERENCE_BY_CODE.get(code, {})
             package_url = (metadata.get("package") or "").strip()
-            citation_text = (metadata.get("citation") or "").strip()
-            citation_url = (metadata.get("url") or "").strip()
             method_display = (
                 html.A(
                     display,
@@ -744,20 +741,6 @@ def register_correction_callbacks(app):
                 if package_url
                 else display
             )
-            citation_content: object
-            citation_children = _parse_italic_text(citation_text) if citation_text else "-"
-            if citation_text and citation_url:
-                citation_content = html.A(
-                    citation_children,
-                    href=citation_url,
-                    target="_blank",
-                    rel="noopener noreferrer",
-                )
-            elif citation_text:
-                citation_content = citation_children
-            else:
-                citation_content = "-"
-            citation_cell = html.Td(citation_content)
             toggle_button = dbc.Button(
                 "Show",
                 id={"type": "method-config-toggle", "code": code},
@@ -793,7 +776,6 @@ def register_correction_callbacks(app):
                     status_cell,
                     run_cell,
                     delete_cell,
-                    citation_cell,
                 ]
             )
             body_rows.append(row)
@@ -807,7 +789,7 @@ def register_correction_callbacks(app):
                                 id={"type": "method-config-collapse", "code": code},
                                 is_open=False,
                             ),
-                            colSpan=8,
+                            colSpan=7,
                             className="p-0",
                         )
                     )
@@ -821,7 +803,7 @@ def register_correction_callbacks(app):
                             id={"type": "method-explanation-collapse", "code": code},
                             is_open=False,
                         ),
-                        colSpan=8,
+                        colSpan=7,
                         className="p-0",
                     )
                 )

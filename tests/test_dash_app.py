@@ -174,6 +174,13 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Johnson WE", text)
         self.assertNotIn("Suggested methods", text)
 
+    def test_correction_table_does_not_repeat_citation_column(self):
+        source = Path("_6_correction.py").read_text(encoding="utf-8")
+
+        self.assertNotIn('html.Th("Citation", className="text-center")', source)
+        self.assertNotIn("citation_cell", source)
+        self.assertIn('html.Th("Explanation"', source)
+
     def test_method_reference_csv_provides_descriptions(self):
         for method_code, metadata in METHOD_REFERENCE_BY_CODE.items():
             self.assertTrue(metadata.get("description"), method_code)

@@ -172,9 +172,6 @@ HELP_MODAL_SECTIONS: List = [
                                 "with different settings. This action only affects the selected "
                                 "method, while other results remain intact."
                             ),
-                            html.Li(
-                                "Citation links to the publication or documentation for the selected method."
-                            ),
                         ],
                         className="mt-2",
                     ),
