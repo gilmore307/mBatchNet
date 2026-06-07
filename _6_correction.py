@@ -16,6 +16,7 @@ from _2_utils import (
     _method_code_from_display,
     _load_session_summary,
     extract_method_timings_from_log,
+    load_method_runtime_averages,
     any_method_outputs,
     delete_method_outputs,
     get_session_dir,
@@ -586,10 +587,15 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id) if session_id else None
         if not session_dir or not session_dir.exists():
             return {"methods": {}}
+        runtime_averages = load_method_runtime_averages()
         log_timings = extract_method_timings_from_log(session_dir)
         method_timings: Dict[str, Dict[str, object]] = {
             code: {"elapsed_sec": elapsed} for code, elapsed in log_timings.items()
         }
+        for code, payload in runtime_averages.items():
+            method_timings.setdefault(code, {})
+            method_timings[code]["expected_elapsed_sec"] = payload.get("mean_sec")
+            method_timings[code]["expected_elapsed_n"] = payload.get("count")
         try:
             session_summary = _load_session_summary(session_dir)
         except Exception:
@@ -642,6 +648,15 @@ def register_correction_callbacks(app):
                     html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Th(
                         _header_with_tooltip(
+                            "Expected time (s)",
+                            "Average elapsed seconds from previous successful runs on this server. Actual runtime depends on data size, method parameters, and server load; use this estimate as a reference only and check Logs for detailed run progress.",
+                            "method-expected-time-help",
+                        ),
+                        className="text-center",
+                        style=_LABEL_COLUMN_WIDTH,
+                    ),
+                    html.Th(
+                        _header_with_tooltip(
                             "Time (s)",
                             "Elapsed seconds from the current session's completed method run, parsed from run.log or session_summary.json.",
                             "method-time-help",
@@ -663,13 +678,21 @@ def register_correction_callbacks(app):
         for code, display in SUPPORTED_METHODS:
             stats = summary_lookup.get(code) or summary_lookup.get(code.lower())
             elapsed = None
+            expected_elapsed = None
             if isinstance(stats, dict):
                 elapsed = stats.get("elapsed_sec")
+                expected_elapsed = stats.get("expected_elapsed_sec")
             if isinstance(elapsed, str):
                 try:
                     elapsed = float(elapsed)
                 except ValueError:
                     elapsed = None
+            if isinstance(expected_elapsed, str):
+                try:
+                    expected_elapsed = float(expected_elapsed)
+                except ValueError:
+                    expected_elapsed = None
+            expected_time_display = "-" if expected_elapsed in (None, "") else f"{float(expected_elapsed):.2f}"
             time_display = "-" if elapsed in (None, "") else f"{float(elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
             failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
@@ -772,6 +795,7 @@ def register_correction_callbacks(app):
                     toggle_cell,
                     explanation_cell,
                     html.Td(method_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Td(expected_time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Td(time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
@@ -789,7 +813,7 @@ def register_correction_callbacks(app):
                                 id={"type": "method-config-collapse", "code": code},
                                 is_open=False,
                             ),
-                            colSpan=7,
+                            colSpan=8,
                             className="p-0",
                         )
                     )
@@ -803,7 +827,7 @@ def register_correction_callbacks(app):
                             id={"type": "method-explanation-collapse", "code": code},
                             is_open=False,
                         ),
-                        colSpan=7,
+                        colSpan=8,
                         className="p-0",
                     )
                 )

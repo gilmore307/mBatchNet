@@ -27,6 +27,7 @@ import dash_bootstrap_components as dbc
 # Paths & constants
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "output"
+METHOD_RUNTIME_STATS_PATH = OUTPUT_ROOT / "method_runtime_stats.json"
 PLOTS_DIR = BASE_DIR / "plots"
 CORRECTION_DIR = BASE_DIR / "correction"
 METHODS_DIR = CORRECTION_DIR / "methods"
@@ -981,6 +982,77 @@ def run_command(command: Sequence[str], cwd: Path) -> Tuple[bool, str]:
         return False, log
 
 
+def load_method_runtime_averages() -> Dict[str, Dict[str, object]]:
+    """Load historical successful-run mean runtimes keyed by method code."""
+
+    try:
+        payload = json.loads(METHOD_RUNTIME_STATS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    methods = payload.get("methods") if isinstance(payload, dict) else None
+    if not isinstance(methods, dict):
+        return {}
+    clean: Dict[str, Dict[str, object]] = {}
+    for raw_code, entry in methods.items():
+        code = _normalize_method_code(str(raw_code))
+        if not code or not isinstance(entry, dict):
+            continue
+        try:
+            mean_sec = float(entry.get("mean_sec"))
+            count = int(entry.get("count"))
+        except (TypeError, ValueError):
+            continue
+        if count <= 0 or mean_sec < 0:
+            continue
+        clean[code] = {
+            "mean_sec": mean_sec,
+            "count": count,
+            "last_elapsed_sec": entry.get("last_elapsed_sec"),
+            "updated_at": entry.get("updated_at"),
+        }
+    return clean
+
+
+def record_method_runtime(method: str, elapsed_sec: float) -> None:
+    """Update historical successful-run mean runtime for one method."""
+
+    code = _normalize_method_code(method)
+    if not code:
+        return
+    try:
+        elapsed = float(elapsed_sec)
+    except (TypeError, ValueError):
+        return
+    if elapsed < 0:
+        return
+    stats = load_method_runtime_averages()
+    existing = stats.get(code, {})
+    try:
+        old_count = int(existing.get("count", 0))
+        old_mean = float(existing.get("mean_sec", 0.0))
+    except (TypeError, ValueError):
+        old_count = 0
+        old_mean = 0.0
+    new_count = old_count + 1
+    new_mean = ((old_mean * old_count) + elapsed) / new_count
+    stats[code] = {
+        "count": new_count,
+        "mean_sec": new_mean,
+        "last_elapsed_sec": elapsed,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    payload = {
+        "schema": "mbatchnet_method_runtime_stats",
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "methods": stats,
+    }
+    try:
+        OUTPUT_ROOT.mkdir(exist_ok=True)
+        METHOD_RUNTIME_STATS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _terminate_process(proc: subprocess.Popen, *, timeout: float = 5.0) -> None:
     """Best-effort helper to terminate a child process."""
 
@@ -1142,11 +1214,14 @@ def run_single_method(
 
     param_args = _format_method_params(params)
     command = build_rscript_command(script_path, session_dir, *param_args)
+    started = time.monotonic()
     if log_path is not None:
         success, log = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
     else:
         success, log = run_command(command, cwd=BASE_DIR)
+    elapsed = time.monotonic() - started
     if success:
+        record_method_runtime(canonical_code, elapsed)
         return True, log
 
     failure_note = f"Method failed: {canonical_code}"

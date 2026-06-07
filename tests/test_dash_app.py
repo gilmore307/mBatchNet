@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dash import Dash, html
 
+import _2_utils
 import server
 from _0_main import _build_download_bundle
 from _0_main import _download_bundle_kind_from_click
@@ -20,6 +21,8 @@ from _2_utils import archive_assessment_figure_outputs
 from _2_utils import clear_assessment_outputs
 from _2_utils import clear_session_derived_outputs
 from _2_utils import PREVIEW_SENTINEL
+from _2_utils import load_method_runtime_averages
+from _2_utils import record_method_runtime
 from _1_components import build_navbar
 from _5_assessment import _expected_figure_files
 from _6_correction import _PARAMETER_CONFIG
@@ -219,6 +222,38 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Elapsed seconds", text)
         self.assertIn("run.log", text)
         self.assertIn("session_summary.json", text)
+
+    def test_expected_time_header_explains_average_runtime_source(self):
+        text = _component_text(
+            _header_with_tooltip(
+                "Expected time (s)",
+                "Average elapsed seconds from previous successful runs on this server. Actual runtime depends on data size, method parameters, and server load; use this estimate as a reference only and check Logs for detailed run progress.",
+                "method-expected-time-help-test",
+            )
+        )
+
+        self.assertIn("Expected time (s)", text)
+        self.assertIn("?", text)
+        self.assertIn("previous successful runs", text)
+        self.assertIn("data size", text)
+        self.assertIn("method parameters", text)
+        self.assertIn("Logs", text)
+
+    def test_method_runtime_averages_record_successful_runs(self):
+        original_path = _2_utils.METHOD_RUNTIME_STATS_PATH
+        with tempfile.TemporaryDirectory() as tmp:
+            _2_utils.METHOD_RUNTIME_STATS_PATH = Path(tmp) / "method_runtime_stats.json"
+            try:
+                record_method_runtime("ComBat", 10.0)
+                record_method_runtime("ComBat", 20.0)
+
+                stats = load_method_runtime_averages()
+            finally:
+                _2_utils.METHOD_RUNTIME_STATS_PATH = original_path
+
+        self.assertIn("combat", stats)
+        self.assertEqual(stats["combat"]["count"], 2)
+        self.assertAlmostEqual(stats["combat"]["mean_sec"], 15.0)
 
     def test_method_explanation_uses_reference_fields(self):
         text = _component_text(
