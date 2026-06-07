@@ -93,7 +93,10 @@ run_method("DEBIAS", {
 
   model$fit(X_train, y_train)
   X_debiased <- model$transform(X_full)
-  Xd <- as.matrix(py_to_r(X_debiased))
+  Xd <- tryCatch(
+    as.matrix(py_to_r(X_debiased)),
+    error = function(e) as.matrix(X_debiased)
+  )
 
   p_full <- ncol(X_with_batch)
   p_feat <- ncol(X_cnt)
