@@ -258,7 +258,8 @@ upper_heatmap_panel <- function(Db, ord, title_label, fill_label,
                                 global_min, global_max,
                                 label_digits = 3,
                                 text_threshold_frac = 0.6,
-                                bar_width_in = NULL) {
+                                bar_width_in = NULL,
+                                show_legend = TRUE) {
   stopifnot(length(ord) == nrow(Db), length(ord) == ncol(Db))
   idx_map <- setNames(seq_along(ord), ord)
   long <- as.data.frame(Db) |>
@@ -299,7 +300,7 @@ upper_heatmap_panel <- function(Db, ord, title_label, fill_label,
       axis.text.y = element_text(size = 8),
       axis.ticks  = element_blank(),
       panel.grid  = element_blank(),
-      legend.position = "bottom",
+      legend.position = if (isTRUE(show_legend)) "bottom" else "none",
       legend.direction = "horizontal",
       plot.margin = margin(8, 10, 8, 10)
     ) +
@@ -325,42 +326,6 @@ safe_anosim <- function(dist_obj, grouping) {
   out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping, permutations = 10), error = function(e) NULL)
   if (is.null(out)) return(default)
   c(ANOSIM_R = unname(out$statistic))
-}
-
-build_spaced_grid <- function(plots, panel_cols, panel_rows, spacer_w_in, spacer_h_in, total_w_in, total_h_in) {
-  if (length(plots) == 1L) return(plots[[1]])
-  panel_cols <- max(1L, as.integer(panel_cols))
-  panel_rows <- max(1L, as.integer(panel_rows))
-  spacer_cols <- max(panel_cols - 1L, 0L)
-  spacer_rows <- max(panel_rows - 1L, 0L)
-  panel_w_in <- (total_w_in - spacer_cols * spacer_w_in) / panel_cols
-  panel_h_in <- (total_h_in - spacer_rows * spacer_h_in) / panel_rows
-  if (!is.finite(panel_w_in) || panel_w_in <= 0) panel_w_in <- total_w_in / panel_cols
-  if (!is.finite(panel_h_in) || panel_h_in <= 0) panel_h_in <- total_h_in / panel_rows
-  spacer_rel_w <- spacer_w_in / panel_w_in
-  spacer_rel_h <- spacer_h_in / panel_h_in
-  layout_cols <- panel_cols + spacer_cols
-  layout_rows <- panel_rows + spacer_rows
-  grid_list <- vector("list", layout_rows * layout_cols)
-  plot_idx <- 1L
-  for (r in seq_len(layout_rows)) {
-    for (c in seq_len(layout_cols)) {
-      is_spacer <- (r %% 2L == 0L) || (c %% 2L == 0L)
-      pos <- (r - 1L) * layout_cols + c
-      if (is_spacer) {
-        grid_list[[pos]] <- plot_spacer()
-      } else if (plot_idx <= length(plots)) {
-        grid_list[[pos]] <- plots[[plot_idx]]
-        plot_idx <- plot_idx + 1L
-      } else {
-        grid_list[[pos]] <- plot_spacer()
-      }
-    }
-  }
-  widths <- rep(c(1, spacer_rel_w), length.out = layout_cols)
-  heights <- rep(c(1, spacer_rel_h), length.out = layout_rows)
-  wrap_plots(grid_list, ncol = layout_cols) +
-    plot_layout(widths = widths, heights = heights)
 }
 
 # ==== A) Aitchison RMSE heatmaps ====
@@ -430,8 +395,6 @@ if (n_panels_ait == 1L) {
   h_ait <- base_row_height_in * panel_rows_ait
 }
 fig_dims_ait <- apply_fig_overrides(w_ait, h_ait, 300, panel_cols_ait, panel_rows_ait)
-spacer_w_ait_in <- fig_dims_ait$width / 1000
-spacer_h_ait_in <- fig_dims_ait$height / 1000
 bar_width_ait_in <- fig_dims_ait$width / 2
 plots_ait <- list()
 for (nm in names(mat_list_ait)) {
@@ -439,38 +402,51 @@ for (nm in names(mat_list_ait)) {
   plots_ait[[nm]] <- upper_heatmap_panel(
     Db = mat_list_ait[[nm]],
     ord = ord_list_ait[[nm]],
-    title_label = if (has_dual_geometries) sprintf("%s - Aitchison", nm_lbl) else nm_lbl,
+    title_label = if (has_dual_geometries) sprintf("%s\nAitchison", nm_lbl) else nm_lbl,
     fill_label = "Batch Dissimilarity",
     global_min = gmin_ait,
     global_max = gmax_ait,
     label_digits = label_digits,
     text_threshold_frac = text_threshold_frac,
-    bar_width_in = bar_width_ait_in
+    bar_width_in = bar_width_ait_in,
+    show_legend = n_panels_ait == 1L
   )
 }
 if (n_panels_ait == 1L) {
   combined_ait <- plots_ait[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
 } else {
-  combined_ait <- build_spaced_grid(
+  legend_ait <- upper_heatmap_panel(
+    Db = mat_list_ait[[1]],
+    ord = ord_list_ait[[1]],
+    title_label = "",
+    fill_label = "Batch Dissimilarity",
+    global_min = gmin_ait,
+    global_max = gmax_ait,
+    label_digits = label_digits,
+    text_threshold_frac = text_threshold_frac,
+    bar_width_in = bar_width_ait_in,
+    show_legend = TRUE
+  )
+  combined_ait <- assemble_panel_grid(
     plots_ait,
     panel_cols = panel_cols_ait,
     panel_rows = panel_rows_ait,
-    spacer_w_in = spacer_w_ait_in,
-    spacer_h_in = spacer_h_ait_in,
-    total_w_in = fig_dims_ait$width,
-    total_h_in = fig_dims_ait$height
-  ) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
+    fig_dims = fig_dims_ait,
+    title = "Dissimilarity Heatmaps",
+    legend_grob = extract_plot_legend(legend_ait)
+  )
 }
-combined_ait <- combined_ait + plot_annotation(
-  title = "Dissimilarity Heatmaps",
-  theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
-)
+if (n_panels_ait == 1L) {
+  combined_ait <- combined_ait + plot_annotation(
+    title = "Dissimilarity Heatmaps",
+    theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+  )
+}
 tif_path_ait <- file.path(output_folder, "dissimilarity_heatmaps_aitchison.tif")
 ggsave(tif_path_ait,
-       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height, dpi = fig_dims_ait$dpi, compression = "lzw")
+       plot = combined_ait, width = fig_dims_ait$width, height = fig_dims_ait$height,
+       dpi = fig_dims_ait$dpi, compression = "lzw", bg = "white")
 rm(combined_ait, plots_ait)
 gc()
 
@@ -487,8 +463,6 @@ if (n_panels_bc == 1L) {
   h_bc <- base_row_height_in * panel_rows_bc
 }
 fig_dims_bc <- apply_fig_overrides(w_bc, h_bc, 300, panel_cols_bc, panel_rows_bc)
-spacer_w_bc_in <- fig_dims_bc$width / 1000
-spacer_h_bc_in <- fig_dims_bc$height / 1000
 bar_width_bc_in <- fig_dims_bc$width / 2
 plots_bc <- list()
 for (nm in names(mat_list_bc)) {
@@ -496,38 +470,51 @@ for (nm in names(mat_list_bc)) {
   plots_bc[[nm]] <- upper_heatmap_panel(
     Db = mat_list_bc[[nm]],
     ord = ord_list_bc[[nm]],
-    title_label = if (has_dual_geometries) sprintf("%s - Bray–Curtis", nm_lbl) else nm_lbl,
+    title_label = if (has_dual_geometries) sprintf("%s\nBray-Curtis", nm_lbl) else nm_lbl,
     fill_label = "Batch Dissimilarity",
     global_min = gmin_bc,
     global_max = gmax_bc,
     label_digits = label_digits,
     text_threshold_frac = text_threshold_frac,
-    bar_width_in = bar_width_bc_in
+    bar_width_in = bar_width_bc_in,
+    show_legend = n_panels_bc == 1L
   )
 }
 if (n_panels_bc == 1L) {
   combined_bc <- plots_bc[[1]] +
     theme(legend.position = "bottom", legend.direction = "horizontal")
 } else {
-  combined_bc <- build_spaced_grid(
+  legend_bc <- upper_heatmap_panel(
+    Db = mat_list_bc[[1]],
+    ord = ord_list_bc[[1]],
+    title_label = "",
+    fill_label = "Batch Dissimilarity",
+    global_min = gmin_bc,
+    global_max = gmax_bc,
+    label_digits = label_digits,
+    text_threshold_frac = text_threshold_frac,
+    bar_width_in = bar_width_bc_in,
+    show_legend = TRUE
+  )
+  combined_bc <- assemble_panel_grid(
     plots_bc,
     panel_cols = panel_cols_bc,
     panel_rows = panel_rows_bc,
-    spacer_w_in = spacer_w_bc_in,
-    spacer_h_in = spacer_h_bc_in,
-    total_w_in = fig_dims_bc$width,
-    total_h_in = fig_dims_bc$height
-  ) +
-    plot_layout(guides = "collect") &
-    theme(legend.position = "bottom", legend.direction = "horizontal")
+    fig_dims = fig_dims_bc,
+    title = "Dissimilarity Heatmaps",
+    legend_grob = extract_plot_legend(legend_bc)
+  )
 }
-combined_bc <- combined_bc + plot_annotation(
-  title = "Dissimilarity Heatmaps",
-  theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
-)
+if (n_panels_bc == 1L) {
+  combined_bc <- combined_bc + plot_annotation(
+    title = "Dissimilarity Heatmaps",
+    theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+  )
+}
 tif_path_bc <- file.path(output_folder, "dissimilarity_heatmaps_braycurtis.tif")
 ggsave(tif_path_bc,
-       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height, dpi = fig_dims_bc$dpi, compression = "lzw")
+       plot = combined_bc, width = fig_dims_bc$width, height = fig_dims_bc$height,
+       dpi = fig_dims_bc$dpi, compression = "lzw", bg = "white")
 rm(combined_bc, plots_bc)
 
 # ==== Unified summaries (Aitchison RMSE + Bray-Curtis) OR baseline-only assessment ====
