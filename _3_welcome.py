@@ -369,7 +369,7 @@ def welcome_layout(active_path: str):
                                             "Help and tutorials",
                                             "Built-in guidance, inline parameter descriptions, and example-based help pages support users through each analysis stage.",
                                             dbc.Button(
-                                                [html.I(className="bi bi-life-preserver me-2"), "Open help page"],
+                                                [html.I(className="bi bi-question-circle me-2"), "Open help page"],
                                                 id={"type": "help-open-trigger", "source": "resources"},
                                                 className="rounded-pill px-4 fw-semibold border-0 mt-auto",
                                                 style={
