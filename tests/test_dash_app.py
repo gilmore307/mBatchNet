@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import shutil
+import re
 from pathlib import Path
 
 from dash import Dash
@@ -9,6 +10,8 @@ import server
 from _0_main import _build_download_bundle
 from _2_utils import write_session_manifests
 from _1_components import build_navbar
+from _6_correction import _PARAMETER_CONFIG
+from _6_correction import _parameter_input
 from _6_correction import correction_layout
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
@@ -59,6 +62,29 @@ class DashAppTests(unittest.TestCase):
 
         self.assertIn("Method guide", text)
         self.assertIn("Phenotype-aware correction", text)
+
+    def test_correction_parameters_match_r_scripts_and_have_tooltips(self):
+        method_files = {
+            "ComBat": "correction/methods/ComBat.R",
+            "ConQuR": "correction/methods/ConQuR.R",
+            "FAbatch": "correction/methods/FAbatch.R",
+            "MetaDICT": "correction/methods/MetaDICT.R",
+            "MMUPHin": "correction/methods/MMUPHin.R",
+            "PLSDA": "correction/methods/PLSDA.R",
+            "RUV": "correction/methods/RUV.R",
+        }
+        for method, path in method_files.items():
+            text = Path(path).read_text(encoding="utf-8")
+            script_params = set(re.findall(r'get_param\("([^"]+)"', text))
+            ui_params = {str(spec["name"]) for spec in _PARAMETER_CONFIG.get(method, [])}
+            self.assertEqual(script_params, ui_params, method)
+            for spec in _PARAMETER_CONFIG[method]:
+                self.assertTrue(spec.get("description"), f"{method}:{spec['name']}")
+                rendered = _component_text(_parameter_input(method, spec))
+                self.assertIn("?", rendered)
+
+        mmuphin_conv = next(spec for spec in _PARAMETER_CONFIG["MMUPHin"] if spec["name"] == "conv")
+        self.assertEqual(mmuphin_conv["default"], 0.000001)
 
     def test_example_dataset_passes_upload_validation(self):
         with tempfile.TemporaryDirectory() as tmp:

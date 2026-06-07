@@ -59,11 +59,32 @@ def _parse_italic_text(text: str) -> object:
     return parts
 
 
+def _safe_fragment(value: object) -> str:
+    text = re.sub(r"[^A-Za-z0-9_-]+", "-", str(value or "").strip())
+    return text.strip("-") or "param"
+
+
 def _parameter_input(code: str, spec: Dict[str, object]) -> dbc.Col:
     name = spec.get("name") or "parameter"
     input_type = spec.get("type") or "text"
     default_value = spec.get("default")
-    label = html.Div(name, className="fw-semibold mb-1")
+    description = spec.get("description")
+    tooltip_id = f"method-param-help-{_safe_fragment(code)}-{_safe_fragment(name)}"
+    label_children: List[object] = [str(name)]
+    if description:
+        label_children.extend(
+            [
+                " ",
+                html.Span(
+                    "?",
+                    id=tooltip_id,
+                    className="badge rounded-pill bg-secondary",
+                    style={"cursor": "help"},
+                ),
+                dbc.Tooltip(str(description), target=tooltip_id, placement="top"),
+            ]
+        )
+    label = html.Div(label_children, className="fw-semibold mb-1")
     control: object
     common_props = {
         "id": {"type": "method-config-input", "code": code, "param": name},
@@ -153,6 +174,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Use ComBat's empirical Bayes parametric prior. False uses the non-parametric prior and is more conservative for heterogeneous microbiome-like data.",
         }
     ],
     "ConQuR": [
@@ -164,9 +186,20 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Use lasso logistic regression in ConQuR's batch-modeling step. It can help when covariates are numerous, but may be slower.",
         },
-        {"name": "quantile_type", "type": "text", "default": "standard"},
-        {"name": "lambda_quantile", "type": "text", "default": "2p/n"},
+        {
+            "name": "quantile_type",
+            "type": "text",
+            "default": "standard",
+            "description": "Quantile-regression mode passed to ConQuR. Keep 'standard' unless reproducing a specific ConQuR setting.",
+        },
+        {
+            "name": "lambda_quantile",
+            "type": "text",
+            "default": "2p/n",
+            "description": "Penalty expression for ConQuR's quantile model. The default follows the wrapper's conservative setting.",
+        },
         {
             "name": "interplt",
             "type": "dropdown",
@@ -175,6 +208,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Enable interpolation in ConQuR's quantile adjustment. This may smooth sparse distributions but can increase runtime.",
         },
         {
             "name": "delta",
@@ -183,8 +217,14 @@ _PARAMETER_CONFIG = {
             "min": 0,
             "max": 1,
             "step": 0.0001,
+            "description": "ConQuR quantile clipping offset. Values near 0.5 are conservative; lower values can make tail corrections stronger.",
         },
-        {"name": "taus", "type": "text", "default": "seq(0.05,0.95,0.05)"},
+        {
+            "name": "taus",
+            "type": "text",
+            "default": "seq(0.05,0.95,0.05)",
+            "description": "Quantile grid used by ConQuR. A denser grid can be smoother but slower.",
+        },
     ],
     "FAbatch": [
         {
@@ -194,6 +234,7 @@ _PARAMETER_CONFIG = {
             "min": 0,
             "max": 1,
             "step": 0.000001,
+            "description": "FAbatch convergence tolerance. Smaller values can run longer; larger values stop earlier.",
         },
         {
             "name": "probcrossbatch",
@@ -203,6 +244,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Allow probabilistic cross-batch class assignment in FAbatch. Enable only when cross-batch class overlap is expected.",
         },
         {
             "name": "maxnbf",
@@ -210,6 +252,7 @@ _PARAMETER_CONFIG = {
             "default": 8,
             "min": 1,
             "step": 1,
+            "description": "Maximum number of batch factors FAbatch may estimate. Higher values can model more structure but risk over-correction.",
         },
     ],
     "MetaDICT": [
@@ -220,6 +263,7 @@ _PARAMETER_CONFIG = {
             "min": 0,
             "max": 1,
             "step": 0.01,
+            "description": "MetaDICT significance threshold for detecting batch-driven structure. Lower values are stricter.",
         },
         {
             "name": "beta",
@@ -228,6 +272,7 @@ _PARAMETER_CONFIG = {
             "min": 0,
             "max": 1,
             "step": 0.01,
+            "description": "MetaDICT effect-size threshold for adjustment strength. Higher values require stronger evidence before correction.",
         },
         {
             "name": "normalization",
@@ -239,6 +284,7 @@ _PARAMETER_CONFIG = {
                 {"label": "None", "value": "none"},
             ],
             "default": "uq",
+            "description": "Normalization strategy used inside MetaDICT before adjustment. Upper quartile is the default wrapper setting.",
         },
     ],
     "MMUPHin": [
@@ -250,13 +296,15 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Tell MMUPHin to use its zero-inflation control path. Useful for sparse count-like microbiome tables.",
         },
         {
             "name": "conv",
             "type": "number",
-            "default": 0.0001,
+            "default": 0.000001,
             "min": 0,
-            "step": 0.0001,
+            "step": 0.000001,
+            "description": "MMUPHin convergence tolerance. Smaller values are stricter and can increase runtime.",
         },
     ],
     "PLSDA": [
@@ -266,6 +314,7 @@ _PARAMETER_CONFIG = {
             "default": 1,
             "min": 1,
             "step": 1,
+            "description": "Number of latent treatment components retained by PLSDA-batch.",
         },
         {
             "name": "ncomp.bat",
@@ -273,6 +322,7 @@ _PARAMETER_CONFIG = {
             "default": 5,
             "min": 1,
             "step": 1,
+            "description": "Number of latent batch components modeled by PLSDA-batch. Larger values can remove more batch structure.",
         },
         {
             "name": "keepX.trt",
@@ -280,6 +330,7 @@ _PARAMETER_CONFIG = {
             "default": 50,
             "min": 1,
             "step": 1,
+            "description": "Number of variables retained for treatment/target discrimination in PLSDA-batch.",
         },
         {
             "name": "near.zero.var",
@@ -289,6 +340,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Filter near-zero variance features before PLSDA-batch. Can improve stability for sparse tables.",
         },
         {
             "name": "balance",
@@ -298,6 +350,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Ask PLSDA-batch to balance classes during model fitting. Use when target classes are strongly imbalanced.",
         },
     ],
     "RUV": [
@@ -307,6 +360,7 @@ _PARAMETER_CONFIG = {
             "default": 2,
             "min": 1,
             "step": 1,
+            "description": "Number of unwanted factors estimated by RUV-III-NB. Larger k can remove more unwanted variation but may remove biology.",
         },
         {
             "name": "use.pseudosample",
@@ -316,6 +370,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Use pseudo-sample controls in RUV-III-NB. Enable only when the study design supports pseudo-sample assumptions.",
         },
         {
             "name": "batch.disp",
@@ -325,6 +380,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Estimate batch-specific dispersion in RUV-III-NB. May help when batches differ in count variability.",
         },
         {
             "name": "zeroinf",
@@ -334,6 +390,7 @@ _PARAMETER_CONFIG = {
                 {"label": "False", "value": False},
             ],
             "default": False,
+            "description": "Enable zero-inflation handling in RUV-III-NB. Useful for sparse count matrices.",
         },
     ],
 }
