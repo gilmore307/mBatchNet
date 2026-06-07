@@ -619,38 +619,69 @@ def upload_layout(active_path: str):
                         [
                             dbc.CardHeader(html.Strong("Input requirements")),
                             dbc.CardBody(
-                                html.Ul(
+                                html.Div(
                                     [
-                                        html.Li(
-                                            "Matrix CSV: samples in rows and profiled features in columns."
+                                        html.Div(
+                                            [
+                                                html.Div("Accepted input", className="fw-semibold mb-1"),
+                                                html.Ul(
+                                                    [
+                                                        html.Li("Matrix CSV: samples in rows and profiled features in columns."),
+                                                        html.Li("Metadata CSV: one row per sample, in the same sample order as the matrix."),
+                                                        html.Li(
+                                                            "Supported data: profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
+                                                        ),
+                                                        html.Li("Not supported: raw sequencing reads; run upstream profiling first."),
+                                                    ],
+                                                    className="mb-3",
+                                                ),
+                                            ]
                                         ),
-                                        html.Li(
-                                            "Metadata CSV: one row per sample, in the same sample order as the matrix."
+                                        html.Div(
+                                            [
+                                                html.Div("Metadata", className="fw-semibold mb-1"),
+                                                html.Ul(
+                                                    [
+                                                        html.Li("Required: one batch column and one binary target/phenotype column."),
+                                                        html.Li(
+                                                            f"Metadata limit: {MAX_METADATA_COLUMNS} columns or fewer, including batch, target, and optional covariates."
+                                                        ),
+                                                    ],
+                                                    className="mb-3",
+                                                ),
+                                            ]
                                         ),
-                                        html.Li(
-                                            "Required metadata: one batch column and one binary target/phenotype column."
+                                        html.Div(
+                                            [
+                                                html.Div("Public server limits", className="fw-semibold mb-1"),
+                                                html.Ul(
+                                                    [
+                                                        html.Li(f"Samples: {MAX_SAMPLES}"),
+                                                        html.Li(f"Features: {MAX_FEATURES}"),
+                                                        html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} per uploaded CSV"),
+                                                        html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,}"),
+                                                    ],
+                                                    className="mb-3",
+                                                ),
+                                            ]
                                         ),
-                                        html.Li(
-                                            "Supported data: profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
-                                        ),
-                                        html.Li(
-                                            "Not supported: raw sequencing reads; run upstream profiling first."
-                                        ),
-                                        html.Li(
-                                            f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, "
-                                            f"{human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells."
-                                        ),
-                                        html.Li(
-                                            f"Metadata limit: {MAX_METADATA_COLUMNS} columns or fewer, including batch, target, and optional covariates."
-                                        ),
-                                        html.Li(
-                                            "Confounding check: mBatchNet reports a warning when batch and target are strongly associated, because batch removal may also remove biological signal."
-                                        ),
-                                        html.Li(
-                                            "For larger studies, run mBatchNet locally or split the feature table before upload."
+                                        html.Div(
+                                            [
+                                                html.Div("Validation warnings", className="fw-semibold mb-1"),
+                                                html.Ul(
+                                                    [
+                                                        html.Li(
+                                                            "Confounding check: mBatchNet reports a warning when batch and target are strongly associated, because batch removal may also remove biological signal."
+                                                        ),
+                                                        html.Li(
+                                                            "For larger studies, run mBatchNet locally or split the feature table before upload."
+                                                        ),
+                                                    ],
+                                                    className="mb-0",
+                                                ),
+                                            ]
                                         ),
                                     ],
-                                    className="mb-0",
                                 )
                             ),
                         ],
