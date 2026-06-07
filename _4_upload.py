@@ -656,6 +656,66 @@ def upload_layout(active_path: str):
                                     className="mt-3",
                                 ),
                             ),
+                            dcc.Tab(
+                                label="Reproducibility Bundle",
+                                value="reproducibility",
+                                children=html.Div(
+                                    [
+                                        dbc.Card(
+                                            [
+                                                dbc.CardHeader(html.Strong("Prepare the reproducibility bundle")),
+                                                dbc.CardBody(
+                                                    [
+                                                        html.P(
+                                                            "Use this checklist before analysis so the Repro bundle is complete enough for reviewers to rerun or audit the session.",
+                                                            className="text-muted",
+                                                        ),
+                                                        html.Ul(
+                                                            [
+                                                                html.Li(
+                                                                    "Use stable CSV inputs: one matrix file, one metadata file, and one row per sample."
+                                                                ),
+                                                                html.Li(
+                                                                    "Choose explicit batch and target columns; these choices are recorded in session_config.json."
+                                                                ),
+                                                                html.Li(
+                                                                    "Keep parameter defaults unless there is a study-specific reason to change them; custom method parameters are recorded in parameter_manifest.json."
+                                                                ),
+                                                                html.Li(
+                                                                    "After validation and preprocessing, validation_report.json and runtime_summary.json are included automatically."
+                                                                ),
+                                                                html.Li(
+                                                                    "Download Repro bundle when sharing results with reviewers or filing an issue."
+                                                                ),
+                                                            ],
+                                                            className="mb-0",
+                                                        ),
+                                                    ]
+                                                ),
+                                            ],
+                                            className="mb-3",
+                                        ),
+                                        dbc.Card(
+                                            [
+                                                dbc.CardHeader(html.Strong("Bundle contents")),
+                                                dbc.CardBody(
+                                                    html.Ul(
+                                                        [
+                                                            html.Li("Inputs: raw.csv, metadata_origin.csv, metadata.csv."),
+                                                            html.Li("Preprocessed matrices: raw_tss.csv and raw_clr.csv."),
+                                                            html.Li("Manifests: validation_report.json, parameter_manifest.json, runtime_summary.json, reproducibility_manifest.json."),
+                                                            html.Li("Execution evidence: run.log and session_config.json."),
+                                                            html.Li("The output bundle remains separate and contains result-oriented files."),
+                                                        ],
+                                                        className="mb-0",
+                                                    )
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                    className="mt-3",
+                                ),
+                            ),
                         ],
                     ),
                     # Shared process area below tabs (wrapped in Loading to prevent duplicate clicks)
@@ -712,7 +772,7 @@ def register_upload_callbacks(app):
         params = parse_qs(query)
         desired_tab = params.get("tab", [None])[0]
 
-        if desired_tab in {"manual", "example"} and desired_tab != current_tab:
+        if desired_tab in {"manual", "example", "reproducibility"} and desired_tab != current_tab:
             return desired_tab
 
         raise dash.exceptions.PreventUpdate
@@ -1392,13 +1452,13 @@ def register_upload_callbacks(app):
             raise dash.exceptions.PreventUpdate
         return {"display": "none", "width": "250px"} if example_loaded else {"width": "250px"}
 
-    # Hide the entire Process section when Example tab is active
+    # Hide the manual Process section when a non-manual tab is active
     @app.callback(
         Output("process-area", "style"),
         Input("upload-tabs", "value"),
     )
     def toggle_process_area(active_tab: str):
-        if active_tab == "example":
+        if active_tab != "manual":
             return {"display": "none"}
         return {}
 
