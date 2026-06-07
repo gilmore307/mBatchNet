@@ -1,7 +1,10 @@
 import unittest
+import base64
 import tempfile
 import shutil
 import re
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
 from dash import Dash
@@ -15,6 +18,7 @@ from _6_correction import _parameter_input
 from _6_correction import correction_layout
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
+from _4_upload import _restore_repro_bundle
 
 
 def _component_text(component):
@@ -46,9 +50,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Preview rows", text)
         self.assertIn("Preview columns", text)
         self.assertIn("Load Selected Example", text)
-        self.assertIn("Prepare the reproducibility bundle", text)
+        self.assertIn("Restore from Repro bundle", text)
+        self.assertIn("Upload Repro bundle", text)
+        self.assertIn("reproducibility_bundle.zip", text)
         self.assertIn("Bundle contents", text)
-        self.assertIn("parameter_manifest.json", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
         self.assertIn("shotgun metagenomics", text)
@@ -104,6 +109,31 @@ class DashAppTests(unittest.TestCase):
 
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"]["metadata_rows"], report["dimensions"]["samples"])
+
+    def test_reproducibility_bundle_upload_restores_session_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            bundle = BytesIO()
+            with zipfile.ZipFile(bundle, "w") as zf:
+                zf.writestr("raw.csv", "1,2\n3,4\n")
+                zf.writestr("metadata_origin.csv", "Batch,Phenotype\nA,case\nB,control\n")
+                zf.writestr("metadata.csv", "batch,Phenotype\nA,case\nB,control\n")
+                zf.writestr("raw_tss.csv", "0.25,0.75\n0.43,0.57\n")
+                zf.writestr("raw_clr.csv", "-0.55,0.55\n-0.14,0.14\n")
+                zf.writestr("session_config.json", '{"label_column":"Phenotype"}')
+                zf.writestr("run.log", "preprocess complete\n")
+            encoded = base64.b64encode(bundle.getvalue()).decode("ascii")
+            contents = "data:application/zip;base64," + encoded
+
+            ok, _status, preprocess_ready = _restore_repro_bundle(contents, session_dir)
+
+            self.assertTrue(ok)
+            self.assertTrue(preprocess_ready)
+            self.assertEqual((session_dir / "raw.csv").read_text(encoding="utf-8"), "1,2\n3,4\n")
+            self.assertTrue((session_dir / "metadata_origin.csv").exists())
+            self.assertTrue((session_dir / "raw_tss.csv").exists())
+            self.assertTrue((session_dir / "raw_clr.csv").exists())
+            self.assertTrue((session_dir / "run.log").exists())
 
     def test_invalid_metadata_row_count_is_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,7 +4,9 @@
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import csv
+from io import BytesIO
 import shutil
+import zipfile
 import json
 from urllib.parse import parse_qs
 from dash import dcc, html
@@ -14,6 +16,7 @@ import dash_bootstrap_components as dbc
 
 from _1_components import build_navbar
 from _2_utils import (
+    decode_contents,
     get_session_dir,
     save_uploaded_file,
     human_size,
@@ -30,6 +33,7 @@ EXAMPLE_DIR = BASE_DIR / "assets" / "example"
 PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_REPRO_BUNDLE_BYTES = 25 * 1024 * 1024
 WARN_UPLOAD_BYTES = 3 * 1024 * 1024
 MAX_SAMPLES = 1000
 MAX_FEATURES = 5000
@@ -317,6 +321,137 @@ def _render_validation_report(report: Dict[str, object]) -> object:
         return dbc.Alert(body, color="warning", className="mt-3")
     body.append(html.Div("Input validation passed.", className="mb-0"))
     return dbc.Alert(body, color="success", className="mt-3")
+
+
+REPRO_BUNDLE_FILES = {
+    "raw.csv",
+    "metadata_origin.csv",
+    "metadata.csv",
+    "raw_tss.csv",
+    "raw_clr.csv",
+    "session_config.json",
+    "validation_report.json",
+    "parameter_manifest.json",
+    "runtime_summary.json",
+    "reproducibility_manifest.json",
+    "session_summary.json",
+    "run.log",
+}
+
+
+def _restore_repro_bundle(contents: str, session_dir: Path) -> Tuple[bool, object, bool]:
+    """Restore a reproducibility bundle zip into the current session directory."""
+
+    try:
+        data = decode_contents(contents)
+    except Exception:
+        return False, dbc.Alert("Could not decode uploaded bundle.", color="danger"), False
+    if len(data) > MAX_REPRO_BUNDLE_BYTES:
+        return (
+            False,
+            dbc.Alert(
+                f"Bundle is too large for this server. Maximum bundle size is {human_size(MAX_REPRO_BUNDLE_BYTES)}.",
+                color="danger",
+            ),
+            False,
+        )
+
+    restored: List[str] = []
+    skipped: List[str] = []
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as zf:
+            allowed_infos = []
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                source_path = Path(info.filename)
+                if source_path.is_absolute() or ".." in source_path.parts:
+                    skipped.append(info.filename)
+                    continue
+                name = source_path.name
+                if name not in REPRO_BUNDLE_FILES:
+                    skipped.append(info.filename)
+                    continue
+                if info.file_size > MAX_UPLOAD_BYTES and name.endswith(".csv"):
+                    return (
+                        False,
+                        dbc.Alert(f"{name} exceeds the public CSV size limit.", color="danger"),
+                        False,
+                    )
+                allowed_infos.append(info)
+
+            incoming_names = {Path(info.filename).name for info in allowed_infos}
+            required = {"raw.csv", "metadata_origin.csv"}
+            missing = sorted(required - incoming_names)
+            if missing:
+                return (
+                    False,
+                    dbc.Alert(
+                        "Bundle is missing required input file(s): " + ", ".join(missing),
+                        color="danger",
+                    ),
+                    False,
+                )
+
+            session_dir.mkdir(parents=True, exist_ok=True)
+            for name in REPRO_BUNDLE_FILES:
+                target = session_dir / name
+                if target.exists():
+                    target.unlink()
+            for info in allowed_infos:
+                name = Path(info.filename).name
+                target = session_dir / name
+                with zf.open(info) as src, target.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                restored.append(name)
+    except zipfile.BadZipFile:
+        return False, dbc.Alert("Uploaded file is not a valid zip bundle.", color="danger"), False
+    except Exception as exc:
+        return False, dbc.Alert(f"Failed to restore bundle: {exc}", color="danger"), False
+
+    preprocess_ready = all((session_dir / name).exists() for name in ("metadata.csv", "raw_tss.csv", "raw_clr.csv"))
+    cfg = _read_session_config(session_dir)
+    target_col = cfg.get("label_column") if isinstance(cfg, dict) else None
+    if not (session_dir / "validation_report.json").exists():
+        batch_col = None
+        try:
+            header, _ = _read_csv_records(session_dir / "metadata_origin.csv")
+            for col in header:
+                if col.lower() == "batch":
+                    batch_col = col
+                    break
+            if target_col not in header:
+                target_col = None
+            if target_col is None:
+                for col in header:
+                    if col.lower() in {"phenotype", "target", "group", "target_binary"}:
+                        target_col = col
+                        break
+        except Exception:
+            batch_col = None
+            target_col = None
+        report_payload = validate_session_inputs(
+            session_dir,
+            batch_col=batch_col,
+            target_col=str(target_col) if target_col else None,
+        )
+    else:
+        report_payload = {}
+
+    body: List[object] = [
+        html.Div("Reproducibility bundle restored.", className="fw-semibold mb-2"),
+        html.Div("Restored files: " + ", ".join(sorted(set(restored))), className="mb-2"),
+    ]
+    if skipped:
+        body.append(html.Div("Ignored non-bundle files: " + ", ".join(sorted(set(skipped))[:5]), className="text-muted mb-2"))
+    if preprocess_ready:
+        body.append(html.Div("Preprocessed inputs found. You can proceed directly to correction or assessment reruns."))
+    else:
+        body.append(html.Div("Raw inputs restored. Switch to Manual Upload if you need to regenerate preprocessing outputs."))
+    if report_payload and not report_payload.get("valid"):
+        body.append(_render_validation_report(report_payload))
+        return False, dbc.Alert(body, color="danger"), False
+    return True, dbc.Alert(body, color="success"), preprocess_ready
 
 
 def _scan_example_sets() -> List[Tuple[str, Path, Path]]:
@@ -663,32 +798,24 @@ def upload_layout(active_path: str):
                                     [
                                         dbc.Card(
                                             [
-                                                dbc.CardHeader(html.Strong("Prepare the reproducibility bundle")),
+                                                dbc.CardHeader(html.Strong("Restore from Repro bundle")),
                                                 dbc.CardBody(
                                                     [
                                                         html.P(
-                                                            "Use this checklist before analysis so the Repro bundle is complete enough for reviewers to rerun or audit the session.",
+                                                            "Upload a reproducibility_bundle.zip exported by mBatchNet to restore the saved session inputs and rerun from the same state.",
                                                             className="text-muted",
                                                         ),
-                                                        html.Ul(
-                                                            [
-                                                                html.Li(
-                                                                    "Use stable CSV inputs: one matrix file, one metadata file, and one row per sample."
-                                                                ),
-                                                                html.Li(
-                                                                    "Choose explicit batch and target columns; these choices are recorded in session_config.json."
-                                                                ),
-                                                                html.Li(
-                                                                    "Keep parameter defaults unless there is a study-specific reason to change them; custom method parameters are recorded in parameter_manifest.json."
-                                                                ),
-                                                                html.Li(
-                                                                    "After validation and preprocessing, validation_report.json and runtime_summary.json are included automatically."
-                                                                ),
-                                                                html.Li(
-                                                                    "Download Repro bundle when sharing results with reviewers or filing an issue."
-                                                                ),
-                                                            ],
-                                                            className="mb-0",
+                                                        dcc.Upload(
+                                                            id="upload-repro-bundle",
+                                                            children=html.Div("Upload Repro bundle"),
+                                                            multiple=False,
+                                                            className="border border-secondary rounded p-4 text-center bg-light",
+                                                            accept=".zip,application/zip",
+                                                        ),
+                                                        html.Div(
+                                                            id="repro-bundle-status",
+                                                            className="mt-3 text-muted",
+                                                            children="No bundle uploaded yet.",
                                                         ),
                                                     ]
                                                 ),
@@ -701,11 +828,11 @@ def upload_layout(active_path: str):
                                                 dbc.CardBody(
                                                     html.Ul(
                                                         [
-                                                            html.Li("Inputs: raw.csv, metadata_origin.csv, metadata.csv."),
-                                                            html.Li("Preprocessed matrices: raw_tss.csv and raw_clr.csv."),
-                                                            html.Li("Manifests: validation_report.json, parameter_manifest.json, runtime_summary.json, reproducibility_manifest.json."),
-                                                            html.Li("Execution evidence: run.log and session_config.json."),
-                                                            html.Li("The output bundle remains separate and contains result-oriented files."),
+                                                            html.Li("Required files: raw.csv and metadata_origin.csv."),
+                                                            html.Li("If metadata.csv, raw_tss.csv, and raw_clr.csv are present, preprocessing is restored automatically."),
+                                                            html.Li("session_config.json and manifests are restored when included."),
+                                                            html.Li("run.log is restored when included and becomes available in the log viewer."),
+                                                            html.Li("Output-result files stay in the separate results download bundle."),
                                                         ],
                                                         className="mb-0",
                                                     )
@@ -801,11 +928,17 @@ def register_upload_callbacks(app):
         Output("metadata-file-info", "children"),
         Output("example-load-status", "children"),
         Output("example-loaded", "data"),
+        Output("repro-bundle-status", "children"),
+        Output("preprocess-complete", "data", allow_duplicate=True),
+        Output("runlog-path", "data", allow_duplicate=True),
+        Output("runlog-file-meta", "data", allow_duplicate=True),
         Input("upload-matrix", "contents"),
         Input("upload-metadata", "contents"),
         Input("load-example", "n_clicks"),
+        Input("upload-repro-bundle", "contents"),
         State("upload-matrix", "filename"),
         State("upload-metadata", "filename"),
+        State("upload-repro-bundle", "filename"),
         State("session-id", "data"),
         State("example-select", "value"),
         prevent_initial_call=True,
@@ -814,13 +947,25 @@ def register_upload_callbacks(app):
         matrix_contents,
         metadata_contents,
         load_example_clicks,
+        repro_contents,
         matrix_name,
         metadata_name,
+        repro_name,
         session_id,
         example_key,
     ):
         if not session_id:
-            return False, "No file uploaded yet.", "No file uploaded yet.", dash.no_update, dash.no_update
+            return (
+                False,
+                "No file uploaded yet.",
+                "No file uploaded yet.",
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                False,
+                "",
+                None,
+            )
 
         session_dir = get_session_dir(session_id)
         saved_items: List[str] = []
@@ -828,6 +973,10 @@ def register_upload_callbacks(app):
         metadata_info = dash.no_update
         example_status = dash.no_update
         example_loaded_out = dash.no_update
+        repro_status = dash.no_update
+        preprocess_complete_out = False
+        runlog_path_out = ""
+        runlog_meta_out = None
 
         # Determine trigger
         ctx = dash.callback_context
@@ -874,6 +1023,7 @@ def register_upload_callbacks(app):
                         )
                     example_status = html.Span("Example files loaded.")
                     example_loaded_out = True
+                    repro_status = "No bundle uploaded yet."
             except Exception:
                 example_status = html.Span("Failed to load example files.", className="text-danger")
 
@@ -885,6 +1035,8 @@ def register_upload_callbacks(app):
                 html.Span(f"Source: {matrix_name} | Saved as: raw.csv | {human_size(size)}"),
             )
             saved_items.append(f"Matrix saved as raw.csv (source: {matrix_name})")
+            example_loaded_out = False
+            repro_status = "No bundle uploaded yet."
 
         if metadata_contents and trig == "upload-metadata":
             save_uploaded_file(metadata_contents, session_dir, "metadata_origin.csv")
@@ -894,9 +1046,54 @@ def register_upload_callbacks(app):
                 html.Span(f"Source: {metadata_name} | Saved as: metadata_origin.csv | {human_size(size)}"),
             )
             saved_items.append(f"Metadata saved as metadata_origin.csv (source: {metadata_name})")
+            example_loaded_out = False
+            repro_status = "No bundle uploaded yet."
+
+        if repro_contents and trig == "upload-repro-bundle":
+            ok, repro_status, preprocess_ready = _restore_repro_bundle(repro_contents, session_dir)
+            example_loaded_out = False
+            upload_complete = bool(ok and (session_dir / "raw.csv").exists() and (session_dir / "metadata_origin.csv").exists())
+            if upload_complete:
+                raw_size = (session_dir / "raw.csv").stat().st_size
+                meta_size = (session_dir / "metadata_origin.csv").stat().st_size
+                source = repro_name or "uploaded bundle"
+                matrix_info = (
+                    dbc.Badge("Restored", color="success", className="me-2"),
+                    html.Span(f"Source: {source} | Saved as: raw.csv | {human_size(raw_size)}"),
+                )
+                metadata_info = (
+                    dbc.Badge("Restored", color="success", className="me-2"),
+                    html.Span(f"Source: {source} | Saved as: metadata_origin.csv | {human_size(meta_size)}"),
+                )
+                preprocess_complete_out = bool(preprocess_ready)
+                log_path = session_dir / "run.log"
+                if log_path.exists():
+                    runlog_path_out = str(log_path)
+                    runlog_meta_out = log_file_meta(log_path)
+            return (
+                upload_complete,
+                matrix_info,
+                metadata_info,
+                dash.no_update,
+                example_loaded_out,
+                repro_status,
+                preprocess_complete_out,
+                runlog_path_out,
+                runlog_meta_out,
+            )
 
         upload_complete = (session_dir / "raw.csv").exists() and (session_dir / "metadata_origin.csv").exists()
-        return upload_complete, matrix_info, metadata_info, example_status, example_loaded_out
+        return (
+            upload_complete,
+            matrix_info,
+            metadata_info,
+            example_status,
+            example_loaded_out,
+            repro_status,
+            preprocess_complete_out,
+            runlog_path_out,
+            runlog_meta_out,
+        )
 
     @app.callback(
         Output("process-uploads", "disabled"),
