@@ -824,15 +824,13 @@ def upload_layout(active_path: str):
                                         ),
                                         dbc.Card(
                                             [
-                                                dbc.CardHeader(html.Strong("Bundle contents")),
+                                                dbc.CardHeader(html.Strong("How to get a Repro bundle")),
                                                 dbc.CardBody(
                                                     html.Ul(
                                                         [
-                                                            html.Li("Required files: raw.csv and metadata_origin.csv."),
-                                                            html.Li("If metadata.csv, raw_tss.csv, and raw_clr.csv are present, preprocessing is restored automatically."),
-                                                            html.Li("session_config.json and manifests are restored when included."),
-                                                            html.Li("run.log is restored when included and becomes available in the log viewer."),
-                                                            html.Li("Output-result files stay in the separate results download bundle."),
+                                                            html.Li("Run or restore an mBatchNet session until the top navigation download menu is enabled."),
+                                                            html.Li("Open Download and choose Repro bundle."),
+                                                            html.Li("Upload that downloaded zip here to reproduce the saved session state."),
                                                         ],
                                                         className="mb-0",
                                                     )
