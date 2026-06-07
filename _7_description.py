@@ -3,6 +3,81 @@ from typing import Dict, List
 
 from dash import html
 
+from _2_utils import CODE_TO_DISPLAY, METHOD_REFERENCE_BY_CODE, SUPPORTED_METHODS
+from _6_correction import _PARAMETER_CONFIG
+
+
+def _format_default_value(value: object) -> str:
+    if value is True:
+        return "True"
+    if value is False:
+        return "False"
+    if value is None:
+        return "not set"
+    return str(value)
+
+
+def _method_help_cards() -> List:
+    cards: List = []
+    for code, display in SUPPORTED_METHODS:
+        metadata = METHOD_REFERENCE_BY_CODE.get(code, {})
+        description = (metadata.get("description") or "").strip()
+        package_url = (metadata.get("package") or "").strip()
+        reference_url = (metadata.get("url") or "").strip()
+        params = _PARAMETER_CONFIG.get(code, [])
+        parameter_items = []
+        if params:
+            for spec in params:
+                parameter_items.append(
+                    html.Li(
+                        [
+                            html.Strong(str(spec.get("name") or "parameter")),
+                            f" (default: {_format_default_value(spec.get('default'))}) - ",
+                            str(spec.get("description") or "No parameter description available."),
+                        ]
+                    )
+                )
+        else:
+            parameter_items.append(
+                html.Li(
+                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, selected covariates, and study settings from the session."
+                )
+            )
+
+        links = []
+        if package_url:
+            links.append(
+                html.A(
+                    "Package/source",
+                    href=package_url,
+                    target="_blank",
+                    rel="noopener noreferrer",
+                    className="me-3",
+                )
+            )
+        if reference_url:
+            links.append(
+                html.A(
+                    "Reference",
+                    href=reference_url,
+                    target="_blank",
+                    rel="noopener noreferrer",
+                )
+            )
+        cards.append(
+            html.Details(
+                [
+                    html.Summary(CODE_TO_DISPLAY.get(code, display), className="fw-semibold"),
+                    html.P(description or "No method description available.", className="mt-2 mb-2"),
+                    html.Div(links, className="mb-2") if links else html.Div(),
+                    html.Div("Exposed parameters", className="fw-semibold mb-1"),
+                    html.Ul(parameter_items, className="mb-0"),
+                ],
+                className="border rounded p-3 mb-2",
+            )
+        )
+    return cards
+
 
 HELP_SECTION_TOC: List[Dict[str, str]] = [
     {"id": "help-overview", "title": "Overview"},
@@ -22,6 +97,7 @@ HELP_SECTION_TOC: List[Dict[str, str]] = [
         "children": [
             {"id": "help-correction-table", "title": "Table columns"},
             {"id": "help-correction-run", "title": "Running corrections"},
+            {"id": "help-correction-methods", "title": "Methods and parameters"},
         ],
     },
     {
@@ -194,6 +270,15 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                         ]
                     ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Methods and parameters", className="mb-2 mt-4", id="help-correction-methods"),
+                    html.P(
+                        "These entries mirror the method descriptions and exposed parameter controls in the Correction table. Method descriptions are drawn from the linked method package or citation records used by mBatchNet; parameter descriptions reflect the current wrapper arguments exposed by the app."
+                    ),
+                    html.Div(_method_help_cards()),
                 ]
             ),
         ],

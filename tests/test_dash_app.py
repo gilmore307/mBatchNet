@@ -29,6 +29,7 @@ from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
 from _6_correction import correction_layout
 from _7_description import HELP_MODAL_SECTIONS
+from _7_description import HELP_SECTION_TOC
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
 from _4_upload import _restore_repro_bundle
@@ -129,6 +130,37 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Download results", text)
         self.assertNotIn("recommended Batch", text)
         self.assertNotIn("best balances", text)
+
+    def test_help_modal_lists_correction_methods_and_parameters(self):
+        text = _component_text(html.Div(HELP_MODAL_SECTIONS))
+        toc_titles = []
+        for item in HELP_SECTION_TOC:
+            toc_titles.append(item["title"])
+            toc_titles.extend(child["title"] for child in item.get("children", []))
+        toc_text = " ".join(toc_titles)
+
+        self.assertIn("Methods and parameters", toc_text)
+        self.assertIn("Methods and parameters", text)
+        self.assertIn("DEBIAS-M", text)
+        self.assertIn("MetaDICT", text)
+        self.assertIn("ComBat-seq", text)
+        self.assertIn("alpha", text)
+        self.assertIn("par.prior", text)
+        self.assertIn("gene.subset.n", text)
+        self.assertIn("No method-specific parameters are exposed", text)
+        self.assertIn("method package or citation records", text)
+
+    def test_readme_documents_correction_methods_and_parameters(self):
+        text = Path("README.md").read_text(encoding="utf-8")
+
+        self.assertIn("## Correction Methods and Parameters", text)
+        self.assertIn("assets/doc/methods.csv", text)
+        self.assertIn("### DEBIAS-M", text)
+        self.assertIn("### MetaDICT", text)
+        self.assertIn("### ComBat-seq", text)
+        self.assertIn("`alpha` (default: `0.05`)", text)
+        self.assertIn("`par.prior` (default: `False`)", text)
+        self.assertIn("Exposed parameters: none.", text)
 
     def test_user_facing_descriptions_avoid_subjective_method_guidance(self):
         banned_terms = (
