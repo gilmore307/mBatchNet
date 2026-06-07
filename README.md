@@ -90,7 +90,7 @@ Rscript assets/env/r-packages.R
    - Pre-assessment
    - Batch Correction
    - Post-assessment
-   - Download results
+   - Download outputs or Repro bundle
 
 The Dash app can also be started directly with:
 
@@ -116,6 +116,12 @@ The Upload page expects two CSV files:
      - covariate columns
 
 After upload, map batch/target/covariate columns in the UI.
+
+Public server limits:
+- CSV size: 25.0 MB per uploaded CSV
+- Samples: 5,000
+- Features: 20,000
+- Matrix cells: 5,000,000
 
 ### Outputs
 For each session, intermediate and final outputs are generated under `output/<session_id>/`, including:

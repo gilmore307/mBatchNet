@@ -22,6 +22,7 @@ from _2_utils import (
     method_output_exists,
     _remove_method_from_summary,
     clear_method_failure,
+    clear_assessment_outputs,
     mark_method_failed,
     method_failed_last_run,
     log_file_meta,
@@ -547,7 +548,6 @@ def correction_layout(active_path: str):
         [
             build_navbar(active_path),
             dcc.Store(id="method-summary-store", data=None),
-            dcc.Store(id="method-operation-trigger", data=0),
             dbc.Container(
                 [
                     html.H2("Batch Effect Correction"),
@@ -942,6 +942,7 @@ def register_correction_callbacks(app):
         new_refresh = refresh_value + 1 if success else refresh_value
         if success:
             clear_method_failure(session_dir, method_code)
+            clear_assessment_outputs(session_dir, stage="post")
             status_text = "Selected"
             run_disabled = True
             delete_disabled = False
@@ -960,6 +961,7 @@ def register_correction_callbacks(app):
             "refresh": new_refresh,
             "log_path": str(log_path),
             "log_meta": log_file_meta(log_path),
+            "post_complete": False,
         }
         run_color = "secondary" if run_disabled else "success"
         delete_color = "secondary" if delete_disabled else "success"
@@ -979,6 +981,7 @@ def register_correction_callbacks(app):
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
+        Output("post-complete", "data", allow_duplicate=True),
         Input({"type": "method-operation-result", "code": ALL}, "data"),
         State({"type": "method-operation-result", "code": ALL}, "id"),
         prevent_initial_call=True,
@@ -1010,6 +1013,7 @@ def register_correction_callbacks(app):
         log_path = payload.get("log_path") if "log_path" in payload else dash.no_update
         log_meta = payload.get("log_meta") if "log_meta" in payload else dash.no_update
         open_log = payload.get("open_log") if "open_log" in payload else dash.no_update
+        post_complete = payload.get("post_complete") if "post_complete" in payload else dash.no_update
         status_message = message if message is not None else dash.no_update
         complete_flag = bool(complete) if isinstance(complete, bool) else complete
 
@@ -1020,6 +1024,7 @@ def register_correction_callbacks(app):
             log_path,
             log_meta,
             open_log,
+            post_complete,
         )
 
     @app.callback(
@@ -1061,6 +1066,8 @@ def register_correction_callbacks(app):
             )
         session_dir = get_session_dir(session_id)
         removed = delete_method_outputs(session_dir, method_code)
+        if removed:
+            clear_assessment_outputs(session_dir, stage="post")
         clear_method_failure(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
         status_text = "Not selected"
@@ -1072,6 +1079,7 @@ def register_correction_callbacks(app):
             "message": message,
             "complete": bool(complete_flag),
             "refresh": refresh_value + 1,
+            "post_complete": False if removed else dash.no_update,
         }
         run_color = "secondary" if run_disabled else "success"
         delete_color = "secondary" if delete_disabled else "success"

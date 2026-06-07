@@ -26,18 +26,19 @@ from _2_utils import (
     BASE_DIR,
     _make_ag_grid,
     _encode_image_source,
+    clear_session_derived_outputs,
 )
 
 
 EXAMPLE_DIR = BASE_DIR / "assets" / "example"
 PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_REPRO_BUNDLE_BYTES = 25 * 1024 * 1024
 WARN_UPLOAD_BYTES = 3 * 1024 * 1024
-MAX_SAMPLES = 1000
-MAX_FEATURES = 5000
-MAX_MATRIX_CELLS = 1_000_000
+MAX_SAMPLES = 5000
+MAX_FEATURES = 20000
+MAX_MATRIX_CELLS = 5_000_000
 WARN_MATRIX_CELLS = 250_000
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.85
@@ -121,6 +122,16 @@ def _level_counts(rows: List[Dict[str, str]], column: str) -> Dict[str, int]:
         if value:
             counts[value] = counts.get(value, 0) + 1
     return counts
+
+
+def _first_non_empty_level(rows: List[Dict[str, str]], column: Optional[str]) -> Optional[str]:
+    if not column:
+        return None
+    for row in rows:
+        value = str(row.get(column, "")).strip()
+        if value:
+            return value
+    return None
 
 
 def _cramers_v(rows: List[Dict[str, str]], col_a: str, col_b: str) -> Optional[float]:
@@ -232,7 +243,7 @@ def validate_session_inputs(
         total_values = sample_count * feature_count
         zero_values = sum(1 for row in matrix for value in row if value == 0)
         if total_values and zero_values / total_values >= HIGH_SPARSITY_FRACTION:
-            warnings.append("Matrix is highly sparse; count-based methods are usually safer than Gaussian methods.")
+            warnings.append("Matrix is highly sparse; review count assumptions and transformed-data assumptions before selecting correction methods.")
         negative_values = sum(1 for row in matrix for value in row if value < 0)
         if negative_values:
             warnings.append("Negative values detected; this looks transformed. Count-specific methods may be inappropriate.")
@@ -280,7 +291,7 @@ def validate_session_inputs(
             dimensions["batch_target_cramers_v"] = round(v, 4)
             if v >= STRONG_CONFOUNDING_V:
                 warnings.append(
-                    "Batch and target are strongly associated. Treat correction results as advisory because "
+                    "Batch and target are strongly associated. Interpret correction results with this confounding in mind because "
                     "batch removal may also remove biological signal."
                 )
 
@@ -394,10 +405,7 @@ def _restore_repro_bundle(contents: str, session_dir: Path) -> Tuple[bool, objec
                 )
 
             session_dir.mkdir(parents=True, exist_ok=True)
-            for name in REPRO_BUNDLE_FILES:
-                target = session_dir / name
-                if target.exists():
-                    target.unlink()
+            clear_session_derived_outputs(session_dir, preserve_inputs=False)
             for info in allowed_infos:
                 name = Path(info.filename).name
                 target = session_dir / name
@@ -412,31 +420,28 @@ def _restore_repro_bundle(contents: str, session_dir: Path) -> Tuple[bool, objec
     preprocess_ready = all((session_dir / name).exists() for name in ("metadata.csv", "raw_tss.csv", "raw_clr.csv"))
     cfg = _read_session_config(session_dir)
     target_col = cfg.get("label_column") if isinstance(cfg, dict) else None
-    if not (session_dir / "validation_report.json").exists():
-        batch_col = None
-        try:
-            header, _ = _read_csv_records(session_dir / "metadata_origin.csv")
-            for col in header:
-                if col.lower() == "batch":
-                    batch_col = col
-                    break
-            if target_col not in header:
-                target_col = None
-            if target_col is None:
-                for col in header:
-                    if col.lower() in {"phenotype", "target", "group", "target_binary"}:
-                        target_col = col
-                        break
-        except Exception:
-            batch_col = None
+    batch_col = None
+    try:
+        header, _ = _read_csv_records(session_dir / "metadata_origin.csv")
+        for col in header:
+            if col.lower() == "batch":
+                batch_col = col
+                break
+        if target_col not in header:
             target_col = None
-        report_payload = validate_session_inputs(
-            session_dir,
-            batch_col=batch_col,
-            target_col=str(target_col) if target_col else None,
-        )
-    else:
-        report_payload = {}
+        if target_col is None:
+            for col in header:
+                if col.lower() in {"phenotype", "target", "group", "target_binary"}:
+                    target_col = col
+                    break
+    except Exception:
+        batch_col = None
+        target_col = None
+    report_payload = validate_session_inputs(
+        session_dir,
+        batch_col=batch_col,
+        target_col=str(target_col) if target_col else None,
+    )
 
     body: List[object] = [
         html.Div("Reproducibility bundle restored.", className="fw-semibold mb-2"),
@@ -828,8 +833,8 @@ def upload_layout(active_path: str):
                                                 dbc.CardBody(
                                                     html.Ul(
                                                         [
-                                                            html.Li("Run or restore an mBatchNet session until the top navigation download menu is enabled."),
-                                                            html.Li("Open Download and choose Repro bundle."),
+                                                            html.Li("Run or restore an mBatchNet session until the navbar download buttons are enabled."),
+                                                            html.Li("Click Repro bundle in the navbar."),
                                                             html.Li("Upload that downloaded zip here to reproduce the saved session state."),
                                                         ],
                                                         className="mb-0",
@@ -928,6 +933,11 @@ def register_upload_callbacks(app):
         Output("example-loaded", "data"),
         Output("repro-bundle-status", "children"),
         Output("preprocess-complete", "data", allow_duplicate=True),
+        Output("pre-started", "data", allow_duplicate=True),
+        Output("pre-complete", "data", allow_duplicate=True),
+        Output("correction-complete", "data", allow_duplicate=True),
+        Output("post-complete", "data", allow_duplicate=True),
+        Output("method-operation-trigger", "data", allow_duplicate=True),
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Input("upload-matrix", "contents"),
@@ -939,6 +949,7 @@ def register_upload_callbacks(app):
         State("upload-repro-bundle", "filename"),
         State("session-id", "data"),
         State("example-select", "value"),
+        State("method-operation-trigger", "data"),
         prevent_initial_call=True,
     )
     def handle_upload(
@@ -951,7 +962,9 @@ def register_upload_callbacks(app):
         repro_name,
         session_id,
         example_key,
+        method_operation_trigger,
     ):
+        method_refresh = int(method_operation_trigger or 0)
         if not session_id:
             return (
                 False,
@@ -961,6 +974,11 @@ def register_upload_callbacks(app):
                 dash.no_update,
                 dash.no_update,
                 False,
+                False,
+                False,
+                False,
+                False,
+                dash.no_update,
                 "",
                 None,
             )
@@ -973,6 +991,11 @@ def register_upload_callbacks(app):
         example_loaded_out = dash.no_update
         repro_status = dash.no_update
         preprocess_complete_out = False
+        pre_started_out = False
+        pre_complete_out = False
+        correction_complete_out = False
+        post_complete_out = False
+        method_operation_trigger_out = dash.no_update
         runlog_path_out = ""
         runlog_meta_out = None
 
@@ -983,6 +1006,8 @@ def register_upload_callbacks(app):
         if trig == "load-example":
             # Copy selected example files into the session directory
             try:
+                clear_session_derived_outputs(session_dir, preserve_inputs=True)
+                method_operation_trigger_out = method_refresh + 1
                 pair = None
                 selected_key = example_key
                 if example_key:
@@ -1026,6 +1051,8 @@ def register_upload_callbacks(app):
                 example_status = html.Span("Failed to load example files.", className="text-danger")
 
         if matrix_contents and trig == "upload-matrix":
+            clear_session_derived_outputs(session_dir, preserve_inputs=True)
+            method_operation_trigger_out = method_refresh + 1
             save_uploaded_file(matrix_contents, session_dir, "raw.csv")
             size = (session_dir / "raw.csv").stat().st_size
             matrix_info = (
@@ -1037,6 +1064,8 @@ def register_upload_callbacks(app):
             repro_status = "No bundle uploaded yet."
 
         if metadata_contents and trig == "upload-metadata":
+            clear_session_derived_outputs(session_dir, preserve_inputs=True)
+            method_operation_trigger_out = method_refresh + 1
             save_uploaded_file(metadata_contents, session_dir, "metadata_origin.csv")
             size = (session_dir / "metadata_origin.csv").stat().st_size
             metadata_info = (
@@ -1050,6 +1079,7 @@ def register_upload_callbacks(app):
         if repro_contents and trig == "upload-repro-bundle":
             ok, repro_status, preprocess_ready = _restore_repro_bundle(repro_contents, session_dir)
             example_loaded_out = False
+            method_operation_trigger_out = method_refresh + 1
             upload_complete = bool(ok and (session_dir / "raw.csv").exists() and (session_dir / "metadata_origin.csv").exists())
             if upload_complete:
                 raw_size = (session_dir / "raw.csv").stat().st_size
@@ -1076,6 +1106,11 @@ def register_upload_callbacks(app):
                 example_loaded_out,
                 repro_status,
                 preprocess_complete_out,
+                pre_started_out,
+                pre_complete_out,
+                correction_complete_out,
+                post_complete_out,
+                method_operation_trigger_out,
                 runlog_path_out,
                 runlog_meta_out,
             )
@@ -1089,6 +1124,11 @@ def register_upload_callbacks(app):
             example_loaded_out,
             repro_status,
             preprocess_complete_out,
+            pre_started_out,
+            pre_complete_out,
+            correction_complete_out,
+            post_complete_out,
+            method_operation_trigger_out,
             runlog_path_out,
             runlog_meta_out,
         )
@@ -1625,7 +1665,20 @@ def register_upload_callbacks(app):
         # Do not auto-open logs modal; user can open manually
         mosaic_children = dash.no_update
         if ok:
-            cfg_ok, _ = _persist_study_settings(session_dir, "0", "A")
+            control_label = None
+            reference_batch = None
+            try:
+                with meta_path.open("r", encoding="utf-8", newline="") as fh:
+                    reader = csv.DictReader(fh)
+                    current_rows = list(reader)
+                control_label = _first_non_empty_level(current_rows, label_col)
+                reference_batch = _first_non_empty_level(current_rows, "batch")
+            except Exception:
+                control_label = None
+                reference_batch = None
+            cfg_ok = False
+            if control_label and reference_batch:
+                cfg_ok, _ = _persist_study_settings(session_dir, control_label, reference_batch)
             if cfg_ok:
                 mosaic_ok, _ = _generate_mosaic(session_dir)
                 if mosaic_ok:

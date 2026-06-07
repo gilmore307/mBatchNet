@@ -95,7 +95,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Example datasets auto-populate every mapping field with that dataset's Batch, target, and covariance selections."
                             ),
                             html.Li(
-                                "Choose from six curated datasets that have different batch sizes, feature counts, and batch/target distributions."
+                                "Use the Example Dataset tab to preview rows and columns before loading the included AD example into the session."
                             ),
                         ]
                     ),

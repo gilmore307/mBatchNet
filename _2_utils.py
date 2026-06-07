@@ -200,6 +200,7 @@ class FigureSpec:
 
 ASSESSMENT_STAGES: Set[str] = {"pre", "post"}
 ASSESSMENT_IMAGE_SUFFIXES: Set[str] = {".png", ".tif", ".tiff"}
+SESSION_INPUT_FILES: Set[str] = {"raw.csv", "metadata_origin.csv"}
 
 
 def assessment_stage_output_name(filename: str, stage: str) -> str:
@@ -280,6 +281,57 @@ def archive_assessment_figure_outputs(
             icon="📁",
         )
     return archived
+
+
+def clear_assessment_outputs(session_dir: Path, stage: Optional[str] = None) -> int:
+    """Delete assessment figures/tables for a stage, or all assessment outputs."""
+
+    removed = 0
+    session_dir = Path(session_dir)
+    stages = ASSESSMENT_STAGES if stage is None else {str(stage).lower()}
+    stage_suffixes = tuple(f"_{item}" for item in stages)
+    for path in list(session_dir.glob("*")):
+        if not path.is_file():
+            continue
+        lower = path.name.lower()
+        suffix = path.suffix.lower()
+        is_stage_file = (
+            suffix in ASSESSMENT_IMAGE_SUFFIXES
+            and any(path.stem.lower().endswith(stage_suffix) for stage_suffix in stage_suffixes)
+        )
+        is_stage_table = any(f"_raw_assessment_{stage_name}.csv" in lower for stage_name in stages)
+        is_ranking = lower.endswith("_ranking.csv") and ("post" in stages or stage is None)
+        if is_stage_file or is_stage_table or is_ranking:
+            try:
+                path.unlink()
+                removed += 1
+            except OSError:
+                pass
+    try:
+        (session_dir / PREVIEW_SENTINEL).unlink(missing_ok=True)
+    except OSError:
+        pass
+    return removed
+
+
+def clear_session_derived_outputs(session_dir: Path, *, preserve_inputs: bool = True) -> int:
+    """Delete generated session files so new inputs cannot reuse stale outputs."""
+
+    removed = 0
+    session_dir = Path(session_dir)
+    if not session_dir.exists():
+        return 0
+    for path in list(session_dir.glob("*")):
+        if not path.is_file():
+            continue
+        if preserve_inputs and path.name in SESSION_INPUT_FILES:
+            continue
+        try:
+            path.unlink()
+            removed += 1
+        except OSError:
+            pass
+    return removed
 
 
 PRE_FIGURES: Sequence[FigureSpec] = (

@@ -78,6 +78,7 @@ def serve_layout() -> html.Div:
             dcc.Store(id="runlog-unread", storage_type="session", data=False),
             dcc.Store(id="runlog-last-seen", storage_type="memory", data=None),
             dcc.Store(id="help-scroll-target", storage_type="memory", data=None),
+            dcc.Store(id="method-operation-trigger", storage_type="session", data=0),
             # Target page for restart confirmation (set when clicking Home/Upload)
             dcc.Store(id="restart-target", storage_type="session", data=""),
 
@@ -322,6 +323,7 @@ def open_restart_modal(upload_clicks: int, home_clicks: int, pathname: str):
     Output("pre-complete", "data", allow_duplicate=True),
     Output("correction-complete", "data", allow_duplicate=True),
     Output("post-complete", "data", allow_duplicate=True),
+    Output("method-operation-trigger", "data", allow_duplicate=True),
     Output("page-url", "pathname"),
     Output("confirm-restart-modal", "is_open", allow_duplicate=True),
     Input("confirm-restart-yes", "n_clicks"),
@@ -356,6 +358,7 @@ def handle_restart(confirm_yes: int, confirm_no: int, current_session: str, rest
             False,        # pre-complete
             False,        # correction-complete
             False,        # post-complete
+            0,            # method-operation-trigger
             nav_path,     # navigate to chosen target (Home or Upload)
             False,        # close modal
         )
@@ -371,10 +374,11 @@ def handle_restart(confirm_yes: int, confirm_no: int, current_session: str, rest
             dash.no_update,
             dash.no_update,
             dash.no_update,
+            dash.no_update,
             False,
         )
 
-# ---- Download results (ZIP session dir) ----
+# ---- Download bundles (ZIP session dir) ----
 def _bundle_filename(bundle_kind: str) -> str:
     if bundle_kind == "outputs":
         return "output_bundle.zip"

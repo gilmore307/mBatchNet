@@ -1,6 +1,7 @@
 ﻿# ===============================
 # File: _5_assessment.py
 # ===============================
+import json
 import threading
 from pathlib import Path
 
@@ -84,6 +85,29 @@ def _clear_outputs(session_dir: Path, expected_files: Sequence[str]) -> None:
         (session_dir / PREVIEW_SENTINEL).unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _assessment_status_path(session_dir: Path, stage: str, key: str) -> Path:
+    safe_stage = "".join(ch for ch in str(stage).lower() if ch.isalnum() or ch in {"-", "_"})
+    safe_key = "".join(ch for ch in str(key).lower() if ch.isalnum() or ch in {"-", "_"})
+    return session_dir / f".assessment_{safe_stage}_{safe_key}_status.json"
+
+
+def _write_assessment_status(session_dir: Path, stage: str, key: str, payload: dict) -> None:
+    try:
+        _assessment_status_path(session_dir, stage, key).write_text(
+            json.dumps(payload, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def _read_assessment_status(session_dir: Path, stage: str, key: str) -> dict:
+    try:
+        return json.loads(_assessment_status_path(session_dir, stage, key).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
 
 
 def _expected_figure_files(stage: str, key: str) -> List[str]:
@@ -865,6 +889,10 @@ def register_pre_post_callbacks(app):
 
                 _reset_found_logs(log_path)
                 _clear_outputs(session_dir, [*expected_files, *base_figure_files])
+                try:
+                    _assessment_status_path(session_dir, _stage, _key).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
                 def _add(flag, val, cast=str):
                     if val is None or val == "":
@@ -937,9 +965,19 @@ def register_pre_post_callbacks(app):
                             base_figure_files,
                             log_path=log_path,
                         )
+                    _write_assessment_status(
+                        session_dir,
+                        _stage,
+                        _key,
+                        {
+                            "status": "complete" if success else "failed",
+                            "script": _script,
+                            "title": _title,
+                        },
+                    )
 
                 threading.Thread(target=_worker, daemon=True).start()
-                stage_flag = True if _stage == "pre" else dash.no_update
+                stage_flag = True if _stage == "pre" else False
                 spinner = dbc.Spinner(
                     html.Div("Running..."),
                     color="primary",
@@ -966,6 +1004,40 @@ def register_pre_post_callbacks(app):
             )
 
             if not files_ready:
+                assessment_status = _read_assessment_status(session_dir, _stage, _key)
+                if assessment_status.get("status") in {"complete", "failed"}:
+                    if assessment_status.get("status") == "complete":
+                        message = (
+                            f"{_title} finished, but expected output files were not found "
+                            f"({ready_count}/{total_expected}). Check run.log."
+                        )
+                    else:
+                        message = f"{_title} failed. Check run.log for details."
+                    append_run_log(log_path, message, icon="❌")
+                    failure_content = html.Div(
+                        [
+                            html.P(message),
+                            html.P("Adjust parameters or input data, then run this assessment again."),
+                        ],
+                        className="text-danger",
+                    )
+                    failure_flag = True if _stage == "pre" else False
+                    return _output(
+                        failure_content,
+                        dash.no_update,
+                        failure_flag,
+                        log_path_value=str(log_path),
+                        log_meta=log_file_meta(log_path),
+                        modal_open=dash.no_update,
+                        param_store=persisted_payload,
+                        poll_disabled=True,
+                        poll_count=0,
+                        run_state_value={
+                            "status": "failed",
+                            "latest_poll": poll_ticks,
+                        },
+                        run_button_disabled=False,
+                    )
                 progress = (
                     f"Waiting for output files ({ready_count}/{total_expected})..."
                     if total_expected
@@ -1034,7 +1106,7 @@ def register_pre_post_callbacks(app):
                     },
                     run_button_disabled=False,
                 )
-            stage_flag = True if _stage == "pre" else dash.no_update
+            stage_flag = True
 
             return _output(
                 dash.no_update,

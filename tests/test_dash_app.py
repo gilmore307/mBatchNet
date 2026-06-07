@@ -1,5 +1,6 @@
 import unittest
 import base64
+import csv
 import tempfile
 import shutil
 import re
@@ -16,6 +17,9 @@ from _2_utils import _DETAILS_INTERPRETATION
 from _2_utils import write_session_manifests
 from _2_utils import METHOD_REFERENCE_BY_CODE
 from _2_utils import archive_assessment_figure_outputs
+from _2_utils import clear_assessment_outputs
+from _2_utils import clear_session_derived_outputs
+from _2_utils import PREVIEW_SENTINEL
 from _1_components import build_navbar
 from _5_assessment import _expected_figure_files
 from _6_correction import _PARAMETER_CONFIG
@@ -28,6 +32,11 @@ from _7_description import HELP_MODAL_SECTIONS
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
 from _4_upload import _restore_repro_bundle
+from _4_upload import _first_non_empty_level
+from _4_upload import MAX_FEATURES
+from _4_upload import MAX_MATRIX_CELLS
+from _4_upload import MAX_SAMPLES
+from _4_upload import MAX_UPLOAD_BYTES
 
 
 def _component_text(component):
@@ -39,6 +48,12 @@ def _component_text(component):
     if isinstance(children, (list, tuple)):
         return " ".join(_component_text(child) for child in children)
     return _component_text(children)
+
+
+def _read_csv_records_for_test(path):
+    with Path(path).open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        return list(reader.fieldnames or []), list(reader)
 
 
 class DashAppTests(unittest.TestCase):
@@ -63,11 +78,21 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Upload Repro bundle", text)
         self.assertIn("reproducibility_bundle.zip", text)
         self.assertIn("How to get a Repro bundle", text)
-        self.assertIn("Open Download and choose Repro bundle", text)
+        self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
         self.assertIn("shotgun metagenomics", text)
         self.assertIn("samples in rows", text)
+        self.assertIn("5000 samples", text)
+        self.assertIn("20000 features", text)
+        self.assertIn("25.0 MB per CSV", text)
+        self.assertIn("5,000,000 matrix cells", text)
+
+    def test_public_upload_limits_match_server_contract(self):
+        self.assertEqual(MAX_SAMPLES, 5000)
+        self.assertEqual(MAX_FEATURES, 20000)
+        self.assertEqual(MAX_UPLOAD_BYTES, 25 * 1024 * 1024)
+        self.assertEqual(MAX_MATRIX_CELLS, 5_000_000)
 
     def test_navbar_exposes_two_download_entries(self):
         text = _component_text(build_navbar("/post"))
@@ -221,6 +246,42 @@ class DashAppTests(unittest.TestCase):
             self.assertEqual((session_dir / "pca_batch_post.tif").read_text(encoding="utf-8"), "post")
             self.assertFalse((session_dir / "pca_batch.tif").exists())
 
+    def test_clearing_post_assessment_preserves_pre_assessment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "pca_batch_pre.tif").write_text("pre", encoding="utf-8")
+            (session_dir / "pca_batch_post.tif").write_text("post", encoding="utf-8")
+            (session_dir / "permanova_raw_assessment_post.csv").write_text("post", encoding="utf-8")
+            (session_dir / "method_ranking.csv").write_text("ranking", encoding="utf-8")
+            (session_dir / PREVIEW_SENTINEL).write_text("preview", encoding="utf-8")
+
+            removed = clear_assessment_outputs(session_dir, stage="post")
+
+            self.assertGreaterEqual(removed, 3)
+            self.assertTrue((session_dir / "pca_batch_pre.tif").exists())
+            self.assertFalse((session_dir / "pca_batch_post.tif").exists())
+            self.assertFalse((session_dir / "permanova_raw_assessment_post.csv").exists())
+            self.assertFalse((session_dir / "method_ranking.csv").exists())
+            self.assertFalse((session_dir / PREVIEW_SENTINEL).exists())
+
+    def test_clearing_session_derived_outputs_preserves_uploaded_inputs_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("raw", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text("metadata", encoding="utf-8")
+            (session_dir / "metadata.csv").write_text("derived", encoding="utf-8")
+            (session_dir / "normalized_limma_tss.csv").write_text("method", encoding="utf-8")
+            (session_dir / "reproducibility_bundle.zip").write_text("zip", encoding="utf-8")
+
+            removed = clear_session_derived_outputs(session_dir, preserve_inputs=True)
+
+            self.assertEqual(removed, 3)
+            self.assertTrue((session_dir / "raw.csv").exists())
+            self.assertTrue((session_dir / "metadata_origin.csv").exists())
+            self.assertFalse((session_dir / "metadata.csv").exists())
+            self.assertFalse((session_dir / "normalized_limma_tss.csv").exists())
+            self.assertFalse((session_dir / "reproducibility_bundle.zip").exists())
+
     def test_no_parameter_methods_use_objective_session_settings_message(self):
         text = _component_text(_build_parameter_layout("ZINBWaVE"))
 
@@ -266,6 +327,14 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"]["metadata_rows"], report["dimensions"]["samples"])
 
+    def test_example_study_settings_use_metadata_levels(self):
+        header, rows = _read_csv_records_for_test("assets/example/metadata_ad.csv")
+
+        self.assertIn("Batch", header)
+        self.assertIn("Initial Phenol Concentration", header)
+        self.assertEqual(_first_non_empty_level(rows, "Batch"), "Batch 1")
+        self.assertEqual(_first_non_empty_level(rows, "Initial Phenol Concentration"), "0-0.5")
+
     def test_reproducibility_bundle_upload_restores_session_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
@@ -290,6 +359,24 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue((session_dir / "raw_tss.csv").exists())
             self.assertTrue((session_dir / "raw_clr.csv").exists())
             self.assertTrue((session_dir / "run.log").exists())
+
+    def test_reproducibility_bundle_upload_revalidates_bundled_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            bundle = BytesIO()
+            with zipfile.ZipFile(bundle, "w") as zf:
+                zf.writestr("raw.csv", "f1,f2\n1,2\n3,4\n")
+                zf.writestr("metadata_origin.csv", "Batch,Phenotype\nA,case\n")
+                zf.writestr("session_config.json", '{"label_column":"Phenotype"}')
+                zf.writestr("validation_report.json", '{"valid": true, "errors": []}')
+            encoded = base64.b64encode(bundle.getvalue()).decode("ascii")
+            contents = "data:application/zip;base64," + encoded
+
+            ok, status, preprocess_ready = _restore_repro_bundle(contents, session_dir)
+
+            self.assertFalse(ok)
+            self.assertFalse(preprocess_ready)
+            self.assertIn("row count", _component_text(status))
 
     def test_invalid_metadata_row_count_is_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -251,7 +251,7 @@ def welcome_layout(active_path: str):
                                         _feature_card(
                                             "bi-sliders",
                                             "Correction and comparison",
-                                            "Run supported correction workflows with curated defaults, compare before/after outputs, and download processed results for downstream analyses.",
+                                            "Run supported correction workflows with documented default parameters, compare before/after outputs, and download processed results for downstream analyses.",
                                         ),
                                         md=6,
                                         lg=4,
@@ -314,7 +314,7 @@ def welcome_layout(active_path: str):
                                         _step_card(
                                             "03",
                                             "Correction",
-                                            "Apply supported batch-effect correction methods using sensible defaults or adjust parameters for your study design.",
+                                            "Apply supported batch-effect correction methods using documented default parameters or adjust parameters for your study design.",
                                             "bi-magic",
                                         ),
                                         md=6,
@@ -385,11 +385,11 @@ def welcome_layout(active_path: str):
                                     dbc.Col(
                                         _resource_card(
                                             "bi-github",
-                                            "Template script on GitHub",
-                                            "Explore the companion template script to understand the underlying workflow, reproduce analyses locally, and review linked method references.",
+                                            "Source code on GitHub",
+                                            "Review the complete mBatchNet source code, installation instructions, server workflow, and linked method references.",
                                             dbc.Button(
                                                 [html.I(className="bi bi-github me-2"), "View on GitHub"],
-                                                href="https://github.com/gilmore307/Batch-Effect-Correction",
+                                                href="https://github.com/gilmore307/mBatchNet",
                                                 target="_blank",
                                                 className="rounded-pill px-4 fw-semibold border-0 mt-auto",
                                                 style={
