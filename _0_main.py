@@ -375,14 +375,92 @@ def handle_restart(confirm_yes: int, confirm_no: int, current_session: str, rest
         )
 
 # ---- Download results (ZIP session dir) ----
+def _bundle_filename(bundle_kind: str) -> str:
+    if bundle_kind == "outputs":
+        return "output_bundle.zip"
+    if bundle_kind == "reproducibility":
+        return "reproducibility_bundle.zip"
+    return "session_bundle.zip"
+
+
+def _include_in_bundle(relative_path: Path, bundle_kind: str) -> bool:
+    name = relative_path.name
+    if name.lower().endswith(".zip"):
+        return False
+    if bundle_kind == "session":
+        return True
+
+    manifest_names = {
+        "output_summary.json",
+        "runtime_summary.json",
+        "validation_report.json",
+        "parameter_manifest.json",
+        "reproducibility_manifest.json",
+        "session_config.json",
+        "session_summary.json",
+        "run.log",
+    }
+    input_names = {"raw.csv", "metadata_origin.csv", "metadata.csv"}
+    derived_input_names = {"raw_tss.csv", "raw_clr.csv"}
+
+    if bundle_kind == "reproducibility":
+        return name in manifest_names or name in input_names or name in derived_input_names
+
+    if bundle_kind == "outputs":
+        if name in input_names:
+            return False
+        if name in manifest_names:
+            return True
+        if name.startswith("normalized_") or name.endswith((".tif", ".png", ".jpg", ".jpeg", ".csv", ".json")):
+            return True
+    return False
+
+
+def _build_download_bundle(session_dir: Path, bundle_kind: str) -> Path:
+    target_zip = session_dir / _bundle_filename(bundle_kind)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip", dir=str(OUTPUT_ROOT)) as tmpf:
+        tmp_zip_path = Path(tmpf.name)
+    try:
+        with zipfile.ZipFile(tmp_zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for p in session_dir.rglob("*"):
+                if not p.is_file():
+                    continue
+                arcname = p.relative_to(session_dir)
+                if not _include_in_bundle(arcname, bundle_kind):
+                    continue
+                zf.write(p, arcname)
+        try:
+            if target_zip.exists():
+                target_zip.unlink(missing_ok=True)
+        except Exception:
+            pass
+        shutil.move(str(tmp_zip_path), str(target_zip))
+    finally:
+        if tmp_zip_path.exists() and not target_zip.exists():
+            try:
+                tmp_zip_path.unlink()
+            except Exception:
+                pass
+    return target_zip
+
+
 @app.callback(
     Output("download-results", "data"),
     Input("download-results-btn", "n_clicks"),
+    Input("download-reproducibility-btn", "n_clicks"),
+    Input("download-session-btn", "n_clicks"),
     State("session-id", "data"),
     prevent_initial_call=True,
 )
-def download_results(n_clicks: int, session_id: str):
-    if not n_clicks:
+def download_results(
+    output_clicks: int,
+    reproducibility_clicks: int,
+    session_clicks: int,
+    session_id: str,
+):
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
+    if not triggered_id:
         raise dash.exceptions.PreventUpdate
     # Only proceed if the session directory already exists
     if not session_id:
@@ -391,34 +469,14 @@ def download_results(n_clicks: int, session_id: str):
     if not session_dir.exists() or not session_dir.is_dir():
         raise dash.exceptions.PreventUpdate
     write_session_manifests(session_dir)
-    # Build a zip that excludes any existing results.zip, then save it into the session folder
-    target_zip = session_dir / "results.zip"
-    # Create zip in a temp location to avoid including it while walking the session dir
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip", dir=str(OUTPUT_ROOT)) as tmpf:
-        tmp_zip_path = Path(tmpf.name)
-    try:
-        with zipfile.ZipFile(tmp_zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for p in session_dir.rglob("*"):
-                if p.is_file():
-                    # Exclude previous results.zip if present
-                    if p.name.lower() == "results.zip":
-                        continue
-                    arcname = p.relative_to(session_dir)
-                    zf.write(p, arcname)
-        # Move into the session directory (overwrite existing if necessary)
-        try:
-            if target_zip.exists():
-                target_zip.unlink(missing_ok=True)
-        except Exception:
-            pass
-        shutil.move(str(tmp_zip_path), str(target_zip))
-    finally:
-        # Clean up temp if move failed
-        if tmp_zip_path.exists() and not target_zip.exists():
-            try:
-                tmp_zip_path.unlink()
-            except Exception:
-                pass
+    bundle_kind = {
+        "download-results-btn": "outputs",
+        "download-reproducibility-btn": "reproducibility",
+        "download-session-btn": "session",
+    }.get(triggered_id)
+    if not bundle_kind:
+        raise dash.exceptions.PreventUpdate
+    target_zip = _build_download_bundle(session_dir, bundle_kind)
     return dcc.send_file(str(target_zip))
 
 
@@ -430,6 +488,8 @@ register_correction_callbacks(app)
 # Enable Download button whenever the session folder exists
 @app.callback(
     Output("download-results-btn", "disabled"),
+    Output("download-reproducibility-btn", "disabled"),
+    Output("download-session-btn", "disabled"),
     Input("session-id", "data"),
     Input("upload-complete", "data"),
     Input("preprocess-complete", "data"),
@@ -438,12 +498,13 @@ register_correction_callbacks(app)
     Input("correction-complete", "data"),
     Input("post-complete", "data"),
 )
-def enable_download(session_id: str, *_stage_flags) -> bool:
+def enable_download(session_id: str, *_stage_flags):
     # Disabled if no session or folder doesn't exist yet
     if not session_id:
-        return True
+        return True, True, True
     session_dir = OUTPUT_ROOT / session_id
-    return not (session_dir.exists() and session_dir.is_dir())
+    disabled = not (session_dir.exists() and session_dir.is_dir())
+    return disabled, disabled, disabled
 
 
 @app.callback(

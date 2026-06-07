@@ -6,7 +6,9 @@ from pathlib import Path
 from dash import Dash
 
 import server
+from _0_main import _build_download_bundle
 from _2_utils import write_session_manifests
+from _1_components import build_navbar
 from _6_correction import correction_layout
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
@@ -36,6 +38,7 @@ class DashAppTests(unittest.TestCase):
     def test_upload_layout_contains_original_example_flow(self):
         text = _component_text(upload_layout("/upload"))
 
+        self.assertIn("Input requirements", text)
         self.assertIn("Quick Start: Example Data", text)
         self.assertIn("Preview rows", text)
         self.assertIn("Preview columns", text)
@@ -43,6 +46,13 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Process", text)
         self.assertIn("shotgun metagenomics", text)
         self.assertIn("samples in rows", text)
+
+    def test_navbar_exposes_three_download_entries(self):
+        text = _component_text(build_navbar("/post"))
+
+        self.assertIn("Download outputs", text)
+        self.assertIn("Repro bundle", text)
+        self.assertIn("Full session", text)
 
     def test_correction_layout_contains_method_guide(self):
         text = _component_text(correction_layout("/correction"))
@@ -113,6 +123,37 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue((session_dir / "runtime_summary.json").exists())
             self.assertTrue((session_dir / "parameter_manifest.json").exists())
             self.assertTrue((session_dir / "reproducibility_manifest.json").exists())
+
+    def test_download_bundles_have_distinct_scopes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("1,2\n3,4\n", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nB,control\n",
+                encoding="utf-8",
+            )
+            (session_dir / "normalized_limma_tss.csv").write_text("1,2\n3,4\n", encoding="utf-8")
+            validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+            write_session_manifests(session_dir)
+
+            output_zip = _build_download_bundle(session_dir, "outputs")
+            repro_zip = _build_download_bundle(session_dir, "reproducibility")
+            session_zip = _build_download_bundle(session_dir, "session")
+
+            import zipfile
+            with zipfile.ZipFile(output_zip) as zf:
+                output_names = set(zf.namelist())
+            with zipfile.ZipFile(repro_zip) as zf:
+                repro_names = set(zf.namelist())
+            with zipfile.ZipFile(session_zip) as zf:
+                session_names = set(zf.namelist())
+
+            self.assertIn("normalized_limma_tss.csv", output_names)
+            self.assertNotIn("raw.csv", output_names)
+            self.assertIn("raw.csv", repro_names)
+            self.assertIn("reproducibility_manifest.json", repro_names)
+            self.assertIn("normalized_limma_tss.csv", session_names)
+            self.assertIn("raw.csv", session_names)
 
 
 if __name__ == "__main__":

@@ -471,14 +471,37 @@ def upload_layout(active_path: str):
                 [
                     html.H2("Upload Data"),
                     html.P("Choose manual upload or example dataset."),
-                    dbc.Alert(
+                    dbc.Card(
                         [
-                            html.Strong("Input requirements: "),
-                            "upload a sample-feature CSV matrix with samples in rows and profiled features in columns, plus one metadata row per sample. ",
-                            "Raw sequencing reads are not supported; profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables are supported after upstream profiling. ",
-                            f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, {human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells.",
+                            dbc.CardHeader(html.Strong("Input requirements")),
+                            dbc.CardBody(
+                                html.Ul(
+                                    [
+                                        html.Li(
+                                            "Matrix CSV: samples in rows and profiled features in columns."
+                                        ),
+                                        html.Li(
+                                            "Metadata CSV: one row per sample, in the same sample order as the matrix."
+                                        ),
+                                        html.Li(
+                                            "Required metadata: one batch column and one binary target/phenotype column."
+                                        ),
+                                        html.Li(
+                                            "Supported data: profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
+                                        ),
+                                        html.Li(
+                                            "Not supported: raw sequencing reads; run upstream profiling first."
+                                        ),
+                                        html.Li(
+                                            f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, "
+                                            f"{human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells."
+                                        ),
+                                    ],
+                                    className="mb-0",
+                                )
+                            ),
                         ],
-                        color="info",
+                        className="mb-3",
                     ),
                     dcc.Tabs(
                         id="upload-tabs",

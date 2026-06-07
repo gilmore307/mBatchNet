@@ -127,7 +127,10 @@ For each session, intermediate and final outputs are generated under `output/<se
 - runtime summary (`runtime_summary.json`)
 - parameter manifest (`parameter_manifest.json`)
 - reproducibility manifest (`reproducibility_manifest.json`)
-- downloadable output and reproducibility bundles
+- three download entries:
+  - output bundle for corrected matrices, assessment outputs, and summaries
+  - reproducibility bundle for inputs, manifests, configuration, and logs
+  - full session bundle for the complete session directory
 
 ## Test Data Links
 Bundled example datasets are available in `assets/example/` and can be loaded directly from the **Example Dataset** tab.
