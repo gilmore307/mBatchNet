@@ -111,6 +111,22 @@ def _parameter_input(code: str, spec: Dict[str, object]) -> dbc.Col:
     return dbc.Col([label, control], lg=3, md=6, sm=12, className="mb-3")
 
 
+def _header_with_tooltip(label: str, description: str, tooltip_id: str) -> html.Span:
+    return html.Span(
+        [
+            label,
+            " ",
+            html.Span(
+                "?",
+                id=tooltip_id,
+                className="badge rounded-pill bg-secondary",
+                style={"cursor": "help"},
+            ),
+            dbc.Tooltip(description, target=tooltip_id, placement="top"),
+        ]
+    )
+
+
 def _build_parameter_layout(code: str) -> object | None:
     parameters = _PARAMETER_CONFIG.get(code)
     if not parameters:
@@ -120,7 +136,7 @@ def _build_parameter_layout(code: str) -> object | None:
                     [html.H6("Correction Parameters", className="mb-0 p-3 bg-light border-bottom")]
                 ),
                 html.Div(
-                    "No configurable parameters available for this method.",
+                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, selected covariates, and study settings from the session.",
                     className="p-3 text-muted",
                 ),
             ],
@@ -624,7 +640,15 @@ def register_correction_callbacks(app):
                     html.Th("Config", className="text-center", style=_CONFIG_COLUMN_WIDTH),
                     html.Th("Explanation", className="text-center", style=_EXPLANATION_COLUMN_WIDTH),
                     html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
-                    html.Th("Time (s)", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th(
+                        _header_with_tooltip(
+                            "Time (s)",
+                            "Elapsed seconds from the current session's completed method run, parsed from run.log or session_summary.json.",
+                            "method-time-help",
+                        ),
+                        className="text-center",
+                        style=_LABEL_COLUMN_WIDTH,
+                    ),
                     html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
                     html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
                     html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),

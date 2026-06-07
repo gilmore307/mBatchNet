@@ -12,6 +12,7 @@ HELP_SECTION_TOC: List[Dict[str, str]] = [
         "children": [
             {"id": "help-upload-manual", "title": "Manual upload"},
             {"id": "help-upload-example", "title": "Example dataset"},
+            {"id": "help-upload-repro", "title": "Repro bundle"},
             {"id": "help-upload-mosaic", "title": "Mosaic plot"},
         ],
     },
@@ -48,7 +49,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Overview"),
             html.P(
-                "The navigation bar mirrors the workflow: upload your inputs, preview pre-correction diagnostics, launch batch-effect correction methods, and then compare the post-correction assessments before downloading the session bundle. "
+                "The navigation bar mirrors the workflow: upload or restore inputs, preview pre-correction diagnostics, launch batch-effect correction methods, and then compare the post-correction assessments before downloading outputs or a Repro bundle. "
                 "Use the Logs button at any time to inspect long-running jobs."
             ),
         ],
@@ -59,7 +60,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Upload Files"),
             html.P(
-                "Upload a profiled count/abundance table and a matching metadata table, or pick one of the curated examples."
+                "Upload a profiled count/abundance table with a matching metadata table, pick one of the curated examples, or restore a session from a Repro bundle."
             ),
             html.Div(
                 [
@@ -91,10 +92,28 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Example datasets auto-populate every mapping field with the recommended Batch, target, and covariance selections."
+                                "Example datasets auto-populate every mapping field with that dataset's Batch, target, and covariance selections."
                             ),
                             html.Li(
                                 "Choose from six curated datasets that have different batch sizes, feature counts, and batch/target distributions."
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Repro bundle", className="mb-2 mt-4", id="help-upload-repro"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Upload a reproducibility_bundle.zip exported from mBatchNet."
+                            ),
+                            html.Li(
+                                "A restored bundle loads the saved input files, mapping settings, parameters, manifests, and run log into the current session."
+                            ),
+                            html.Li(
+                                "If preprocessed files are present, the restored session can continue into correction and assessment without re-running preprocessing first."
                             ),
                         ]
                     ),
@@ -127,13 +146,19 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Methods lists each available algorithm so you can scan the "
-                                "options alongside their references. Expand the accordion on "
-                                "each method to review parameter presets before launching."
+                                "Config opens method-specific parameter controls. Saved values are "
+                                "recorded in parameter_manifest.json."
+                            ),
+                            html.Li(
+                                "Explanation opens the citation-derived method description, package "
+                                "or source link, citation, and reference link."
+                            ),
+                            html.Li(
+                                "Methods lists each available algorithm and opens its package or source reference when one is available."
                             ),
                             html.Li(
                                 "Time (s) shows how long each method took to run in the current session "
-                                "so you can monitor performance without relying on prior sessions."
+                                "from the run log or session_summary.json."
                             ),
                             html.Li(
                                 "Status shows whether that method already has outputs stored for "
@@ -148,8 +173,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "method, while other results remain intact."
                             ),
                             html.Li(
-                                "Citation links to the publication or documentation for the "
-                                "selected method."
+                                "Citation links to the publication or documentation for the selected method."
                             ),
                         ],
                         className="mt-2",
@@ -167,8 +191,9 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Once a method completes, its corrected matrix is stored for the "
-                                "post-correction assessments and final download bundle. Use \"Download "
-                                "results\" to export intermediate corrections at any time."
+                                "post-correction assessments. Use Download outputs to export corrected "
+                                "matrices, figures, logs, and manifests. Use Repro bundle to export "
+                                "the files needed to restore the session later."
                             ),
                         ]
                     ),
@@ -199,16 +224,16 @@ HELP_MODAL_SECTIONS: List = [
                         "update automatically when you re-run assessments after new corrections."
                     ),
                     html.Li(
-                        "Use the detail table to compare pre vs. post performance and identify which "
-                        "method best balances batch removal with phenotype separation."
+                        "Use the detail table to compare pre vs. post assessment values across methods."
                     ),
                     html.Li(
                         "Click any detail table column title to filter, sort, and re-rank methods "
                         "on the fly."
                     ),
                     html.Li(
-                        "When you are satisfied, click \"Download results\" from the navbar to "
-                        "export every corrected matrix, assessment figure, and log file."
+                        "Use Download outputs from the navbar to export corrected matrices, "
+                        "assessment figures, logs, and manifests. Use Repro bundle to export the "
+                        "session files needed for restore."
                     ),
                 ]
             ),

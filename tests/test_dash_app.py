@@ -7,7 +7,7 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
-from dash import Dash
+from dash import Dash, html
 
 import server
 from _0_main import _build_download_bundle
@@ -16,9 +16,12 @@ from _2_utils import write_session_manifests
 from _2_utils import METHOD_REFERENCE_BY_CODE
 from _1_components import build_navbar
 from _6_correction import _PARAMETER_CONFIG
+from _6_correction import _build_parameter_layout
+from _6_correction import _header_with_tooltip
 from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
 from _6_correction import correction_layout
+from _7_description import HELP_MODAL_SECTIONS
 from _4_upload import upload_layout
 from _4_upload import validate_session_inputs
 from _4_upload import _restore_repro_bundle
@@ -87,6 +90,33 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Phenotype-aware correction", text)
         self.assertIn("package or source reference", text)
 
+    def test_help_modal_matches_repro_bundle_download_flow(self):
+        text = _component_text(html.Div(HELP_MODAL_SECTIONS))
+
+        self.assertIn("Repro bundle", text)
+        self.assertIn("Upload a reproducibility_bundle.zip exported from mBatchNet", text)
+        self.assertIn("Use Download outputs", text)
+        self.assertIn("restore the session", text)
+        self.assertNotIn("session bundle", text)
+        self.assertNotIn("Download results", text)
+        self.assertNotIn("recommended Batch", text)
+        self.assertNotIn("best balances", text)
+
+    def test_time_header_explains_elapsed_time_source(self):
+        text = _component_text(
+            _header_with_tooltip(
+                "Time (s)",
+                "Elapsed seconds from the current session's completed method run, parsed from run.log or session_summary.json.",
+                "method-time-help-test",
+            )
+        )
+
+        self.assertIn("Time (s)", text)
+        self.assertIn("?", text)
+        self.assertIn("Elapsed seconds", text)
+        self.assertIn("run.log", text)
+        self.assertIn("session_summary.json", text)
+
     def test_method_explanation_uses_reference_fields(self):
         text = _component_text(
             _build_method_explanation_layout(
@@ -112,6 +142,13 @@ class DashAppTests(unittest.TestCase):
     def test_method_reference_csv_provides_descriptions(self):
         for method_code, metadata in METHOD_REFERENCE_BY_CODE.items():
             self.assertTrue(metadata.get("description"), method_code)
+
+    def test_no_parameter_methods_use_objective_session_settings_message(self):
+        text = _component_text(_build_parameter_layout("ZINBWaVE"))
+
+        self.assertIn("No method-specific parameters are exposed", text)
+        self.assertIn("uploaded matrix", text)
+        self.assertNotIn("No configurable parameters available", text)
 
     def test_correction_parameters_match_r_scripts_and_have_tooltips(self):
         method_files = {
