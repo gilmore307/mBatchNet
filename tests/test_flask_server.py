@@ -22,8 +22,12 @@ class FlaskServerTests(unittest.TestCase):
         self.assertIn(b"Count matrix (CSV)", upload.data)
         self.assertEqual(example.status_code, 200)
         self.assertIn(b"Quick Start: Example Data", example.data)
+        self.assertIn(b"Input requirements", upload.data)
         self.assertEqual(help_page.status_code, 200)
         self.assertIn(b"Help and tutorials", help_page.data)
+        self.assertIn(b"Diagnostic metrics", help_page.data)
+        self.assertIn(b"Method guidance", help_page.data)
+        self.assertIn(b"PERMANOVA", help_page.data)
 
     def test_pipeline_routes_do_not_dead_end(self):
         client = app.test_client()
@@ -43,7 +47,7 @@ class FlaskServerTests(unittest.TestCase):
         session_dir = get_session_dir(session_id)
         (session_dir / "raw.csv").write_text("1,2\n3,4\n", encoding="utf-8")
         (session_dir / "metadata_origin.csv").write_text(
-            "sample_id,batch,phenotype\ns1,a,x\ns2,b,y\n",
+            "sample_id,batch,phenotype,covariate\ns1,a,x,1\ns2,b,y,2\n",
             encoding="utf-8",
         )
         (session_dir / "metadata.csv").write_text(
@@ -51,9 +55,13 @@ class FlaskServerTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+        configure = client.get(f"/sessions/{session_id}/configure")
+        self.assertEqual(configure.status_code, 200)
+        self.assertIn(b"Optional covariate columns", configure.data)
+
         for path, expected in (
-            (f"/sessions/{session_id}/pre", b"Run all assessments"),
-            (f"/sessions/{session_id}/correction", b"Run Correction"),
+            (f"/sessions/{session_id}/pre", b"Metric guide"),
+            (f"/sessions/{session_id}/correction", b"Choosing methods"),
             (f"/sessions/{session_id}/post", b"Post-correction Assessment"),
         ):
             response = client.get(path)

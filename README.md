@@ -9,7 +9,7 @@ The app supports an end-to-end pipeline:
 3. Run pre-/post-correction visual and statistical assessments
 4. Download a packaged result bundle
 
-The current lightweight server entry point is `server.py`. It uses Flask/Jinja for the web workflow, keeps the existing Bootstrap visual style, and runs analysis through explicit backend services under `mbatchnet/`. The older Dash entry point (`_0_main.py`) remains available during the transition as a regression reference while the server path is migrated.
+The current server entry point is `server.py`. It uses Flask/Jinja for the web workflow, keeps the Bootstrap visual style, and runs analysis through explicit backend services under `mbatchnet/`.
 
 ## Installation
 
@@ -55,10 +55,6 @@ The DEBIAS-M method depends on PyTorch and can install a large machine-learning 
 ### Python
 Core packages:
 - `flask`
-- `dash`
-- `dash-bootstrap-components`
-- `dash-ag-grid`
-- `flask-sock`
 - `gunicorn`
 - `numpy`
 - `pandas`
@@ -92,20 +88,14 @@ Rscript assets/env/r-packages.R
    - Post-assessment
    - Download results
 
-During the migration period, the legacy Dash app can still be started with:
-
-```bash
-.venv/bin/python _0_main.py
-```
-
 ## Input / Output Specification
 
 ### Inputs
 The Upload page expects two CSV files:
 
 1. **Count matrix (CSV)**
-   - Rows: features (e.g., OTU/ASV/genes)
-   - Columns: samples
+   - Rows: samples
+   - Columns: features (e.g., OTU/ASV/genes)
 
 2. **Metadata (CSV)**
    - Must include at least:

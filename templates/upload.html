@@ -4,7 +4,7 @@
 <div class="row mb-3">
   <div class="col-12">
     <h2 class="fw-bold be-section-title">Upload Data</h2>
-    <p class="text-muted">Choose manual upload or example dataset.</p>
+    <p class="text-muted">Upload clean microbiome data, or load the bundled example to inspect the full workflow.</p>
   </div>
 </div>
 
@@ -24,7 +24,12 @@
       <div class="card-body">
         <h5 class="fw-semibold mb-2">Quick Start: Example Data</h5>
         <div class="fw-semibold mb-2">Example dataset: Anaerobic Digestion</div>
-        <p class="text-muted">Columns mapped as Batch (batch), Initial Phenol Concentration (target), Treatment Duration (covariate).</p>
+        <p class="text-muted">Columns are mapped as Batch, Initial Phenol Concentration as target, and Treatment Duration as a covariate when available.</p>
+        <ul class="small text-muted">
+          {% for item in upload_guidance.example %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
         <div class="row g-3 mb-3">
           <div class="col-sm-6">
             <label class="form-label">Rows to preview</label>
@@ -43,7 +48,8 @@
     <div class="card h-100 be-content-card">
       <div class="card-body">
         <h5 class="fw-semibold mb-2">Example preview</h5>
-        <p class="text-muted mb-0">The example workflow uses the bundled anaerobic digestion dataset so users can inspect the interface before uploading their own study.</p>
+        <p class="text-muted">The example workflow uses the bundled anaerobic digestion dataset so users can inspect the interface before uploading their own study.</p>
+        <img class="img-fluid rounded border" src="/assets/Figure/mosaic_plot.png" alt="Mosaic plot example">
       </div>
     </div>
   </div>
@@ -59,7 +65,7 @@
           <span>Drag and drop or click to upload count matrix.</span>
         </label>
         <input class="form-control mt-3" id="matrix" name="matrix" type="file" accept=".csv,text/csv" required>
-        <div class="text-muted small mt-3">No file uploaded yet.</div>
+        <div class="text-muted small mt-3">Rows should be samples. Columns should be microbial features.</div>
       </div>
     </div>
   </div>
@@ -72,15 +78,28 @@
           <span>Drag and drop or click to upload metadata.</span>
         </label>
         <input class="form-control mt-3" id="metadata" name="metadata" type="file" accept=".csv,text/csv" required>
-        <div class="text-muted small mt-3">No file uploaded yet.</div>
+        <div class="text-muted small mt-3">Rows should describe samples and include batch plus target labels.</div>
       </div>
     </div>
   </div>
   <div class="col-12">
-    <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
+      <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
   </div>
 </form>
 {% endif %}
+
+<section class="card be-content-card mb-4">
+  <div class="card-body">
+    <h5 class="fw-semibold mb-3">Input requirements</h5>
+    <div class="row g-3">
+      {% for item in upload_guidance.manual %}
+        <div class="col-md-6">
+          <div class="border rounded-3 p-3 h-100 text-muted">{{ item }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 
 <section class="card be-content-card mb-4">
   <div class="card-body">
@@ -107,7 +126,7 @@
       <div class="col-lg-4">
         <div class="border rounded-3 p-3 h-100">
           <div class="fw-semibold mb-2">Mosaic preview</div>
-          <p class="text-muted mb-0">Preview sample-by-feature structure and confounding warnings after validation.</p>
+          <p class="text-muted mb-0">Preview batch-by-target structure and confounding warnings after validation.</p>
         </div>
       </div>
     </div>
@@ -115,6 +134,6 @@
 </section>
 
 <div class="alert alert-info">
-  Uploaded input is expected to be clean microbiome count data plus matching metadata. The server pre-checks obvious issues and warns when batch and phenotype appear confounded, but it does not block users solely because confounding is detected.
+  Uploaded input is expected to be valid, clean microbiome count data plus matching metadata. The server pre-checks obvious issues and warns when batch and phenotype appear confounded, but it does not block users solely because confounding is detected.
 </div>
 {% endblock %}

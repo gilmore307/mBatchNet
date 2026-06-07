@@ -8,6 +8,7 @@ from urllib.parse import unquote
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
 
 from mbatchnet.artifacts import build_output_bundle, build_reproducibility_bundle, write_output_summary
+from mbatchnet.content import ASSESSMENT_OVERVIEW, HELP_SECTIONS, METHOD_GUIDANCE, METRIC_GUIDES, UPLOAD_GUIDANCE
 from mbatchnet.jobs import runner
 from mbatchnet.methods import PARAMETER_CONFIG, load_methods
 from mbatchnet.paths import ASSETS_DIR, EXAMPLE_DIR
@@ -87,12 +88,18 @@ def home():
 @app.get("/upload")
 def upload():
     active_tab = request.args.get("tab", "manual")
-    return render_template("upload.html", active_path="/upload", active_tab=active_tab)
+    return render_template("upload.html", active_path="/upload", active_tab=active_tab, upload_guidance=UPLOAD_GUIDANCE)
 
 
 @app.get("/help")
 def help_page():
-    return render_template("help.html", active_path="/")
+    return render_template(
+        "help.html",
+        active_path="/",
+        help_sections=HELP_SECTIONS,
+        metric_guides=METRIC_GUIDES,
+        method_guidance=METHOD_GUIDANCE,
+    )
 
 
 @app.get("/pre")
@@ -156,6 +163,7 @@ def configure_session(session_id: str):
     selected = {
         "batch": "Batch" if "Batch" in report.metadata_columns else "batch" if "batch" in report.metadata_columns else "",
         "target": "Initial Phenol Concentration" if "Initial Phenol Concentration" in report.metadata_columns else "",
+        "covariates": ["Treatment Duration"] if "Treatment Duration" in report.metadata_columns else [],
     }
     return render_template(
         "configure.html",
@@ -171,6 +179,7 @@ def preprocess_session(session_id: str):
     session_dir = _session(session_id)
     batch_column = request.form.get("batch_column", "")
     target_column = request.form.get("target_column", "")
+    covariates = [value for value in request.form.getlist("covariates") if value and value not in {batch_column, target_column}]
     report = validate_uploaded_inputs(
         session_dir / "raw.csv",
         session_dir / "metadata_origin.csv",
@@ -185,11 +194,11 @@ def preprocess_session(session_id: str):
                 active_path="/upload",
                 session_id=session_id,
                 report=report,
-                selected={"batch": batch_column, "target": target_column},
+                selected={"batch": batch_column, "target": target_column, "covariates": covariates},
             ),
             400,
         )
-    standardize_metadata(session_dir, batch_column=batch_column, target_column=target_column)
+    standardize_metadata(session_dir, batch_column=batch_column, target_column=target_column, covariates=covariates)
     job = runner.submit("preprocess", session_id, lambda: run_preprocess(session_dir))
     return redirect(url_for("job_status_page", job_id=job.id))
 
@@ -237,6 +246,8 @@ def pre_session(session_id: str):
         description="Run diagnostics before correction to understand batch-associated structure and phenotype separation.",
         assessments=assessments_for("pre"),
         files=stage_files(session_dir, "pre"),
+        assessment_overview=ASSESSMENT_OVERVIEW,
+        metric_guides=METRIC_GUIDES,
     )
 
 
@@ -249,6 +260,7 @@ def correction_session(session_id: str):
         session_id=session_id,
         rows=method_status(session_dir),
         parameter_config=PARAMETER_CONFIG,
+        method_guidance=METHOD_GUIDANCE,
     )
 
 
@@ -264,6 +276,8 @@ def post_session(session_id: str):
         description="Run post-correction diagnostics after at least one correction method has generated outputs.",
         assessments=assessments_for("post"),
         files=stage_files(session_dir, "post"),
+        assessment_overview=ASSESSMENT_OVERVIEW,
+        metric_guides=METRIC_GUIDES,
     )
 
 

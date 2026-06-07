@@ -2,44 +2,95 @@
 {% block title %}Help · mBatchNet{% endblock %}
 {% block body %}
 <div class="row mb-4">
-  <div class="col-12">
+  <div class="col-lg-9">
     <h2 class="fw-bold be-section-title">Help and tutorials</h2>
     <p class="text-muted mb-0">Guidance is organized around the same workflow used by the server: upload, pre-correction assessment, correction, post-correction assessment, and export.</p>
   </div>
 </div>
 
 <div class="row g-4">
-  <div class="col-lg-6">
-    <div class="card h-100 be-content-card">
+  <aside class="col-xl-3">
+    <div class="card be-content-card be-sticky-toc">
       <div class="card-body">
-        <h5 class="fw-semibold">Upload data</h5>
-        <p class="text-muted mb-0">Upload a count matrix and metadata table in CSV format, then map the required metadata fields. The example anaerobic digestion dataset remains available for a quick walkthrough.</p>
+        <div class="fw-semibold mb-3">Jump to section</div>
+        <div class="d-grid gap-2">
+          {% for section in help_sections %}
+            <a class="btn btn-outline-secondary btn-sm text-start" href="#{{ section.id }}">{{ section.title }}</a>
+          {% endfor %}
+          <a class="btn btn-outline-secondary btn-sm text-start" href="#metrics">Diagnostic metrics</a>
+          <a class="btn btn-outline-secondary btn-sm text-start" href="#methods">Method guidance</a>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card h-100 be-content-card">
+  </aside>
+
+  <div class="col-xl-9">
+    {% for section in help_sections %}
+      <section class="card be-content-card mb-4" id="{{ section.id }}">
+        <div class="card-body">
+          <h4 class="fw-semibold mb-2">{{ section.title }}</h4>
+          <p class="text-muted">{{ section.body }}</p>
+          <ul class="mb-0">
+            {% for bullet in section.bullets %}
+              <li>{{ bullet }}</li>
+            {% endfor %}
+          </ul>
+          {% if section.image %}
+            <figure class="mt-4 mb-0">
+              <img class="img-fluid rounded border be-help-figure" src="/assets/{{ section.image }}" alt="{{ section.title }}">
+              <figcaption class="small text-muted mt-2">{{ section.image_caption }}</figcaption>
+            </figure>
+          {% endif %}
+        </div>
+      </section>
+    {% endfor %}
+
+    <section class="card be-content-card mb-4" id="metrics">
       <div class="card-body">
-        <h5 class="fw-semibold">Pre-correction assessment</h5>
-        <p class="text-muted mb-0">Inspect study design, ordination structure, batch association, and phenotype separation before correction so technical variation can be interpreted in context.</p>
+        <h4 class="fw-semibold mb-2">Diagnostic metrics</h4>
+        <p class="text-muted">These diagnostics are meant to be read together. A good correction should reduce batch-associated structure without collapsing target-associated structure.</p>
+        <div class="row g-3">
+          {% for key, guide in metric_guides.items() %}
+            <div class="col-lg-6">
+              <div class="border rounded-3 p-3 h-100">
+                <h5 class="fw-semibold">{{ guide.title }}</h5>
+                <p class="text-muted">{{ guide.summary }}</p>
+                {% if guide.image %}
+                  <img class="img-fluid rounded border mb-3 be-help-thumb" src="/assets/{{ guide.image }}" alt="{{ guide.title }}">
+                {% endif %}
+                <ul class="small mb-0">
+                  {% for point in guide.points %}
+                    <li>{{ point }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card h-100 be-content-card">
+    </section>
+
+    <section class="card be-content-card mb-4" id="methods">
       <div class="card-body">
-        <h5 class="fw-semibold">Batch effect correction</h5>
-        <p class="text-muted mb-0">Run compatible correction methods with curated defaults or adjust method-specific parameters when the study design requires it.</p>
+        <h4 class="fw-semibold mb-2">Method guidance</h4>
+        <p class="text-muted">mBatchNet integrates existing methods rather than proposing a new correction algorithm. Method choice should depend on data type, study design, confounding, runtime tolerance, and the post-correction evidence.</p>
+        <div class="row g-3">
+          {% for code, guide in method_guidance.items() %}
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="fw-semibold mb-2">{{ code }}</div>
+                <p class="text-muted mb-2">{{ guide.scenario }}</p>
+                <ul class="small mb-0">
+                  {% for note in guide.notes %}
+                    <li>{{ note }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card h-100 be-content-card">
-      <div class="card-body">
-        <h5 class="fw-semibold">Post-correction assessment</h5>
-        <p class="text-muted mb-0">Compare before and after diagnostics, review correction trade-offs, and download result bundles for downstream analysis.</p>
-      </div>
-    </div>
+    </section>
   </div>
 </div>
 {% endblock %}

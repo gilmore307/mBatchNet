@@ -94,3 +94,21 @@
   border-color: #1fbfa8;
   background: #f4fffd;
 }
+
+.be-sticky-toc {
+  position: sticky;
+  top: 120px;
+}
+
+.be-help-figure {
+  max-height: 520px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.be-help-thumb {
+  max-height: 220px;
+  width: 100%;
+  object-fit: contain;
+  background: #ffffff;
+}

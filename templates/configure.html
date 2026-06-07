@@ -53,9 +53,17 @@
           {% endfor %}
         </select>
       </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="covariates">Optional covariate columns</label>
+        <select class="form-select" id="covariates" name="covariates" multiple size="5">
+          {% for column in report.metadata_columns %}
+            <option value="{{ column }}" {% if selected.covariates and column in selected.covariates %}selected{% endif %}>{{ column }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Hold Ctrl or Command to select multiple covariates. Do not select the batch or target column as a covariate.</div>
+      </div>
     </div>
     <button class="btn btn-success btn-sm be-wide-button mt-3" type="submit">Apply mapping and preprocess</button>
   </div>
 </form>
 {% endblock %}
-
