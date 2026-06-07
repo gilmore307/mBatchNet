@@ -62,6 +62,9 @@ mBatchNet: an interactive web server for diagnosis, correction and benchmarking 
 \noindent \textbf{Supplementary Figures}
 \hfill \pageref{sec:supp-figures}\\
 
+\noindent \textbf{Supplementary Tables}
+\hfill \pageref{sec:supp-tables}\\
+
 \noindent \textbf{Supplementary References}
 \hfill \pageref{sec:supp-refs}\\
 
@@ -82,7 +85,7 @@ mBatchNet: an interactive web server for diagnosis, correction and benchmarking 
 We visualize dominant structure using principal component analysis (PCA) in Aitchison space and principal coordinates analysis (PCoA) and non-metric multidimensional scaling (NMDS) on Aitchison and Bray--Curtis dissimilarities. Plots are colored by batch and by target label to inspect batch mixing and phenotype separation. For NMDS, we report the stress value, a goodness-of-fit measure for low-dimensional representation, where lower stress indicates a more faithful embedding.
 
 \item \textbf{Distance-matrix tests and dissimilarity summaries.}
-We quantify residual batch association using analysis of similarities (ANOSIM) and permutational multivariate analysis of variance (PERMANOVA) on Aitchison and/or Bray--Curtis distances~\cite{Li2019MiPro,braycurtis1957}. ANOSIM reports a separation statistic $R$, where larger $R$ indicates stronger between-batch separation~\cite{Clarke1993ANOSIM}, whereas PERMANOVA reports an effect size $R^2$, corresponding to the fraction of distance variation explained by batch~\cite{anderson2001permanova}. We also generate dissimilarity heatmaps summarizing mean between-batch distances across batch pairs. More homogeneous values indicate weaker batch-driven separation.
+We quantify residual batch association using analysis of similarities (ANOSIM) and permutational multivariate analysis of variance (PERMANOVA) on Aitchison and/or Bray--Curtis distances~\cite{Li2019MiPro,braycurtis1957}. ANOSIM reports a separation statistic $R$, where larger $R$ indicates stronger between-batch separation~\cite{Clarke1993ANOSIM}, whereas PERMANOVA reports an effect size $R^2$, corresponding to the fraction of distance variation explained by batch~\cite{anderson2001permanova}. The accompanying permutation $p$-values evaluate whether the observed batch association is larger than expected under random relabeling of the batch variable. We also generate dissimilarity heatmaps summarizing mean between-batch distances across batch pairs. More homogeneous values indicate weaker batch-driven separation.
 
 \item \textbf{Variance-partitioning analyses.}
 To quantify how compositional variation is apportioned among target (phenotype), batch, and their overlap, we used two multivariate variance-partitioning analyses under Aitchison geometry: partial redundancy analysis (pRDA) and principal variance component analysis (PVCA)~\cite{Wang2023PLSDABatch}. pRDA partitions variance into target, batch, intersection, and residual components; the intersection term reflects batch $\times$ target imbalance or confounding, with larger values indicating stronger confounding. PVCA yields an analogous Target/Batch/Intersection/Residual decomposition by applying a variance-components (mixed-effects) model to retained principal component (PC) scores and aggregating components across PCs using eigenvalue-based weights. We also computed per-feature one-way analysis of variance (ANOVA) $R^2$ values for batch and target and summarized them, for example by the median across features.
@@ -90,6 +93,8 @@ To quantify how compositional variation is apportioned among target (phenotype),
 \item \textbf{Mixing and separation metrics based on neighborhood and embedding.}
 We quantify local mixing using a $k$-nearest neighbor ($k$-NN) alignment score, where higher values indicate stronger cross-batch neighborhood mixing~\cite{Butler2018Seurat,Luecken2022scIB}. We compute a Uniform Manifold Approximation and Projection (UMAP) embedding~\cite{McInnes2018UMAP} and report an entropy-of-batch-mixing score on UMAP neighborhoods, where higher values indicate more uniform batch mixing~\cite{Haghverdi2018MNN,Luecken2022scIB}. To quantify phenotype preservation and separation, we report the silhouette coefficient with respect to target labels on the UMAP coordinates, where higher values indicate stronger separation~\cite{Rousseeuw1987Silhouette}.
 \end{enumerate}
+
+In the anaerobic digestion case study, these diagnostics were interpreted jointly rather than as a single ranking criterion. Ordination and distance-based tests summarize residual batch separation, variance-partitioning analyses describe how variation is attributed to batch, target and their overlap, and neighborhood metrics summarize local cross-batch mixing and target-label separation. Together, these outputs allow users to identify whether a correction output mainly reduces batch-associated structure, preserves target-associated structure, or changes both.
 
 
 \newpage
@@ -102,7 +107,7 @@ We quantify local mixing using a $k$-nearest neighbor ($k$-NN) alignment score, 
 \includegraphics[width=\textwidth]{FigSu1.pdf}
 \end{center}
 \textbf{Supplementary Figure S1. Sample composition by batch and target group.}
-Proportion of samples in each batch stratified by the two target (phenotypic) cohorts.
+Proportion of samples in each batch stratified by the two target (phenotypic) cohorts. The anaerobic digestion example contains 75 samples and 231 OTUs. The two initial phenol concentration groups contain 26 and 49 samples, respectively, and the five processing-date batches contain 9, 16, 21, 17 and 12 samples. Batch-target composition is non-uniform across batches, which motivates inspecting batch-target balance before correction.
 \end{figure}
 \vspace*{\fill}
 
@@ -182,6 +187,30 @@ Principal variance component analysis (PVCA) showing the fraction of variance at
 Comparison of alignment, silhouette, and entropy-based metrics across methods, summarizing cross-batch mixing and target separation.
 \end{figure}
 \vspace*{\fill}
+
+
+\newpage
+\section*{Supplementary Tables}
+\label{sec:supp-tables}
+
+\begin{table}[H]
+\centering
+\caption{\textbf{Supplementary Table S1. Bray--Curtis batch-association statistics for the anaerobic digestion case study.} ANOSIM and PERMANOVA were computed using Bray--Curtis distances on relative-abundance profiles with 999 permutations.}
+\label{tab:case-study-bray-stats}
+\begin{tabular}{lrrrr}
+\toprule
+Method & ANOSIM $R$ & ANOSIM $p$ & PERMANOVA $R^2$ & PERMANOVA $p$ \\
+\midrule
+Before correction & 0.637 & 0.001 & 0.457 & 0.001 \\
+ConQuR & -0.051 & 0.974 & 0.029 & 0.994 \\
+DEBIAS-M & -0.052 & 0.981 & 0.035 & 0.908 \\
+MetaDICT & 0.039 & 0.109 & 0.093 & 0.009 \\
+MMUPHin & -0.010 & 0.648 & 0.069 & 0.148 \\
+PLSDA-batch & 0.377 & 0.001 & 0.377 & 0.001 \\
+RUV-III-NB & 0.639 & 0.001 & 0.460 & 0.001 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
 \newpage
