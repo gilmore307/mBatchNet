@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Help · mBatchNet{% endblock %}
+{% block body %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h2 class="fw-bold be-section-title">Help and tutorials</h2>
+    <p class="text-muted mb-0">Guidance is organized around the same workflow used by the server: upload, pre-correction assessment, correction, post-correction assessment, and export.</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold">Upload data</h5>
+        <p class="text-muted mb-0">Upload a count matrix and metadata table in CSV format, then map the required metadata fields. The example anaerobic digestion dataset remains available for a quick walkthrough.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold">Pre-correction assessment</h5>
+        <p class="text-muted mb-0">Inspect study design, ordination structure, batch association, and phenotype separation before correction so technical variation can be interpreted in context.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold">Batch effect correction</h5>
+        <p class="text-muted mb-0">Run compatible correction methods with curated defaults or adjust method-specific parameters when the study design requires it.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold">Post-correction assessment</h5>
+        <p class="text-muted mb-0">Compare before and after diagnostics, review correction trade-offs, and download result bundles for downstream analysis.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

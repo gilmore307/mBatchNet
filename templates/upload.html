@@ -1,34 +1,120 @@
 {% extends "base.html" %}
+{% block title %}Upload Data · mBatchNet{% endblock %}
 {% block body %}
-<div class="row">
+<div class="row mb-3">
   <div class="col-12">
-    <h2>Upload Data</h2>
-    <p class="text-muted">Choose manual upload or the bundled anaerobic digestion example dataset.</p>
+    <h2 class="fw-bold be-section-title">Upload Data</h2>
+    <p class="text-muted">Choose manual upload or example dataset.</p>
   </div>
 </div>
-<div class="row g-3">
-  <div class="col-lg-7">
-    <form class="card h-100" method="post" action="/sessions/upload" enctype="multipart/form-data">
-      <div class="card-header"><strong>Manual Upload</strong></div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {{ 'active' if active_tab != 'example' else '' }}" href="/upload">Manual Upload</a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {{ 'active' if active_tab == 'example' else '' }}" href="/upload?tab=example">Example Dataset</a>
+  </li>
+</ul>
+
+{% if active_tab == "example" %}
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <form class="card h-100 be-content-card" method="post" action="/sessions/example">
       <div class="card-body">
-        <label class="form-label fw-semibold" for="matrix">Count matrix CSV</label>
-        <input class="form-control mb-3" id="matrix" name="matrix" type="file" accept=".csv,text/csv" required>
-        <label class="form-label fw-semibold" for="metadata">Metadata CSV</label>
-        <input class="form-control mb-3" id="metadata" name="metadata" type="file" accept=".csv,text/csv" required>
-        <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
-      </div>
-    </form>
-  </div>
-  <div class="col-lg-5">
-    <form class="card h-100" method="post" action="/sessions/example">
-      <div class="card-header"><strong>Quick Start: Example Data</strong></div>
-      <div class="card-body">
-        <div class="fw-semibold">Example dataset: Anaerobic Digestion</div>
-        <p class="text-muted">Batch, target, and covariate mappings are preconfigured for the example workflow.</p>
+        <h5 class="fw-semibold mb-2">Quick Start: Example Data</h5>
+        <div class="fw-semibold mb-2">Example dataset: Anaerobic Digestion</div>
+        <p class="text-muted">Columns mapped as Batch (batch), Initial Phenol Concentration (target), Treatment Duration (covariate).</p>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Rows to preview</label>
+            <input class="form-control" type="number" value="10" min="1" disabled>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Columns to preview</label>
+            <input class="form-control" type="number" value="8" min="1" disabled>
+          </div>
+        </div>
         <button class="btn btn-success btn-sm be-wide-button" type="submit">Load Selected Example</button>
       </div>
     </form>
   </div>
+  <div class="col-lg-4">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold mb-2">Example preview</h5>
+        <p class="text-muted mb-0">The example workflow uses the bundled anaerobic digestion dataset so users can inspect the interface before uploading their own study.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<form class="row g-3 mb-4" method="post" action="/sessions/upload" enctype="multipart/form-data">
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold mb-3">Count matrix (CSV)</h5>
+        <label class="be-upload-box" for="matrix">
+          <i class="bi bi-cloud-arrow-up"></i>
+          <span>Drag and drop or click to upload count matrix.</span>
+        </label>
+        <input class="form-control mt-3" id="matrix" name="matrix" type="file" accept=".csv,text/csv" required>
+        <div class="text-muted small mt-3">No file uploaded yet.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 be-content-card">
+      <div class="card-body">
+        <h5 class="fw-semibold mb-3">Metadata (CSV)</h5>
+        <label class="be-upload-box" for="metadata">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+          <span>Drag and drop or click to upload metadata.</span>
+        </label>
+        <input class="form-control mt-3" id="metadata" name="metadata" type="file" accept=".csv,text/csv" required>
+        <div class="text-muted small mt-3">No file uploaded yet.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
+  </div>
+</form>
+{% endif %}
+
+<section class="card be-content-card mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+      <div>
+        <h5 class="fw-semibold mb-1">Process</h5>
+        <p class="text-muted mb-0">Review metadata columns and run preprocessing.</p>
+      </div>
+      <button class="btn btn-secondary btn-sm be-wide-button" disabled>Process</button>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="fw-semibold mb-2">Metadata columns</div>
+          <p class="text-muted mb-0">Upload files or load the example dataset to inspect detected metadata fields.</p>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="fw-semibold mb-2">Study settings</div>
+          <p class="text-muted mb-0">Map batch, target, and covariate fields before running correction workflows.</p>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="fw-semibold mb-2">Mosaic preview</div>
+          <p class="text-muted mb-0">Preview sample-by-feature structure and confounding warnings after validation.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="alert alert-info">
+  Uploaded input is expected to be clean microbiome count data plus matching metadata. The server pre-checks obvious issues and warns when batch and phenotype appear confounded, but it does not block users solely because confounding is detected.
 </div>
 {% endblock %}
-

@@ -15,23 +15,31 @@
         <div class="d-flex align-items-center flex-wrap justify-content-between w-100 py-1 px-3">
           <div class="d-flex align-items-center flex-wrap">
             <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="/"><i class="bi bi-house me-1"></i>Home</a>
-            <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="https://github.com/gilmore307/mBatchNet" target="_blank"><i class="bi bi-github me-1"></i>GitHub</a>
+            <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="https://github.com/gilmore307/Batch-Effect-Correction" target="_blank"><i class="bi bi-github me-1"></i>GitHub</a>
+            <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="https://github.com/gilmore307/Batch-Effect-Correction/issues" target="_blank"><i class="bi bi-bug me-1"></i>Report issue</a>
           </div>
           <div class="d-flex align-items-center flex-wrap ms-auto">
+            <a class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed" href="/help"><i class="bi bi-question-circle me-1"></i>Help</a>
+            {% if session_id %}
+              <a class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed" href="/sessions/{{ session_id }}/logs"><i class="bi bi-terminal me-1"></i>Logs</a>
+              <a class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed" href="/sessions/{{ session_id }}/download/output"><i class="bi bi-download me-1"></i>Download results</a>
+            {% else %}
+              <span class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed disabled"><i class="bi bi-terminal me-1"></i>Logs</span>
+              <span class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed disabled"><i class="bi bi-download me-1"></i>Download results</span>
+            {% endif %}
             {% block nav_actions %}{% endblock %}
           </div>
         </div>
         <div class="be-pipeline-container d-flex align-items-stretch flex-nowrap w-100 py-1">
-          <a class="btn btn-light btn-sm be-pipeline-step text-truncate" href="/upload">Upload Files</a>
-          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Pre-correction Assessment</span>
-          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Batch Effect Correction</span>
-          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Post-correction Assessment</span>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/upload' else 'btn-outline-light' }}" href="/upload">Upload Files</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/pre' else 'btn-outline-light' }}" href="/pre">Pre-correction Assessment</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/correction' else 'btn-outline-light' }}" href="/correction">Batch Effect Correction</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/post' else 'btn-outline-light' }}" href="/post">Post-correction Assessment</a>
         </div>
       </div>
     </nav>
-    <main class="container-fluid">
+    <main class="container-fluid be-page-shell">
       {% block body %}{% endblock %}
     </main>
   </body>
 </html>
-
