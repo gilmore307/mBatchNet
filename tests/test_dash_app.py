@@ -183,7 +183,12 @@ class DashAppTests(unittest.TestCase):
 
     def test_method_reference_csv_provides_descriptions(self):
         for method_code, metadata in METHOD_REFERENCE_BY_CODE.items():
-            self.assertTrue(metadata.get("description"), method_code)
+            description = metadata.get("description", "")
+
+            self.assertTrue(description, method_code)
+            self.assertGreaterEqual(len(description), 180, method_code)
+            self.assertGreaterEqual(description.count("."), 3, method_code)
+            self.assertIn("In mBatchNet", description, method_code)
 
     def test_no_parameter_methods_use_objective_session_settings_message(self):
         text = _component_text(_build_parameter_layout("ZINBWaVE"))
