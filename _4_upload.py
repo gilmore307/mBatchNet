@@ -810,6 +810,14 @@ def upload_layout(active_path: str):
                                                             "Upload a reproducibility_bundle.zip exported by mBatchNet to restore the saved session inputs and rerun from the same state.",
                                                             className="text-muted",
                                                         ),
+                                                        html.Ul(
+                                                            [
+                                                                html.Li("Run or restore an mBatchNet session until the navbar download buttons are enabled."),
+                                                                html.Li("Click Repro bundle in the navbar."),
+                                                                html.Li("Upload that downloaded zip here to reproduce the saved session state."),
+                                                            ],
+                                                            className="mb-3",
+                                                        ),
                                                         dcc.Upload(
                                                             id="upload-repro-bundle",
                                                             children=html.Div("Upload Repro bundle"),
@@ -826,21 +834,6 @@ def upload_layout(active_path: str):
                                                 ),
                                             ],
                                             className="mb-3",
-                                        ),
-                                        dbc.Card(
-                                            [
-                                                dbc.CardHeader(html.Strong("How to get a Repro bundle")),
-                                                dbc.CardBody(
-                                                    html.Ul(
-                                                        [
-                                                            html.Li("Run or restore an mBatchNet session until the navbar download buttons are enabled."),
-                                                            html.Li("Click Repro bundle in the navbar."),
-                                                            html.Li("Upload that downloaded zip here to reproduce the saved session state."),
-                                                        ],
-                                                        className="mb-0",
-                                                    )
-                                                ),
-                                            ]
                                         ),
                                     ],
                                     className="mt-3",

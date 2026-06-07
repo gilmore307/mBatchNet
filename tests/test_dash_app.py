@@ -80,7 +80,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Restore from Repro bundle", text)
         self.assertIn("Upload Repro bundle", text)
         self.assertIn("reproducibility_bundle.zip", text)
-        self.assertIn("How to get a Repro bundle", text)
+        self.assertNotIn("How to get a Repro bundle", text)
         self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
