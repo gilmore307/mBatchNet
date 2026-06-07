@@ -183,8 +183,8 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Jobs run sequentially and stream status updates to the run log. You can "
-                                "re-open the log modal while methods are running to watch the process in real time."
+                                "Jobs run sequentially and write status updates to the run log. "
+                                "When a method finishes, open the log modal to review the process."
                             ),
                             html.Li(
                                 "Once a method completes, its corrected matrix is stored for the "
