@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}mBatchNet{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/flatly/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/assets/ui.css">
+    <link rel="stylesheet" href="/assets/server.css">
+  </head>
+  <body>
+    <nav class="navbar navbar-dark bg-primary sticky-top mb-4 be-navbar">
+      <div class="container-fluid d-flex flex-column py-1">
+        <div class="d-flex align-items-center flex-wrap justify-content-between w-100 py-1 px-3">
+          <div class="d-flex align-items-center flex-wrap">
+            <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="/"><i class="bi bi-house me-1"></i>Home</a>
+            <a class="btn btn-outline-light btn-sm mb-2 me-2 be-nav-fixed" href="https://github.com/gilmore307/mBatchNet" target="_blank"><i class="bi bi-github me-1"></i>GitHub</a>
+          </div>
+          <div class="d-flex align-items-center flex-wrap ms-auto">
+            {% block nav_actions %}{% endblock %}
+          </div>
+        </div>
+        <div class="be-pipeline-container d-flex align-items-stretch flex-nowrap w-100 py-1">
+          <a class="btn btn-light btn-sm be-pipeline-step text-truncate" href="/upload">Upload Files</a>
+          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Pre-correction Assessment</span>
+          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Batch Effect Correction</span>
+          <span class="btn btn-outline-light btn-sm be-pipeline-step text-truncate disabled">Post-correction Assessment</span>
+        </div>
+      </div>
+    </nav>
+    <main class="container-fluid">
+      {% block body %}{% endblock %}
+    </main>
+  </body>
+</html>
+

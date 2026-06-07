@@ -1,0 +1,21 @@
+.be-nav-fixed {
+  width: 150px;
+}
+
+.be-wide-button {
+  width: 250px;
+}
+
+.be-hero {
+  background: linear-gradient(135deg, #31475e 0%, #2b3f52 55%, #243545 100%);
+  box-shadow: 0 14px 34px rgba(24, 35, 48, 0.20);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.be-hero h1 {
+  font-size: 3.4rem;
+}
+
+.text-white-75 {
+  color: rgba(255,255,255,0.88);
+}

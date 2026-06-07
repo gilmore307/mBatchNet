@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block nav_actions %}
+<a class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed" href="/sessions/{{ session_id }}/download/output"><i class="bi bi-download me-1"></i>Output bundle</a>
+<a class="btn btn-outline-light btn-sm mb-2 ms-2 be-nav-fixed" href="/sessions/{{ session_id }}/download/reproducibility"><i class="bi bi-box-arrow-down me-1"></i>Repro bundle</a>
+{% endblock %}
+{% block body %}
+<h2>Session Results</h2>
+<p class="text-muted">Generated artifacts are stored server-side and exposed through explicit bundles.</p>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><strong>Run a correction method</strong></div>
+      <div class="card-body">
+        {% for method in methods %}
+          <form class="d-inline-block me-2 mb-2" method="post" action="/sessions/{{ session_id }}/methods/{{ method.code }}">
+            <button class="btn btn-outline-success btn-sm" type="submit">{{ method.display }}</button>
+          </form>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><strong>Artifacts</strong></div>
+      <div class="card-body">
+        {% if files %}
+          <ul class="mb-0">
+            {% for file in files %}
+              <li>{{ file }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-muted">No artifacts yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Input Pre-check</h2>
+<p class="text-muted">Review detected input dimensions, warnings, and metadata mappings before preprocessing.</p>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><strong>Input summary</strong></div>
+      <div class="card-body">
+        <p class="mb-1"><strong>Status:</strong> <span class="badge text-bg-{{ 'danger' if report.status == 'error' else 'warning' if report.status == 'warning' else 'success' }}">{{ report.status }}</span></p>
+        <p class="mb-1"><strong>Samples:</strong> {{ report.n_samples }}</p>
+        <p class="mb-1"><strong>Features:</strong> {{ report.n_features }}</p>
+        <p class="mb-0"><strong>Metadata columns:</strong> {{ report.metadata_columns|join(', ') }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><strong>Validation messages</strong></div>
+      <div class="card-body">
+        {% if report.messages %}
+          <ul class="mb-0">
+            {% for item in report.messages %}
+              <li><span class="badge text-bg-{{ 'danger' if item.level == 'error' else 'warning' }}">{{ item.level }}</span> {{ item.message }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-success">No blocking input issues detected.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<form class="card mt-4" method="post" action="/sessions/{{ session_id }}/preprocess">
+  <div class="card-header"><strong>Map Metadata Columns</strong></div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="batch-column">Batch ID column</label>
+        <select class="form-select" id="batch-column" name="batch_column" required>
+          <option value="">Select batch column</option>
+          {% for column in report.metadata_columns %}
+            <option value="{{ column }}" {% if selected.batch == column %}selected{% endif %}>{{ column }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="target-column">Target column</label>
+        <select class="form-select" id="target-column" name="target_column" required>
+          <option value="">Select target column</option>
+          {% for column in report.metadata_columns %}
+            <option value="{{ column }}" {% if selected.target == column %}selected{% endif %}>{{ column }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-success btn-sm be-wide-button mt-3" type="submit">Apply mapping and preprocess</button>
+  </div>
+</form>
+{% endblock %}
+

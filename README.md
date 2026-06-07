@@ -1,7 +1,7 @@
 # mBatchNet
 
 ## Project Overview
-mBatchNet is a **Dash + R-script** application for batch-effect correction and post-correction evaluation in microbiome/omics count or abundance analysis workflows.
+mBatchNet is a browser-based application for batch-effect correction and post-correction evaluation in microbiome/omics count or abundance analysis workflows.
 
 The app supports an end-to-end pipeline:
 1. Upload count matrix and metadata
@@ -9,7 +9,7 @@ The app supports an end-to-end pipeline:
 3. Run pre-/post-correction visual and statistical assessments
 4. Download a packaged result bundle
 
-The main entry point is `_0_main.py`. UI workflow pages are implemented in `_4_upload.py`, `_5_assessment.py`, and `_6_correction.py`, while computation is driven by R scripts under `correction/` and `plots/`.
+The current lightweight server entry point is `server.py`. It uses Flask/Jinja for the web workflow, keeps the existing Bootstrap visual style, and runs analysis through explicit backend services under `mbatchnet/`. The older Dash entry point (`_0_main.py`) remains available during the transition as a regression reference while the server path is migrated.
 
 ## Installation
 
@@ -46,6 +46,7 @@ Rscript assets/env/r-packages.R
 
 ### Python
 Core packages:
+- `flask`
 - `dash`
 - `dash-bootstrap-components`
 - `dash-ag-grid`
@@ -70,7 +71,7 @@ Rscript assets/env/r-packages.R
 2. Start the app:
 
 ```bash
-python _0_main.py
+python server.py
 ```
 
 3. Open the app in your browser:
@@ -83,6 +84,12 @@ python _0_main.py
    - Batch Correction
    - Post-assessment
    - Download results
+
+During the migration period, the legacy Dash app can still be started with:
+
+```bash
+python _0_main.py
+```
 
 ## Input / Output Specification
 
@@ -107,7 +114,9 @@ For each session, intermediate and final outputs are generated under `output/<se
 - preprocessed and corrected matrices
 - assessment figures (PCA/PCoA/NMDS/PERMANOVA/PVCA, etc.)
 - run log (`run.log`)
-- downloadable result archive from **Download results**
+- output summary (`output_summary.json`)
+- validation report (`validation_report.json`)
+- downloadable output and reproducibility bundles
 
 ## Test Data Links
 Bundled example datasets are available in `assets/example/` and can be loaded directly from the **Example Dataset** tab.

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="be-hero rounded-4 px-4 px-lg-5 py-5 mb-5">
+  <div class="col-lg-9 py-4 py-lg-5">
+    <span class="badge rounded-pill text-bg-info px-3 py-2 mb-3">Microbiome batch-effect analysis</span>
+    <h1 class="fw-bold text-white mb-3">mBatchNet</h1>
+    <p class="lead text-white-75 mb-3">Assess, correct, and compare batch effects across microbiome datasets in a streamlined browser-based workspace.</p>
+    <p class="text-white-50 mb-4">This lightweight server path keeps the existing product appearance while running analysis through explicit backend jobs and artifacts.</p>
+    <a class="btn btn-success btn-lg rounded-pill px-4 me-3 mb-2" href="/upload"><i class="bi bi-upload me-2"></i>Start with your data</a>
+    <form class="d-inline" method="post" action="/sessions/example">
+      <button class="btn btn-outline-light btn-lg rounded-pill px-4 mb-2" type="submit"><i class="bi bi-collection-play me-2"></i>Try sample workflow</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
+

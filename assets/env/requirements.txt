@@ -1,4 +1,6 @@
-# Core Dash app dependencies
+# Core web app dependencies
+flask>=3.0.0
+# Legacy Dash app dependencies
 # Dash pins plotly/dash-core-components/dash-html-components internally.
 dash>=2.14.0
 # Bootstrap styling + layout helpers

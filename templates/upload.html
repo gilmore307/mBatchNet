@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="row">
+  <div class="col-12">
+    <h2>Upload Data</h2>
+    <p class="text-muted">Choose manual upload or the bundled anaerobic digestion example dataset.</p>
+  </div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form class="card h-100" method="post" action="/sessions/upload" enctype="multipart/form-data">
+      <div class="card-header"><strong>Manual Upload</strong></div>
+      <div class="card-body">
+        <label class="form-label fw-semibold" for="matrix">Count matrix CSV</label>
+        <input class="form-control mb-3" id="matrix" name="matrix" type="file" accept=".csv,text/csv" required>
+        <label class="form-label fw-semibold" for="metadata">Metadata CSV</label>
+        <input class="form-control mb-3" id="metadata" name="metadata" type="file" accept=".csv,text/csv" required>
+        <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
+      </div>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <form class="card h-100" method="post" action="/sessions/example">
+      <div class="card-header"><strong>Quick Start: Example Data</strong></div>
+      <div class="card-body">
+        <div class="fw-semibold">Example dataset: Anaerobic Digestion</div>
+        <p class="text-muted">Batch, target, and covariate mappings are preconfigured for the example workflow.</p>
+        <button class="btn btn-success btn-sm be-wide-button" type="submit">Load Selected Example</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
