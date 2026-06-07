@@ -2,7 +2,7 @@
 flask>=3.0.0
 # Legacy Dash app dependencies
 # Dash pins plotly/dash-core-components/dash-html-components internally.
-dash>=2.14.0
+dash>=2.14.0,<5
 # Bootstrap styling + layout helpers
 dash-bootstrap-components>=1.6.0
 # Enterprise-ready hosting entrypoint

@@ -774,10 +774,9 @@ if __name__ == "__main__":
     except Exception:
         port = 8050
     # Disable hot reload so writing large files (e.g. results.zip) won't refresh the page
-    app.run_server(
+    app.run(
         debug=debug,
         host=host,
         port=port,
         use_reloader=False,
     )
-
