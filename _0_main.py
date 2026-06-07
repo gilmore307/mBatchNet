@@ -22,6 +22,7 @@ from _2_utils import (
     cleanup_old_sessions,
     get_session_dir,
     OUTPUT_ROOT,
+    write_session_manifests,
 )
 from _3_welcome import welcome_layout
 from _4_upload import upload_layout, register_upload_callbacks
@@ -389,6 +390,7 @@ def download_results(n_clicks: int, session_id: str):
     session_dir = OUTPUT_ROOT / session_id
     if not session_dir.exists() or not session_dir.is_dir():
         raise dash.exceptions.PreventUpdate
+    write_session_manifests(session_dir)
     # Build a zip that excludes any existing results.zip, then save it into the session folder
     target_zip = session_dir / "results.zip"
     # Create zip in a temp location to avoid including it while walking the session dir

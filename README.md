@@ -103,9 +103,10 @@ The Dash app can also be started directly with:
 ### Inputs
 The Upload page expects two CSV files:
 
-1. **Count matrix (CSV)**
-   - Rows: features (e.g., OTU/ASV/genes)
-   - Columns: samples
+1. **Feature table / count matrix (CSV)**
+   - Rows: samples
+   - Columns: profiled features (for example OTU/ASV/gene/pathway columns)
+   - Raw sequencing reads are not accepted; run upstream profiling first for amplicon, shotgun metagenomics, metatranscriptomic, or similar inputs.
 
 2. **Metadata (CSV)**
    - Must include at least:
@@ -123,6 +124,9 @@ For each session, intermediate and final outputs are generated under `output/<se
 - run log (`run.log`)
 - output summary (`output_summary.json`)
 - validation report (`validation_report.json`)
+- runtime summary (`runtime_summary.json`)
+- parameter manifest (`parameter_manifest.json`)
+- reproducibility manifest (`reproducibility_manifest.json`)
 - downloadable output and reproducibility bundles
 
 ## Test Data Links

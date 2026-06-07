@@ -59,7 +59,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Upload Files"),
             html.P(
-                "Upload a raw count/abundance table and a matching metadata table, or pick one of the curated examples."
+                "Upload a profiled count/abundance table and a matching metadata table, or pick one of the curated examples."
             ),
             html.Div(
                 [
@@ -70,13 +70,16 @@ HELP_MODAL_SECTIONS: List = [
                                 "Manual uploads accept CSV files."
                             ),
                             html.Li(
-                                "The matrix must use features as rows, samples as columns, and omit row/column names. Use consistent feature order between the matrix and metadata to avoid mismatches."
+                                "The matrix must use samples as rows and profiled features as columns. Metadata must have one row per sample in the same order."
+                            ),
+                            html.Li(
+                                "Raw sequencing reads are not accepted. Use an upstream profiler first for amplicon, shotgun metagenomics, metatranscriptomic, or similar data."
                             ),
                             html.Li(
                                 "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariance columns (keep the count modest to avoid slow runs)."
                             ),
                             html.Li(
-                                "Use the dropdowns below each table preview to map the batch, target, and covariance columns."
+                                "The Upload page writes validation_report.json and blocks core input errors before preprocessing."
                             ),
                         ]
                     ),

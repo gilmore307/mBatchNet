@@ -286,17 +286,40 @@ fallback_metadata_path  <- file.path(output_folder, "metadata_origin.csv")
 default_matrix_path     <- file.path("assets", "example", "raw_1.csv")
 default_metadata_path   <- file.path("assets", "example", "metadata_1.csv")
 
+clean_uploaded_matrix <- function(df) {
+  if (is.null(df)) return(df)
+  if (!ncol(df)) return(df)
+  num_cols <- vapply(df, is.numeric, TRUE)
+  if (!all(num_cols) && ncol(df) > 1 && !num_cols[1] && all(num_cols[-1])) {
+    say("ℹ️ Dropping non-numeric sample ID column from uploaded matrix: ", colnames(df)[1])
+    df <- df[, -1, drop = FALSE]
+  }
+  df
+}
+
+read_uploaded_matrix <- function(path) {
+  opt1 <- tryCatch(read.csv(path, header = FALSE, check.names = FALSE), error = function(e) NULL)
+  opt2 <- tryCatch(read.csv(path, header = TRUE, check.names = FALSE), error = function(e) NULL)
+  score <- function(df) {
+    if (is.null(df)) return(-Inf)
+    mean(vapply(df, is.numeric, TRUE))
+  }
+  if (!is.null(opt1) && score(opt1) >= score(opt2)) return(clean_uploaded_matrix(opt1))
+  if (!is.null(opt2)) return(clean_uploaded_matrix(opt2))
+  stop("Failed to read matrix: ", path)
+}
+
 if (file.exists(custom_matrix_path) && file.exists(custom_metadata_path)) {
   say("✅ Using uploaded user files")
-  uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
+  uploaded_mat <- read_uploaded_matrix(custom_matrix_path)
   metadata <- read.csv(custom_metadata_path, check.names = FALSE)
 } else if (file.exists(custom_matrix_path) && file.exists(fallback_metadata_path)) {
   say("✅ Using uploaded matrix with fallback metadata_origin.csv")
-  uploaded_mat <- read.csv(custom_matrix_path, header = FALSE, check.names = FALSE)
+  uploaded_mat <- read_uploaded_matrix(custom_matrix_path)
   metadata <- read.csv(fallback_metadata_path, check.names = FALSE)
 } else {
   say("⚠️ No uploaded files found — using default assets")
-  uploaded_mat <- read.csv(default_matrix_path, header = FALSE, check.names = FALSE)
+  uploaded_mat <- read_uploaded_matrix(default_matrix_path)
   metadata     <- read.csv(default_metadata_path, check.names = FALSE)
 }
 

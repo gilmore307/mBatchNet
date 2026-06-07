@@ -454,12 +454,23 @@ if (isTRUE(run_main)) {
   prepare_metadata_outputs(output_folder)
 
   # Prefer header-less numeric matrix; fall back to headered if needed
+  clean_uploaded_matrix <- function(df) {
+    if (is.null(df)) return(df)
+    if (!ncol(df)) return(df)
+    num_cols <- vapply(df, is.numeric, TRUE)
+    if (!all(num_cols) && ncol(df) > 1 && !num_cols[1] && all(num_cols[-1])) {
+      say("ℹ️ Dropping non-numeric sample ID column from uploaded matrix: ", colnames(df)[1])
+      df <- df[, -1, drop = FALSE]
+    }
+    df
+  }
+
   read_matrix_guess <- function(p) {
     opt1 <- tryCatch(utils::read.csv(p, header = FALSE, check.names = FALSE), error = function(e) NULL)
     opt2 <- tryCatch(utils::read.csv(p, header = TRUE,  check.names = FALSE), error = function(e) NULL)
     score <- function(df) { if (is.null(df)) return(-Inf); mean(vapply(df, is.numeric, TRUE)) }
-    if (!is.null(opt1) && score(opt1) >= score(opt2)) return(opt1)
-    if (!is.null(opt2)) return(opt2)
+    if (!is.null(opt1) && score(opt1) >= score(opt2)) return(clean_uploaded_matrix(opt1))
+    if (!is.null(opt2)) return(clean_uploaded_matrix(opt2))
     stop("Failed to read matrix: ", p)
   }
 

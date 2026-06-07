@@ -25,6 +25,7 @@ from _2_utils import (
     mark_method_failed,
     method_failed_last_run,
     log_file_meta,
+    record_method_parameters,
     run_single_method,
 )
 
@@ -338,6 +339,62 @@ _PARAMETER_CONFIG = {
 }
 
 
+_METHOD_GUIDE_ROWS = (
+    ("Count tables with known batch labels", "ComBat-seq, ConQuR, MMUPHin, DEBIAS-M", "Use when values are non-negative counts or count-like profiled features."),
+    ("Continuous/log/CLR abundance tables", "ComBat, limma, FSQN, BMC", "Use when input has already been transformed or normalized."),
+    ("Phenotype-aware correction", "PLSDA-batch, FAbatch, DEBIAS-M", "Requires a binary target column; avoid over-interpreting results when target and batch are strongly confounded."),
+    ("Sparse microbiome feature tables", "ConQuR, MMUPHin, MetaDICT", "Prefer microbiome-aware methods and inspect warnings for all-zero samples or features."),
+    ("Exploratory public-server runs", "Run 2-4 methods first", "Large tables and machine-learning methods can be slow; download a bundle after each successful method set."),
+)
+
+
+def _method_guide_card() -> object:
+    rows = [
+        html.Tr(
+            [
+                html.Td(scenario),
+                html.Td(methods),
+                html.Td(note),
+            ]
+        )
+        for scenario, methods, note in _METHOD_GUIDE_ROWS
+    ]
+    return dbc.Card(
+        [
+            dbc.CardHeader(html.Strong("Method guide")),
+            dbc.CardBody(
+                [
+                    html.P(
+                        "Select methods according to the data scale and study design before launching correction. "
+                        "Parameter controls stay under each method row and are written into the reproducibility bundle.",
+                        className="text-muted",
+                    ),
+                    dbc.Table(
+                        [
+                            html.Thead(
+                                html.Tr(
+                                    [
+                                        html.Th("Use case"),
+                                        html.Th("Suggested methods"),
+                                        html.Th("Caution"),
+                                    ]
+                                )
+                            ),
+                            html.Tbody(rows),
+                        ],
+                        bordered=True,
+                        hover=True,
+                        responsive=True,
+                        size="sm",
+                        className="mb-0",
+                    ),
+                ]
+            ),
+        ],
+        className="mb-3",
+    )
+
+
 def correction_layout(active_path: str):
     return html.Div(
         [
@@ -353,6 +410,7 @@ def correction_layout(active_path: str):
                     html.P(
                         "Click a method name to open its package source, where you can read the manual or download the package version."
                     ),
+                    _method_guide_card(),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),
                 ],
@@ -701,6 +759,7 @@ def register_correction_callbacks(app):
                 payload,
             )
         log_path = session_dir / "run.log"
+        record_method_parameters(session_dir, method_code, params)
         success, _ = run_single_method(session_dir, method_code, log_path=log_path, params=params)
         new_refresh = refresh_value + 1 if success else refresh_value
         if success:

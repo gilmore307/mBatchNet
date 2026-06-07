@@ -87,6 +87,110 @@ def log_file_meta(log_path: Path | None) -> Optional[Dict[str, Any]]:
     }
 
 
+def _json_load(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _json_write(path: Path, payload: Dict[str, Any]) -> None:
+    try:
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def record_method_parameters(session_dir: Path, method_code: str, params: Dict[str, object]) -> None:
+    """Persist user-selected method parameters for reproducible downloads."""
+
+    manifest_path = session_dir / "parameter_manifest.json"
+    manifest = _json_load(manifest_path)
+    methods = manifest.get("methods")
+    if not isinstance(methods, dict):
+        methods = {}
+    methods[str(method_code)] = {
+        "display_name": CODE_TO_DISPLAY.get(method_code, method_code),
+        "parameters": dict(params or {}),
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    manifest["schema"] = "mbatchnet_parameter_manifest"
+    manifest["methods"] = methods
+    _json_write(manifest_path, manifest)
+
+
+def write_session_manifests(session_dir: Path) -> None:
+    """Write concise output/runtime/reproducibility manifests into a session directory."""
+
+    session_dir = Path(session_dir)
+    session_config = _json_load(session_dir / "session_config.json")
+    validation_report = _json_load(session_dir / "validation_report.json")
+    session_summary = _json_load(session_dir / "session_summary.json")
+    parameter_manifest = _json_load(session_dir / "parameter_manifest.json")
+    if not parameter_manifest:
+        parameter_manifest = {"schema": "mbatchnet_parameter_manifest", "methods": {}}
+        _json_write(session_dir / "parameter_manifest.json", parameter_manifest)
+
+    files: List[Dict[str, object]] = []
+    for path in sorted(session_dir.rglob("*")):
+        if not path.is_file() or path.name.lower().endswith(".zip"):
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        files.append(
+            {
+                "path": str(path.relative_to(session_dir)),
+                "bytes": stat.st_size,
+                "mtime": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            }
+        )
+
+    method_outputs = []
+    for code, display in SUPPORTED_METHODS:
+        paths = [p.relative_to(session_dir).as_posix() for p in method_output_paths(session_dir, code) if p.exists()]
+        if paths:
+            method_outputs.append({"code": code, "display_name": display, "outputs": paths})
+
+    output_summary = {
+        "schema": "mbatchnet_output_summary",
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "session_id": session_dir.name,
+        "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
+        "validation": validation_report,
+        "method_outputs": method_outputs,
+        "files": files,
+    }
+    _json_write(session_dir / "output_summary.json", output_summary)
+
+    runtime_summary = {
+        "schema": "mbatchnet_runtime_summary",
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "session_id": session_dir.name,
+        "method_timings_sec": extract_method_timings_from_log(session_dir),
+        "session_summary": session_summary,
+    }
+    _json_write(session_dir / "runtime_summary.json", runtime_summary)
+
+    reproducibility_manifest = {
+        "schema": "mbatchnet_reproducibility_manifest",
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "session_id": session_dir.name,
+        "app_title": "mBatchNet",
+        "python_executable": sys.executable,
+        "session_config": session_config,
+        "validation_report": validation_report,
+        "parameter_manifest": parameter_manifest,
+        "required_inputs": ["raw.csv", "metadata_origin.csv"],
+        "derived_inputs": ["metadata.csv", "raw_tss.csv", "raw_clr.csv"],
+    }
+    _json_write(session_dir / "reproducibility_manifest.json", reproducibility_manifest)
+
+
 # ---- Dataclasses & config ----
 @dataclass
 class FigureSpec:

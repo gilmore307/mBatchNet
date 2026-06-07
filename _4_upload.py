@@ -3,6 +3,7 @@
 # ===============================
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
+import csv
 import shutil
 import json
 from urllib.parse import parse_qs
@@ -28,6 +29,14 @@ from _2_utils import (
 EXAMPLE_DIR = BASE_DIR / "assets" / "example"
 PREVIEW_MAX_ROWS = 5
 PREVIEW_MAX_COLS = 50
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+WARN_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_SAMPLES = 5000
+MAX_FEATURES = 20000
+MAX_MATRIX_CELLS = 5_000_000
+WARN_MATRIX_CELLS = 1_000_000
+HIGH_SPARSITY_FRACTION = 0.80
+STRONG_CONFOUNDING_V = 0.85
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -37,6 +46,277 @@ EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
         "covariates": ["Treatment Duration"],
     },
 }
+
+
+def _blank(value: object) -> bool:
+    return value is None or str(value).strip() == ""
+
+
+def _as_float(value: object) -> Optional[float]:
+    if _blank(value):
+        return None
+    try:
+        val = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if val != val or val in (float("inf"), float("-inf")):
+        return None
+    return val
+
+
+def _read_csv_records(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    with path.open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        header = [str(col).strip() for col in (reader.fieldnames or []) if str(col).strip()]
+        rows = [dict(row) for row in reader]
+    return header, rows
+
+
+def _read_numeric_matrix(path: Path) -> Tuple[List[List[float]], Dict[str, object]]:
+    rows: List[List[str]] = []
+    with path.open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.reader(fh)
+        rows = [[cell.strip() for cell in row] for row in reader if any(not _blank(cell) for cell in row)]
+    if not rows:
+        return [], {"header_detected": False, "sample_id_column": False}
+
+    header_detected = False
+    sample_id_column = False
+
+    def numeric_fraction(cells: List[str]) -> float:
+        if not cells:
+            return 0.0
+        return sum(_as_float(cell) is not None for cell in cells) / len(cells)
+
+    if numeric_fraction(rows[0]) < 0.75 and len(rows) > 1 and numeric_fraction(rows[1]) >= 0.75:
+        header_detected = True
+        rows = rows[1:]
+
+    if rows and all(_as_float(row[0]) is None and numeric_fraction(row[1:]) >= 0.75 for row in rows if row):
+        sample_id_column = True
+        rows = [row[1:] for row in rows]
+
+    width = max((len(row) for row in rows), default=0)
+    matrix: List[List[float]] = []
+    for row in rows:
+        padded = row + [""] * (width - len(row))
+        parsed: List[float] = []
+        for cell in padded:
+            value = _as_float(cell)
+            if value is None:
+                raise ValueError("Matrix contains blank, non-numeric, NA, NaN, or Inf values.")
+            parsed.append(value)
+        matrix.append(parsed)
+    return matrix, {"header_detected": header_detected, "sample_id_column": sample_id_column}
+
+
+def _level_counts(rows: List[Dict[str, str]], column: str) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for row in rows:
+        value = str(row.get(column, "")).strip()
+        if value:
+            counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def _cramers_v(rows: List[Dict[str, str]], col_a: str, col_b: str) -> Optional[float]:
+    levels_a = sorted(_level_counts(rows, col_a))
+    levels_b = sorted(_level_counts(rows, col_b))
+    if len(levels_a) < 2 or len(levels_b) < 2:
+        return None
+    table = [[0 for _ in levels_b] for _ in levels_a]
+    idx_a = {value: idx for idx, value in enumerate(levels_a)}
+    idx_b = {value: idx for idx, value in enumerate(levels_b)}
+    n = 0
+    for row in rows:
+        a = str(row.get(col_a, "")).strip()
+        b = str(row.get(col_b, "")).strip()
+        if not a or not b:
+            continue
+        table[idx_a[a]][idx_b[b]] += 1
+        n += 1
+    if n == 0:
+        return None
+    row_totals = [sum(row) for row in table]
+    col_totals = [sum(table[i][j] for i in range(len(levels_a))) for j in range(len(levels_b))]
+    chi2 = 0.0
+    for i, row_total in enumerate(row_totals):
+        for j, col_total in enumerate(col_totals):
+            expected = row_total * col_total / n if n else 0
+            if expected > 0:
+                chi2 += ((table[i][j] - expected) ** 2) / expected
+    denom = n * max(1, min(len(levels_a) - 1, len(levels_b) - 1))
+    return (chi2 / denom) ** 0.5 if denom else None
+
+
+def _write_validation_report(session_dir: Path, report: Dict[str, object]) -> None:
+    try:
+        (session_dir / "validation_report.json").write_text(
+            json.dumps(report, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def validate_session_inputs(
+    session_dir: Path,
+    *,
+    batch_col: Optional[str] = None,
+    target_col: Optional[str] = None,
+) -> Dict[str, object]:
+    """Validate the server-side upload contract before running R preprocessing."""
+
+    raw_path = session_dir / "raw.csv"
+    meta_path = session_dir / "metadata_origin.csv"
+    errors: List[str] = []
+    warnings: List[str] = []
+    dimensions: Dict[str, object] = {}
+
+    if not raw_path.exists():
+        errors.append("Missing raw.csv.")
+    if not meta_path.exists():
+        errors.append("Missing metadata_origin.csv.")
+    if errors:
+        report = {"valid": False, "errors": errors, "warnings": warnings, "dimensions": dimensions}
+        _write_validation_report(session_dir, report)
+        return report
+
+    raw_size = raw_path.stat().st_size
+    meta_size = meta_path.stat().st_size
+    dimensions["raw_file_bytes"] = raw_size
+    dimensions["metadata_file_bytes"] = meta_size
+    if raw_size > MAX_UPLOAD_BYTES or meta_size > MAX_UPLOAD_BYTES:
+        errors.append(f"CSV files must be {human_size(MAX_UPLOAD_BYTES)} or smaller for the public server.")
+    elif raw_size > WARN_UPLOAD_BYTES or meta_size > WARN_UPLOAD_BYTES:
+        warnings.append("Large CSV detected; correction methods may take several minutes or fail on the public server.")
+
+    matrix: List[List[float]] = []
+    matrix_meta: Dict[str, object] = {}
+    try:
+        matrix, matrix_meta = _read_numeric_matrix(raw_path)
+    except Exception as exc:
+        errors.append(str(exc))
+    if matrix:
+        sample_count = len(matrix)
+        feature_count = len(matrix[0]) if matrix else 0
+        dimensions.update(
+            {
+                "samples": sample_count,
+                "features": feature_count,
+                "matrix_cells": sample_count * feature_count,
+                **matrix_meta,
+            }
+        )
+        if sample_count < 2 or feature_count < 2:
+            errors.append("Matrix must contain at least 2 samples and 2 features.")
+        if sample_count > MAX_SAMPLES or feature_count > MAX_FEATURES or sample_count * feature_count > MAX_MATRIX_CELLS:
+            errors.append(
+                f"Matrix exceeds public-server limits: {MAX_SAMPLES} samples, "
+                f"{MAX_FEATURES} features, or {MAX_MATRIX_CELLS:,} cells."
+            )
+        elif sample_count * feature_count > WARN_MATRIX_CELLS:
+            warnings.append("Large matrix detected; run a smaller method set first and download results frequently.")
+        zero_rows = sum(1 for row in matrix if all(value == 0 for value in row))
+        zero_cols = 0
+        if feature_count:
+            zero_cols = sum(1 for col in range(feature_count) if all(row[col] == 0 for row in matrix))
+        if zero_rows:
+            errors.append(f"Matrix contains {zero_rows} all-zero sample row(s).")
+        if zero_cols:
+            warnings.append(f"Matrix contains {zero_cols} all-zero feature column(s); these features add runtime only.")
+        total_values = sample_count * feature_count
+        zero_values = sum(1 for row in matrix for value in row if value == 0)
+        if total_values and zero_values / total_values >= HIGH_SPARSITY_FRACTION:
+            warnings.append("Matrix is highly sparse; count-based methods are usually safer than Gaussian methods.")
+        negative_values = sum(1 for row in matrix for value in row if value < 0)
+        if negative_values:
+            warnings.append("Negative values detected; this looks transformed. Count-specific methods may be inappropriate.")
+
+    metadata_header: List[str] = []
+    metadata_rows: List[Dict[str, str]] = []
+    try:
+        metadata_header, metadata_rows = _read_csv_records(meta_path)
+    except Exception as exc:
+        errors.append(f"Could not read metadata_origin.csv: {exc}")
+    dimensions["metadata_rows"] = len(metadata_rows)
+    dimensions["metadata_columns"] = len(metadata_header)
+    if matrix and metadata_rows and len(metadata_rows) != len(matrix):
+        errors.append(
+            "Metadata row count must match matrix sample rows "
+            f"({len(metadata_rows)} metadata rows vs {len(matrix)} matrix rows)."
+        )
+    if not metadata_rows or not metadata_header:
+        errors.append("Metadata must include a header and at least one data row.")
+    if batch_col:
+        if batch_col not in metadata_header:
+            errors.append(f"Selected batch column '{batch_col}' is missing from metadata.")
+        else:
+            batch_counts = _level_counts(metadata_rows, batch_col)
+            dimensions["batch_levels"] = len(batch_counts)
+            if len(batch_counts) < 2:
+                errors.append("Batch column must contain at least two non-empty levels.")
+            if any(_blank(row.get(batch_col)) for row in metadata_rows):
+                errors.append("Batch column contains blank values.")
+    if target_col:
+        if target_col not in metadata_header:
+            errors.append(f"Selected target column '{target_col}' is missing from metadata.")
+        else:
+            target_counts = _level_counts(metadata_rows, target_col)
+            dimensions["target_levels"] = len(target_counts)
+            if len(target_counts) != 2:
+                errors.append("Target column must contain exactly two non-empty levels for current binary assessments.")
+            if any(_blank(row.get(target_col)) for row in metadata_rows):
+                errors.append("Target column contains blank values.")
+    if batch_col and target_col and batch_col == target_col:
+        errors.append("Batch and target columns must be different.")
+    if batch_col and target_col and batch_col in metadata_header and target_col in metadata_header:
+        v = _cramers_v(metadata_rows, batch_col, target_col)
+        if v is not None:
+            dimensions["batch_target_cramers_v"] = round(v, 4)
+            if v >= STRONG_CONFOUNDING_V:
+                warnings.append(
+                    "Batch and target are strongly associated. Treat correction results as advisory because "
+                    "batch removal may also remove biological signal."
+                )
+
+    report = {
+        "valid": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "dimensions": dimensions,
+        "limits": {
+            "max_upload_bytes": MAX_UPLOAD_BYTES,
+            "max_samples": MAX_SAMPLES,
+            "max_features": MAX_FEATURES,
+            "max_matrix_cells": MAX_MATRIX_CELLS,
+        },
+        "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
+    }
+    _write_validation_report(session_dir, report)
+    return report
+
+
+def _render_validation_report(report: Dict[str, object]) -> object:
+    errors = list(report.get("errors") or [])
+    warnings = list(report.get("warnings") or [])
+    dimensions = report.get("dimensions") if isinstance(report.get("dimensions"), dict) else {}
+    dim_text = []
+    if dimensions.get("samples") and dimensions.get("features"):
+        dim_text.append(f"{dimensions.get('samples')} samples x {dimensions.get('features')} features")
+    if dimensions.get("metadata_rows"):
+        dim_text.append(f"{dimensions.get('metadata_rows')} metadata rows")
+    body: List[object] = []
+    if dim_text:
+        body.append(html.Div("Detected: " + "; ".join(dim_text), className="mb-2"))
+    if errors:
+        body.append(html.Ul([html.Li(msg) for msg in errors], className="mb-0"))
+        return dbc.Alert(body, color="danger", className="mt-3")
+    if warnings:
+        body.append(html.Ul([html.Li(msg) for msg in warnings], className="mb-0"))
+        return dbc.Alert(body, color="warning", className="mt-3")
+    body.append(html.Div("Input validation passed.", className="mb-0"))
+    return dbc.Alert(body, color="success", className="mt-3")
 
 
 def _scan_example_sets() -> List[Tuple[str, Path, Path]]:
@@ -191,6 +471,15 @@ def upload_layout(active_path: str):
                 [
                     html.H2("Upload Data"),
                     html.P("Choose manual upload or example dataset."),
+                    dbc.Alert(
+                        [
+                            html.Strong("Input requirements: "),
+                            "upload a sample-feature CSV matrix with samples in rows and profiled features in columns, plus one metadata row per sample. ",
+                            "Raw sequencing reads are not supported; profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables are supported after upstream profiling. ",
+                            f"Public-server limits: {MAX_SAMPLES} samples, {MAX_FEATURES} features, {human_size(MAX_UPLOAD_BYTES)} per CSV, and {MAX_MATRIX_CELLS:,} matrix cells.",
+                        ],
+                        color="info",
+                    ),
                     dcc.Tabs(
                         id="upload-tabs",
                         value="manual",
@@ -757,74 +1046,119 @@ def register_upload_callbacks(app):
             batch_label = preset.get("batch") if preset else "batch"
             target_label = preset.get("target") if preset else "phenotype"
             covar_labels = preset.get("covariates") if preset else []
-            mapping_display = dbc.Card([
-                dbc.CardHeader(html.Strong("Metadata mapping")),
-                dbc.CardBody([
-                    html.Div("Using the following mapping for example data:"),
-                    html.Ul([
-                        html.Li([html.Code(batch_label), " column -> batch"]),
-                        html.Li([html.Code(target_label), " column -> target_binary (binary copy written for correction)"]),
-                        html.Li([html.Code(", ".join(map(str, covar_labels)) or "(none)"), " column(s) -> covariates"]),
-                    ], className="mb-0"),
-                ]),
-            ], className="mt-2")
-
-            info = html.Div([
-                html.H6("Columns in metadata_origin.csv:"),
-                chips,
-            ])
-            return info, mapping_display
-        else:
-            # Manual flow: require explicit user selection (no defaults)
-            opts = [{"label": name, "value": name} for name in col_names]
-            mapping_ui = dbc.Card([
-                dbc.CardHeader(html.Strong("Map Metadata Columns")),
-                dbc.CardBody([
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Batch ID column"),
-                            dcc.Dropdown(
-                                id="map-batch-id",
-                                options=opts,
-                                value=None,
-                                placeholder="Select batch column",
-                                clearable=True,
+            report = validate_session_inputs(
+                session_dir,
+                batch_col=str(batch_label),
+                target_col=str(target_label),
+            )
+            mapping_display = dbc.Card(
+                [
+                    dbc.CardHeader(html.Strong("Metadata mapping")),
+                    dbc.CardBody(
+                        [
+                            html.Div("Using the following mapping for example data:"),
+                            html.Ul(
+                                [
+                                    html.Li([html.Code(batch_label), " column -> batch"]),
+                                    html.Li(
+                                        [
+                                            html.Code(target_label),
+                                            " column -> target_binary (binary copy written for correction)",
+                                        ]
+                                    ),
+                                    html.Li(
+                                        [
+                                            html.Code(", ".join(map(str, covar_labels)) or "(none)"),
+                                            " column(s) -> covariates",
+                                        ]
+                                    ),
+                                ],
+                                className="mb-0",
                             ),
-                        ], md=6),
-                        dbc.Col([
-                            dbc.Label("Target (binary) column"),
-                            dcc.Dropdown(
-                                id="map-target-binary",
-                                options=opts,
-                                value=None,
-                                placeholder="Select column to convert to target_binary (e.g., positive/negative)",
-                                clearable=True,
-                            ),
-                        ], md=6),
-                    ], className="gy-2"),
-                    dbc.Button(
-                        "Apply mapping and preprocess",
-                        id="apply-mapping",
-                        color="secondary",  # gray until both selections made
-                        className="mt-3",
-                        disabled=True,
-                        style={"width": "250px"},
-                        size="sm",
+                        ]
                     ),
-                ])
-            ], className="mt-2")
+                ],
+                className="mt-2",
+            )
 
-            info = html.Div([
+            info = html.Div(
+                [
+                    html.H6("Columns in metadata_origin.csv:"),
+                    chips,
+                    _render_validation_report(report),
+                ]
+            )
+            return info, mapping_display
+
+        # Manual flow: require explicit user selection (no defaults)
+        report = validate_session_inputs(session_dir)
+        opts = [{"label": name, "value": name} for name in col_names]
+        mapping_ui = dbc.Card(
+            [
+                dbc.CardHeader(html.Strong("Map Metadata Columns")),
+                dbc.CardBody(
+                    [
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        dbc.Label("Batch ID column"),
+                                        dcc.Dropdown(
+                                            id="map-batch-id",
+                                            options=opts,
+                                            value=None,
+                                            placeholder="Select batch column",
+                                            clearable=True,
+                                        ),
+                                    ],
+                                    md=6,
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Label("Target (binary) column"),
+                                        dcc.Dropdown(
+                                            id="map-target-binary",
+                                            options=opts,
+                                            value=None,
+                                            placeholder="Select column to convert to target_binary (e.g., positive/negative)",
+                                            clearable=True,
+                                        ),
+                                    ],
+                                    md=6,
+                                ),
+                            ],
+                            className="gy-2",
+                        ),
+                        dbc.Button(
+                            "Apply mapping and preprocess",
+                            id="apply-mapping",
+                            color="secondary",
+                            className="mt-3",
+                            disabled=True,
+                            style={"width": "250px"},
+                            size="sm",
+                        ),
+                    ]
+                ),
+            ],
+            className="mt-2",
+        )
+
+        info = html.Div(
+            [
                 html.H6("Columns in metadata_origin.csv:"),
                 chips,
-            ])
-            return info, mapping_ui
+                _render_validation_report(report),
+            ]
+        )
+        return info, mapping_ui
 
     @app.callback(
         Output("preprocess-complete", "data", allow_duplicate=True),
         Output("runlog-path", "data", allow_duplicate=True),
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
+        Output("process-result", "children", allow_duplicate=True),
         Input("apply-mapping", "n_clicks"),
         State("map-batch-id", "value"),
         State("map-target-binary", "value"),
@@ -839,14 +1173,18 @@ def register_upload_callbacks(app):
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         if not batch_col or not pheno_col:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         session_dir = get_session_dir(session_id)
         meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+        pre_report = validate_session_inputs(session_dir, batch_col=batch_col, target_col=pheno_col)
+        if not pre_report.get("valid"):
+            return False, dash.no_update, dash.no_update, dash.no_update, _render_validation_report(pre_report)
 
         # Rename columns by rewriting CSV
         try:
@@ -877,14 +1215,21 @@ def register_upload_callbacks(app):
                 target_binary_column="target_binary",
             )
         except Exception:
-            return False, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+        report = validate_session_inputs(session_dir, batch_col="batch", target_col=pheno_col)
+        if not report.get("valid"):
+            return False, dash.no_update, dash.no_update, dash.no_update, _render_validation_report(report)
 
         # Run preprocess.R in the session directory
         # Use a single session-wide log file and append to it
         log_path = session_dir / "run.log"
         ok, log = run_preprocess(session_dir, log_path=log_path)
         # Do not auto-open logs modal; user can open manually
-        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update
+        result = _render_validation_report(report)
+        if not ok:
+            result = dbc.Alert("Preprocessing failed. Check the run log for details.", color="danger")
+        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update, result
 
     # Auto-preprocess when example data is loaded (no button press needed)
     @app.callback(
@@ -893,6 +1238,7 @@ def register_upload_callbacks(app):
         Output("runlog-file-meta", "data", allow_duplicate=True),
         Output("runlog-modal", "is_open", allow_duplicate=True),
         Output("mosaic-preview", "children", allow_duplicate=True),
+        Output("process-result", "children", allow_duplicate=True),
         Input("example-loaded", "data"),
         State("session-id", "data"),
         State("page-url", "pathname"),
@@ -905,11 +1251,12 @@ def register_upload_callbacks(app):
         if not example_loaded:
             raise dash.exceptions.PreventUpdate
         if not session_id:
-            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
         session_dir = get_session_dir(session_id)
         meta_path = session_dir / "metadata_origin.csv"
         if not meta_path.exists():
-            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            return False, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        label_col: Optional[str] = None
 
         # Ensure standard header names if needed (batch and chosen label column)
         try:
@@ -976,6 +1323,21 @@ def register_upload_callbacks(app):
         except Exception:
             pass
 
+        report = validate_session_inputs(
+            session_dir,
+            batch_col="batch",
+            target_col=label_col or "__missing_target__",
+        )
+        if not report.get("valid"):
+            return (
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+                _render_validation_report(report),
+            )
+
         # Kick off preprocess and append to the session-wide log
         log_path = session_dir / "run.log"
         ok, _ = run_preprocess(session_dir, log_path=log_path)
@@ -987,7 +1349,10 @@ def register_upload_callbacks(app):
                 mosaic_ok, _ = _generate_mosaic(session_dir)
                 if mosaic_ok:
                     mosaic_children = _render_mosaic_card(session_dir)
-        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update, mosaic_children
+        result = _render_validation_report(report)
+        if not ok:
+            result = dbc.Alert("Preprocessing failed. Check the run log for details.", color="danger")
+        return bool(ok), str(log_path), log_file_meta(log_path), dash.no_update, mosaic_children, result
 
     # Hide the manual Process button when example data is used
     @app.callback(
