@@ -619,69 +619,103 @@ def upload_layout(active_path: str):
                         [
                             dbc.CardHeader(html.Strong("Input requirements")),
                             dbc.CardBody(
-                                html.Div(
+                                dbc.Row(
                                     [
-                                        html.Div(
-                                            [
-                                                html.Div("Accepted input", className="fw-semibold mb-1"),
-                                                html.Ul(
-                                                    [
-                                                        html.Li("Matrix CSV: samples in rows and profiled features in columns."),
-                                                        html.Li("Metadata CSV: one row per sample, in the same sample order as the matrix."),
-                                                        html.Li(
-                                                            "Supported data: profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
-                                                        ),
-                                                        html.Li("Not supported: raw sequencing reads; run upstream profiling first."),
-                                                    ],
-                                                    className="mb-3",
-                                                ),
-                                            ]
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(html.Strong("Basic requirements")),
+                                                    dbc.CardBody(
+                                                        html.Ul(
+                                                            [
+                                                                html.Li("Upload CSV files only."),
+                                                                html.Li(
+                                                                    "Use profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
+                                                                ),
+                                                                html.Li("Raw sequencing reads are not accepted; run upstream profiling first."),
+                                                            ],
+                                                            className="mb-0",
+                                                        )
+                                                    ),
+                                                ],
+                                                className="h-100",
+                                            ),
+                                            md=6,
+                                            className="mb-3",
                                         ),
-                                        html.Div(
-                                            [
-                                                html.Div("Metadata", className="fw-semibold mb-1"),
-                                                html.Ul(
-                                                    [
-                                                        html.Li("Required: one batch column and one binary target/phenotype column."),
-                                                        html.Li(
-                                                            f"Metadata limit: {MAX_METADATA_COLUMNS} columns or fewer, including batch, target, and optional covariates."
-                                                        ),
-                                                    ],
-                                                    className="mb-3",
-                                                ),
-                                            ]
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(html.Strong("Matrix")),
+                                                    dbc.CardBody(
+                                                        html.Ul(
+                                                            [
+                                                                html.Li("Samples in rows and profiled features in columns."),
+                                                                html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
+                                                                html.Li(f"Features: {MAX_FEATURES} or fewer."),
+                                                                html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
+                                                                html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                            ],
+                                                            className="mb-0",
+                                                        )
+                                                    ),
+                                                ],
+                                                className="h-100",
+                                            ),
+                                            md=6,
+                                            className="mb-3",
                                         ),
-                                        html.Div(
-                                            [
-                                                html.Div("Public server limits", className="fw-semibold mb-1"),
-                                                html.Ul(
-                                                    [
-                                                        html.Li(f"Samples: {MAX_SAMPLES}"),
-                                                        html.Li(f"Features: {MAX_FEATURES}"),
-                                                        html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} per uploaded CSV"),
-                                                        html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,}"),
-                                                    ],
-                                                    className="mb-3",
-                                                ),
-                                            ]
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(html.Strong("Metadata")),
+                                                    dbc.CardBody(
+                                                        html.Ul(
+                                                            [
+                                                                html.Li("One row per sample, in the same sample order as the matrix."),
+                                                                html.Li("Required: one batch column and one binary target/phenotype column."),
+                                                                html.Li(
+                                                                    f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
+                                                                ),
+                                                                html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                            ],
+                                                            className="mb-0",
+                                                        )
+                                                    ),
+                                                ],
+                                                className="h-100",
+                                            ),
+                                            md=6,
+                                            className="mb-3 mb-md-0",
                                         ),
-                                        html.Div(
-                                            [
-                                                html.Div("Validation warnings", className="fw-semibold mb-1"),
-                                                html.Ul(
-                                                    [
-                                                        html.Li(
-                                                            "Confounding check: mBatchNet reports a warning when batch and target are strongly associated, because batch removal may also remove biological signal."
-                                                        ),
-                                                        html.Li(
-                                                            "For larger studies, run mBatchNet locally or split the feature table before upload."
-                                                        ),
-                                                    ],
-                                                    className="mb-0",
-                                                ),
-                                            ]
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(html.Strong("Validation warnings")),
+                                                    dbc.CardBody(
+                                                        html.Ul(
+                                                            [
+                                                                html.Li(
+                                                                    "mBatchNet reports a warning when batch and target are strongly associated."
+                                                                ),
+                                                                html.Li(
+                                                                    "Interpret correction results carefully because batch removal may also remove biological signal."
+                                                                ),
+                                                                html.Li(
+                                                                    "For larger studies, run mBatchNet locally or split the feature table before upload."
+                                                                ),
+                                                            ],
+                                                            className="mb-0",
+                                                        )
+                                                    ),
+                                                ],
+                                                className="h-100",
+                                            ),
+                                            md=6,
+                                            className="mb-0",
                                         ),
                                     ],
+                                    className="g-3",
                                 )
                             ),
                         ],
