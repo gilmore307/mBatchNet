@@ -701,78 +701,90 @@ _DETAILS_INTERPRETATION: Dict[str, Dict[str, object]] = {
     "alignment": {
         "title": "Alignment score",
         "points": (
-            "Higher values indicate more local mixing of batches after correction.",
-            "Compare alignment values together with biological-separation assessments.",
+            "The score summarizes local batch mixing in a neighbourhood graph: it reflects how evenly nearby samples are distributed across batch labels.",
+            "Larger values correspond to neighbourhoods with less dominance by one original batch label under the same graph settings.",
+            "This metric describes batch-label composition among neighbours; it does not measure target-label separation or feature-level variance.",
         ),
     },
     "pca": {
         "title": "PCA ordination",
         "points": (
-            "Use PC1/PC2 scatter and ellipses to check if batch clusters overlap more after correction.",
-            "Batch centroid distances and target separation can be inspected in the same ordination view.",
+            "PCA projects the feature matrix onto linear axes that capture the largest variance directions; the axis labels report the variance percentage represented by PC1 and PC2.",
+            "Each point is a sample, colour encodes the selected grouping variable, and ellipses summarize group dispersion in the displayed two-dimensional projection.",
+            "Overlap or separation in PC1/PC2 is a visual summary of the first two axes only; structure outside these axes is not shown in the figure.",
         ),
     },
     "pcoa": {
         "title": "PCoA ordination",
         "points": (
-            "Review both Aitchison and Bray-Curtis views because corrections can behave differently by geometry.",
-            "Inspect batch overlap and target structure in each geometry.",
+            "PCoA embeds samples from a distance matrix; the Aitchison view uses CLR/Euclidean compositional geometry, while the Bray-Curtis view uses abundance-profile dissimilarity.",
+            "Axis percentages describe how much of the distance-matrix variation is represented by the displayed coordinates.",
+            "Read point positions, ellipses, and density margins within each geometry separately because the two distance definitions encode different sample relationships.",
         ),
     },
     "nmds": {
         "title": "NMDS ordination",
         "points": (
-            "Lower NMDS stress means the embedding has lower mismatch with the dissimilarity matrix.",
-            "Interpret batch/target overlap together with stress.",
+            "NMDS places samples in two dimensions while preserving the rank order of pairwise dissimilarities as closely as possible.",
+            "Stress quantifies the mismatch between the displayed configuration and the original dissimilarity ranks; lower stress means less mismatch for that embedding.",
+            "NMDS axes have arbitrary orientation and scale, so relative distances, overlap, and stress are more informative than the numeric axis coordinates.",
         ),
     },
     "dissimilarity": {
         "title": "Dissimilarity heatmaps",
         "points": (
-            "Check whether within-batch block patterns weaken after correction.",
-            "Inspect batch-driven structure together with target-related contrast.",
+            "A heatmap cell represents the pairwise dissimilarity between two samples under the displayed geometry.",
+            "Blocks along the diagonal indicate groups of samples with similar profiles; off-diagonal contrast shows relationships between groups.",
+            "Read colour intensity as distance magnitude, and compare Aitchison and Bray-Curtis panels as separate distance definitions.",
         ),
     },
     "permanova": {
         "title": "PERMANOVA",
         "points": (
-            "Lower batch-associated R² generally indicates reduced technical variation.",
-            "Interpret alongside target-associated patterns to ensure biology is not over-corrected.",
+            "PERMANOVA partitions distance-matrix variation by metadata terms such as batch or target label.",
+            "R² is the proportion of distance variation associated with the tested term in the model.",
+            "Permutation p-values, when present, describe how often a randomized label assignment produced a statistic at least as large as the observed statistic.",
+            "PERMANOVA is sensitive to both group centroid differences and dispersion differences, so it describes association in distance space rather than a single causal source.",
         ),
     },
     "r2": {
         "title": "Per-feature ANOVA",
         "points": (
-            "Compare median Batch R² and Treatment R² across methods.",
-            "Use this table to inspect whether changes affect batch-associated and treatment-associated variance.",
+            "Per-feature ANOVA fits feature-wise models and reports the fraction of variation associated with each metadata term.",
+            "Batch R² describes variation associated with batch labels; Treatment R² describes variation associated with the target or treatment label.",
+            "Median R² summarizes the feature-level distribution, while individual feature behaviour can vary around that summary.",
         ),
     },
     "prda": {
         "title": "Partial RDA",
         "points": (
-            "Treatment-explained variance is reported after correction.",
-            "Batch and interaction fractions are reported alongside the treatment fraction.",
+            "Partial RDA is a constrained ordination that partitions transformed feature variation across specified model terms.",
+            "Treatment, batch, and intersection fractions describe variation assigned to those components in the fitted model.",
+            "The residual fraction is variation not represented by the included constrained terms.",
         ),
     },
     "pvca": {
         "title": "PVCA",
         "points": (
-            "Compare the fraction of variance attributed to batch, treatment, and interaction components.",
-            "Batch contribution and treatment-related variance are reported in the same table.",
+            "PVCA combines principal components with variance-component modelling to estimate how much overall variation is associated with metadata factors.",
+            "Reported components such as batch, treatment, interaction, and residual are variance fractions from the fitted component model.",
+            "The table is a variance-attribution summary; it does not identify which individual features drive each component.",
         ),
     },
     "ebm": {
         "title": "Entropy batch mixing",
         "points": (
-            "Higher entropy indicates more even local batch composition.",
-            "Interpret entropy together with metrics that report biological-label structure.",
+            "Entropy is calculated from batch-label composition in local neighbourhoods.",
+            "Larger entropy values correspond to more even representation of batch labels among neighbouring samples.",
+            "The value depends on neighbourhood construction and describes batch-label mixing, not target-label separation.",
         ),
     },
     "silhouette": {
         "title": "UMAP silhouette",
         "points": (
-            "Silhouette reflects cluster separation in the UMAP embedding.",
-            "Interpret with caution and together with ordination/variance metrics rather than in isolation.",
+            "Silhouette width compares each sample's distance to samples with the same label against its distance to samples with other labels in the UMAP embedding.",
+            "Values near 1 indicate tighter same-label neighbourhoods in the displayed embedding; values near 0 indicate overlap; negative values indicate closer proximity to another label.",
+            "Because this summary is computed after UMAP projection, it reflects the chosen embedding parameters as well as the underlying sample relationships.",
         ),
     },
 }

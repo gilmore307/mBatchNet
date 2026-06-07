@@ -209,6 +209,28 @@ class DashAppTests(unittest.TestCase):
         for term in banned_terms:
             self.assertNotIn(term, visible_text)
 
+    def test_details_interpretation_explains_metric_concepts(self):
+        interpretation_text = " ".join(
+            point
+            for payload in _DETAILS_INTERPRETATION.values()
+            for point in payload.get("points", ())
+        ).lower()
+
+        expected_terms = (
+            "neighbourhood graph",
+            "variance percentage represented by pc1 and pc2",
+            "aitchison view uses clr/euclidean compositional geometry",
+            "stress quantifies the mismatch",
+            "pairwise dissimilarity",
+            "permutation p-values",
+            "median r²",
+            "constrained ordination",
+            "variance-component modelling",
+            "silhouette width",
+        )
+        for term in expected_terms:
+            self.assertIn(term, interpretation_text)
+
     def test_time_header_explains_elapsed_time_source(self):
         text = _component_text(
             _header_with_tooltip(
