@@ -31,6 +31,46 @@ DISPLAY_BY_CODE = {
 }
 
 
+PARAMETER_CONFIG = {
+    "ComBat": [{"name": "par.prior", "type": "boolean", "default": False}],
+    "ConQuR": [
+        {"name": "logistic_lasso", "type": "boolean", "default": False},
+        {"name": "quantile_type", "type": "text", "default": "standard"},
+        {"name": "lambda_quantile", "type": "text", "default": "2p/n"},
+        {"name": "interplt", "type": "boolean", "default": False},
+        {"name": "delta", "type": "number", "default": 0.4999},
+        {"name": "taus", "type": "text", "default": "seq(0.05,0.95,0.05)"},
+    ],
+    "FAbatch": [
+        {"name": "minerr", "type": "number", "default": 0.000001},
+        {"name": "probcrossbatch", "type": "boolean", "default": False},
+        {"name": "maxnbf", "type": "number", "default": 8},
+    ],
+    "MetaDICT": [
+        {"name": "alpha", "type": "number", "default": 0.05},
+        {"name": "beta", "type": "number", "default": 0.2},
+        {"name": "normalization", "type": "text", "default": "uq"},
+    ],
+    "MMUPHin": [
+        {"name": "zero_inflation", "type": "boolean", "default": False},
+        {"name": "conv", "type": "number", "default": 0.0001},
+    ],
+    "PLSDA": [
+        {"name": "ncomp.trt", "type": "number", "default": 1},
+        {"name": "ncomp.bat", "type": "number", "default": 5},
+        {"name": "keepX.trt", "type": "number", "default": 50},
+        {"name": "near.zero.var", "type": "boolean", "default": False},
+        {"name": "balance", "type": "boolean", "default": False},
+    ],
+    "RUV": [
+        {"name": "k", "type": "number", "default": 2},
+        {"name": "use.pseudosample", "type": "boolean", "default": False},
+        {"name": "batch.disp", "type": "boolean", "default": False},
+        {"name": "zeroinf", "type": "boolean", "default": False},
+    ],
+}
+
+
 def load_methods() -> list[MethodInfo]:
     reference = {}
     if METHODS_REFERENCE_PATH.exists():
@@ -52,4 +92,3 @@ def load_methods() -> list[MethodInfo]:
             )
         )
     return methods
-

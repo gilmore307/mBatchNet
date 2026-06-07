@@ -1,6 +1,8 @@
 import unittest
+import shutil
 
 from server import app
+from mbatchnet.runtime import get_session_dir
 
 
 class FlaskServerTests(unittest.TestCase):
@@ -34,6 +36,30 @@ class FlaskServerTests(unittest.TestCase):
             response = client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertIn(expected, response.data)
+
+    def test_session_workflow_pages_render(self):
+        client = app.test_client()
+        session_id = "test-session-workflow"
+        session_dir = get_session_dir(session_id)
+        (session_dir / "raw.csv").write_text("1,2\n3,4\n", encoding="utf-8")
+        (session_dir / "metadata_origin.csv").write_text(
+            "sample_id,batch,phenotype\ns1,a,x\ns2,b,y\n",
+            encoding="utf-8",
+        )
+        (session_dir / "metadata.csv").write_text(
+            "sample_id,batch,target_binary\ns1,a,0\ns2,b,1\n",
+            encoding="utf-8",
+        )
+
+        for path, expected in (
+            (f"/sessions/{session_id}/pre", b"Run all assessments"),
+            (f"/sessions/{session_id}/correction", b"Run Correction"),
+            (f"/sessions/{session_id}/post", b"Post-correction Assessment"),
+        ):
+            response = client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(expected, response.data)
+        shutil.rmtree(session_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

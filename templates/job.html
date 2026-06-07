@@ -11,7 +11,7 @@
       <div id="job-progress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/sessions/{{ job.session_id }}/logs">View log</a>
-    <a id="results-link" class="btn btn-success btn-sm {% if job.status == 'running' %}disabled{% endif %}" href="/sessions/{{ job.session_id }}">View results</a>
+    <a id="results-link" class="btn btn-success btn-sm {% if job.status == 'running' %}disabled{% endif %}" href="{{ next_url }}">Continue</a>
   </div>
 </div>
 <script>
@@ -32,4 +32,3 @@ async function pollJob() {
 setTimeout(pollJob, 1200);
 </script>
 {% endblock %}
-

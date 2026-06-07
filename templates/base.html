@@ -32,14 +32,15 @@
         </div>
         <div class="be-pipeline-container d-flex align-items-stretch flex-nowrap w-100 py-1">
           <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/upload' else 'btn-outline-light' }}" href="/upload">Upload Files</a>
-          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/pre' else 'btn-outline-light' }}" href="/pre">Pre-correction Assessment</a>
-          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/correction' else 'btn-outline-light' }}" href="/correction">Batch Effect Correction</a>
-          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/post' else 'btn-outline-light' }}" href="/post">Post-correction Assessment</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/pre' else 'btn-outline-light' }}" href="{{ '/sessions/' ~ session_id ~ '/pre' if session_id else '/pre' }}">Pre-correction Assessment</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/correction' else 'btn-outline-light' }}" href="{{ '/sessions/' ~ session_id ~ '/correction' if session_id else '/correction' }}">Batch Effect Correction</a>
+          <a class="btn btn-sm be-pipeline-step text-truncate {{ 'btn-light' if active_path == '/post' else 'btn-outline-light' }}" href="{{ '/sessions/' ~ session_id ~ '/post' if session_id else '/post' }}">Post-correction Assessment</a>
         </div>
       </div>
     </nav>
     <main class="container-fluid be-page-shell">
       {% block body %}{% endblock %}
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>

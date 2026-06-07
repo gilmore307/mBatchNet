@@ -26,7 +26,7 @@
         {% if files %}
           <ul class="mb-0">
             {% for file in files %}
-              <li>{{ file }}</li>
+              <li><a href="/sessions/{{ session_id }}/files/{{ file.path }}">{{ file.path }}</a></li>
             {% endfor %}
           </ul>
         {% else %}
@@ -37,4 +37,3 @@
   </div>
 </div>
 {% endblock %}
-

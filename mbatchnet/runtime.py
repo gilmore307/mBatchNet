@@ -5,11 +5,12 @@ import subprocess
 import sys
 import time
 import uuid
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
-from .paths import BASE_DIR, OUTPUT_ROOT, PREPROCESS_SCRIPT, METHODS_DIR
+from .paths import BASE_DIR, OUTPUT_ROOT, PREPROCESS_SCRIPT, METHODS_DIR, PLOTS_DIR
 
 
 RSCRIPT_BASE_COMMAND = (
@@ -68,6 +69,10 @@ def _subprocess_env(command: Sequence[str]) -> dict[str, str]:
 
 
 def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> bool:
+    executable = shutil.which(str(command[0])) if command else None
+    if command and executable is None:
+        append_run_log(log_path, f"Command not found: {command[0]}. Install R runtime before running analysis jobs.", icon="ERROR")
+        return False
     append_run_log(log_path, "$ " + " ".join(command), icon=">")
     proc = subprocess.Popen(
         command,
@@ -89,7 +94,11 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
 
 def run_preprocess(session_dir: Path) -> bool:
     command = build_rscript_command(PREPROCESS_SCRIPT, session_dir, session_dir / "raw.csv")
-    return run_command_streaming(command, BASE_DIR, session_dir / "run.log")
+    ok = run_command_streaming(command, BASE_DIR, session_dir / "run.log")
+    mosaic_script = PLOTS_DIR / "Mosaic.R"
+    if ok and mosaic_script.exists():
+        run_command_streaming(build_rscript_command(mosaic_script, session_dir), BASE_DIR, session_dir / "run.log")
+    return ok
 
 
 def normalize_method_code(value: str) -> str:
@@ -118,10 +127,25 @@ def run_method(session_dir: Path, method: str, params: Optional[dict[str, object
     return run_command_streaming(command, BASE_DIR, session_dir / "run.log")
 
 
-def run_scripts(session_dir: Path, scripts: Iterable[Path]) -> bool:
+def run_scripts(session_dir: Path, scripts: Iterable[Path], extra_args: Optional[Sequence[str]] = None) -> bool:
     ok = True
+    args = tuple(extra_args or ())
     for script in scripts:
-        command = build_rscript_command(script, session_dir)
+        command = build_rscript_command(script, session_dir, *args)
         ok = run_command_streaming(command, BASE_DIR, session_dir / "run.log") and ok
     return ok
 
+
+def run_plot_script(session_dir: Path, script_name: str, extra_args: Optional[Sequence[str]] = None) -> bool:
+    script = PLOTS_DIR / script_name
+    if not script.exists():
+        append_run_log(session_dir / "run.log", f"Missing plot script: {script_name}", icon="ERROR")
+        return False
+    return run_scripts(session_dir, (script,), extra_args=extra_args)
+
+
+def generate_previews(session_dir: Path) -> bool:
+    script = PLOTS_DIR / "preview.R"
+    if not script.exists():
+        return True
+    return run_scripts(session_dir, (script,))

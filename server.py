@@ -1,17 +1,29 @@
 from __future__ import annotations
 
-import shutil
 import os
+import shutil
 from pathlib import Path
+from urllib.parse import unquote
 
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
 
 from mbatchnet.artifacts import build_output_bundle, build_reproducibility_bundle, write_output_summary
 from mbatchnet.jobs import runner
-from mbatchnet.methods import load_methods
+from mbatchnet.methods import PARAMETER_CONFIG, load_methods
 from mbatchnet.paths import ASSETS_DIR, EXAMPLE_DIR
 from mbatchnet.runtime import cleanup_old_sessions, get_session_dir, new_session_id, run_method, run_preprocess
 from mbatchnet.validation import standardize_metadata, validate_uploaded_inputs, write_validation_report
+from mbatchnet.workflow import (
+    assessment_by_key,
+    assessments_for,
+    display_name_for,
+    list_files,
+    method_status,
+    run_all_assessments,
+    run_assessment,
+    run_correction_method,
+    stage_files,
+)
 
 
 app = Flask(__name__, static_folder=None)
@@ -28,6 +40,37 @@ def _example_pair() -> tuple[Path, Path]:
 
 def _session(session_id: str) -> Path:
     return get_session_dir(session_id)
+
+
+def _job_next_url(job) -> str:
+    kind = job.kind or ""
+    if kind == "preprocess":
+        return url_for("pre_session", session_id=job.session_id)
+    if kind.startswith("assessment:"):
+        parts = kind.split(":")
+        stage = parts[1] if len(parts) > 1 else "pre"
+        return url_for("post_session" if stage == "post" else "pre_session", session_id=job.session_id)
+    if kind.startswith("method:"):
+        return url_for("correction_session", session_id=job.session_id)
+    return url_for("session_results", session_id=job.session_id)
+
+
+def _coerce_params(form) -> dict[str, object]:
+    params: dict[str, object] = {}
+    for key, value in form.items():
+        if not key.startswith("param:"):
+            continue
+        name = key.split(":", 1)[1]
+        if value in ("", None):
+            continue
+        if value in {"true", "false"}:
+            params[name] = value == "true"
+            continue
+        try:
+            params[name] = float(value) if "." in value else int(value)
+        except ValueError:
+            params[name] = value
+    return params
 
 
 @app.route("/assets/<path:filename>")
@@ -156,7 +199,7 @@ def job_status_page(job_id: str):
     job = runner.get(job_id)
     if job is None:
         abort(404)
-    return render_template("job.html", active_path="/upload", job=job)
+    return render_template("job.html", active_path="/upload", job=job, next_url=_job_next_url(job))
 
 
 @app.get("/jobs/<job_id>.json")
@@ -172,7 +215,7 @@ def session_results(session_id: str):
     session_dir = _session(session_id)
     write_output_summary(session_dir)
     methods = load_methods()
-    files = sorted(path.name for path in session_dir.iterdir() if path.is_file())
+    files = list_files(session_dir)
     return render_template(
         "results.html",
         active_path="/correction",
@@ -182,11 +225,100 @@ def session_results(session_id: str):
     )
 
 
+@app.get("/sessions/<session_id>/pre")
+def pre_session(session_id: str):
+    session_dir = _session(session_id)
+    return render_template(
+        "assessment.html",
+        active_path="/pre",
+        session_id=session_id,
+        stage="pre",
+        title="Pre-correction Assessment",
+        description="Run diagnostics before correction to understand batch-associated structure and phenotype separation.",
+        assessments=assessments_for("pre"),
+        files=stage_files(session_dir, "pre"),
+    )
+
+
+@app.get("/sessions/<session_id>/correction")
+def correction_session(session_id: str):
+    session_dir = _session(session_id)
+    return render_template(
+        "correction.html",
+        active_path="/correction",
+        session_id=session_id,
+        rows=method_status(session_dir),
+        parameter_config=PARAMETER_CONFIG,
+    )
+
+
+@app.get("/sessions/<session_id>/post")
+def post_session(session_id: str):
+    session_dir = _session(session_id)
+    return render_template(
+        "assessment.html",
+        active_path="/post",
+        session_id=session_id,
+        stage="post",
+        title="Post-correction Assessment",
+        description="Run post-correction diagnostics after at least one correction method has generated outputs.",
+        assessments=assessments_for("post"),
+        files=stage_files(session_dir, "post"),
+    )
+
+
+@app.post("/sessions/<session_id>/assessment/<stage>/<key>")
+def run_assessment_route(session_id: str, stage: str, key: str):
+    if assessment_by_key(stage, key) is None:
+        abort(404)
+    session_dir = _session(session_id)
+    job = runner.submit(f"assessment:{stage}:{key}", session_id, lambda: run_assessment(session_dir, stage, key))
+    return redirect(url_for("job_status_page", job_id=job.id))
+
+
+@app.post("/sessions/<session_id>/assessment/<stage>/all")
+def run_all_assessments_route(session_id: str, stage: str):
+    if stage not in {"pre", "post"}:
+        abort(404)
+    session_dir = _session(session_id)
+    job = runner.submit(f"assessment:{stage}:all", session_id, lambda: run_all_assessments(session_dir, stage))
+    return redirect(url_for("job_status_page", job_id=job.id))
+
+
 @app.post("/sessions/<session_id>/methods/<method_code>")
 def run_method_route(session_id: str, method_code: str):
     session_dir = _session(session_id)
-    job = runner.submit(f"method:{method_code}", session_id, lambda: run_method(session_dir, method_code))
+    params = _coerce_params(request.form)
+    job = runner.submit(
+        f"method:{method_code}",
+        session_id,
+        lambda: run_correction_method(session_dir, method_code, params=params),
+    )
     return redirect(url_for("job_status_page", job_id=job.id))
+
+
+@app.post("/sessions/<session_id>/methods/<method_code>/delete")
+def delete_method_route(session_id: str, method_code: str):
+    session_dir = _session(session_id)
+    aliases = {
+        "BMC": "normalized_bmc",
+        "limma": "normalized_limma",
+        "ConQuR": "normalized_conqur",
+        "PLSDA": "normalized_plsda",
+        "ComBat": "normalized_combat",
+        "FSQN": "normalized_fsqn",
+        "MMUPHin": "normalized_mmuphin",
+        "RUV": "normalized_ruv",
+        "MetaDICT": "normalized_metadict",
+        "FAbatch": "normalized_fabatch",
+        "ComBatSeq": "normalized_combatseq",
+        "DEBIAS": "normalized_debias",
+    }
+    basename = aliases.get(method_code, f"normalized_{method_code.lower()}")
+    for suffix in (".csv", "_tss.csv", "_clr.csv"):
+        path = session_dir / f"{basename}{suffix}"
+        path.unlink(missing_ok=True)
+    return redirect(url_for("correction_session", session_id=session_id))
 
 
 @app.get("/sessions/<session_id>/logs")
@@ -195,6 +327,15 @@ def download_log(session_id: str):
     if not log_path.exists():
         abort(404)
     return send_file(log_path, as_attachment=False)
+
+
+@app.get("/sessions/<session_id>/files/<path:relative_path>")
+def download_session_file(session_id: str, relative_path: str):
+    session_dir = _session(session_id).resolve()
+    target = (session_dir / unquote(relative_path)).resolve()
+    if not str(target).startswith(str(session_dir)) or not target.exists() or not target.is_file():
+        abort(404)
+    return send_file(target, as_attachment=False)
 
 
 @app.get("/sessions/<session_id>/download/output")
