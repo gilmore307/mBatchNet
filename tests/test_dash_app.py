@@ -71,7 +71,7 @@ class DashAppTests(unittest.TestCase):
     def test_upload_layout_contains_original_example_flow(self):
         text = _component_text(upload_layout("/upload"))
 
-        self.assertIn("Matrix", text)
+        self.assertIn("Count matrix (CSV)", text)
         self.assertIn("Metadata", text)
         self.assertIn("Quick Start: Example Data", text)
         self.assertIn("Preview rows", text)
