@@ -118,10 +118,10 @@ The Upload page expects two CSV files:
 After upload, map batch/target/covariate columns in the UI.
 
 Public server limits:
-- CSV size: 25.0 MB per uploaded CSV
-- Samples: 5,000
-- Features: 20,000
-- Matrix cells: 5,000,000
+- CSV size: 10.0 MB per uploaded CSV
+- Samples: 1,000
+- Features: 5,000
+- Matrix cells: 1,000,000
 
 ## Correction Methods and Parameters
 

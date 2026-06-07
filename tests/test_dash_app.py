@@ -84,16 +84,16 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Process", text)
         self.assertIn("shotgun metagenomics", text)
         self.assertIn("samples in rows", text)
-        self.assertIn("5000 samples", text)
-        self.assertIn("20000 features", text)
-        self.assertIn("25.0 MB per CSV", text)
-        self.assertIn("5,000,000 matrix cells", text)
+        self.assertIn("1000 samples", text)
+        self.assertIn("5000 features", text)
+        self.assertIn("10.0 MB per CSV", text)
+        self.assertIn("1,000,000 matrix cells", text)
 
     def test_public_upload_limits_match_server_contract(self):
-        self.assertEqual(MAX_SAMPLES, 5000)
-        self.assertEqual(MAX_FEATURES, 20000)
-        self.assertEqual(MAX_UPLOAD_BYTES, 25 * 1024 * 1024)
-        self.assertEqual(MAX_MATRIX_CELLS, 5_000_000)
+        self.assertEqual(MAX_SAMPLES, 1000)
+        self.assertEqual(MAX_FEATURES, 5000)
+        self.assertEqual(MAX_UPLOAD_BYTES, 10 * 1024 * 1024)
+        self.assertEqual(MAX_MATRIX_CELLS, 1_000_000)
 
     def test_navbar_exposes_two_download_entries(self):
         text = _component_text(build_navbar("/post"))
