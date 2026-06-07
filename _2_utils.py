@@ -542,41 +542,50 @@ _PREVIEW_ATTEMPTED: Set[Path] = set()
 _PREVIEW_LOCK = threading.Lock()
 
 
+def _preview_sidecars_are_current(session_dir: Path, marker: Path) -> bool:
+    if not marker.exists():
+        return False
+    try:
+        marker_mtime = marker.stat().st_mtime
+        for path in session_dir.iterdir():
+            if not path.is_file() or path.suffix.lower() not in {".tif", ".tiff"}:
+                continue
+            png_path = path.with_suffix(".png")
+            if not png_path.exists():
+                return False
+            tif_mtime = path.stat().st_mtime
+            if png_path.stat().st_mtime < tif_mtime or marker_mtime < tif_mtime:
+                return False
+    except OSError:
+        return False
+    return True
+
+
 def ensure_png_previews(session_dir: Path, log_path: Optional[Path] = None) -> bool:
-    """Run the preview R script once to generate PNG sidecars for TIFF figures."""
+    """Generate PNG sidecars for TIFF figures using the app's Pillow preview path."""
 
     marker = session_dir / PREVIEW_SENTINEL
-    if marker.exists():
+    if _preview_sidecars_are_current(session_dir, marker):
         return True
 
     resolved = session_dir.resolve()
     with _PREVIEW_LOCK:
-        if resolved in _PREVIEW_ATTEMPTED:
-            return marker.exists()
+        if resolved in _PREVIEW_ATTEMPTED and _preview_sidecars_are_current(session_dir, marker):
+            return True
         _PREVIEW_ATTEMPTED.add(resolved)
 
-    script_path = PLOTS_DIR / "preview.R"
-    if not script_path.exists():
-        append_run_log(log_path, f"Preview script missing: {script_path}", icon="⚠️")
-        return False
-
     append_run_log(log_path, "Generating PNG previews from TIFF figures...", icon="🖼️")
-    command = build_rscript_command(script_path, session_dir)
-    if log_path is not None:
-        success, _ = run_command_streaming(command, cwd=BASE_DIR, log_path=log_path)
-    else:
-        success, _ = run_command(command, cwd=BASE_DIR)
-
-    if success:
+    try:
+        _ensure_png_previews(session_dir)
         try:
             marker.touch()
         except OSError:
             pass
         append_run_log(log_path, "Preview generation complete.", icon="✅")
         return True
-
-    append_run_log(log_path, "Preview generation failed; proceeding with TIFF files.", icon="⚠️")
-    return False
+    except Exception:
+        append_run_log(log_path, "Preview generation failed; proceeding with TIFF files.", icon="⚠️")
+        return False
 
 
 _METHOD_DISPLAY_NAMES: Dict[str, str] = {

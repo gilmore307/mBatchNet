@@ -1,6 +1,7 @@
 import unittest
 import base64
 import csv
+import os
 import tempfile
 import shutil
 import re
@@ -339,6 +340,28 @@ class DashAppTests(unittest.TestCase):
             self.assertFalse((session_dir / "permanova_raw_assessment_post.csv").exists())
             self.assertFalse((session_dir / "method_ranking.csv").exists())
             self.assertFalse((session_dir / PREVIEW_SENTINEL).exists())
+
+    def test_ensure_png_previews_refreshes_stale_sidecar(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            tif_path = session_dir / "pca_batch.tif"
+            png_path = session_dir / "pca_batch.png"
+            marker = session_dir / PREVIEW_SENTINEL
+
+            Image.new("RGB", (8, 8), "white").save(tif_path)
+            png_path.write_bytes(b"stale")
+            marker.write_text("old", encoding="utf-8")
+            old_time = tif_path.stat().st_mtime - 10
+            os.utime(png_path, (old_time, old_time))
+            os.utime(marker, (old_time, old_time))
+
+            self.assertTrue(_2_utils.ensure_png_previews(session_dir))
+
+            self.assertNotEqual(png_path.read_bytes(), b"stale")
+            self.assertGreaterEqual(png_path.stat().st_mtime, tif_path.stat().st_mtime)
+            self.assertGreaterEqual(marker.stat().st_mtime, tif_path.stat().st_mtime)
 
     def test_clearing_session_derived_outputs_preserves_uploaded_inputs_only(self):
         with tempfile.TemporaryDirectory() as tmp:

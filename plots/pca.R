@@ -289,7 +289,8 @@ compute_pca_frames <- function(df, metadata, model.vars = c("batch","group"), n_
 }
 
 # ==== panel: scatter + marginal densities; legend kept (not collected here) ====
-mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch") {
+mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, palette_name = "Batch",
+                        show_legend = TRUE, return_legend = FALSE) {
   
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
@@ -335,12 +336,14 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
       axis.ticks = element_blank(),
       axis.title.x = element_text(size = 12, face = "plain"),
       axis.title.y = element_text(size = 12, face = "plain"),
-      legend.position = 'bottom',
+      legend.position = if (isTRUE(show_legend)) 'bottom' else 'none',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
       legend.text = element_text(size = 12, face = "plain"),
       legend.title = element_text(size = 13, face = "plain")
     )
+
+  if (isTRUE(return_legend)) return(extract_plot_legend(pMain))
   
   # top density (PC1) — no legend
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
@@ -465,7 +468,8 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
       model.vars = c(color_var),
       pca.axes  = pcs_to_plot,
       label     = label_nm,
-      palette_name = palette_label
+      palette_name = palette_label,
+      show_legend = n_panels == 1L
     )
   })
   if (n_panels == 1L) {
@@ -478,26 +482,36 @@ save_pca_plot_set <- function(frames_cache, color_var, palette_label, filename_s
         legend.title     = element_text(size = 14, face = "plain")
       ) +
       plot_annotation(
-        title = "Principal Component Analysis"
+        title = "Principal Component Analysis",
+        theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
   } else {
-    plot_list <- lapply(plot_list, function(p) {
-      p + theme(
-        legend.position  = "bottom",
-        legend.direction = "horizontal",
-        legend.box       = "vertical",
-        legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 13, face = "plain")
-      )
-    })
-    combined <- wrap_plots(plot_list, ncol = panel_cols)
-    combined <- combined + plot_annotation(
-      title = "Principal Component Analysis"
+    first_name <- valid_names[[1]]
+    fr <- frames_cache[[first_name]]
+    first_label <- paste(first_name, if (identical(palette_label, "Batch")) "Batch" else "Target", sep = " - ")
+    legend_grob <- mbecPCAPlot(
+      plot.df   = fr$plot.df,
+      metric.df = fr$metric.df,
+      model.vars = c(color_var),
+      pca.axes  = pcs_to_plot,
+      label     = first_label,
+      palette_name = palette_label,
+      show_legend = TRUE,
+      return_legend = TRUE
+    )
+    combined <- assemble_panel_grid(
+      plot_list,
+      panel_cols,
+      panel_rows,
+      fig_dims,
+      "Principal Component Analysis",
+      legend_grob
     )
   }
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+         plot = combined, width = fig_dims$width, height = fig_dims$height,
+         dpi = fig_dims$dpi, compression = "lzw", bg = "white")
   rm(combined, plot_list)
   gc()
 }

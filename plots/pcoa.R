@@ -360,7 +360,8 @@ compute_pcoa_frames_bray <- function(df, metadata, model.vars = c("batch", label
 
 # ==== PCoA panel (scatter + marginals) with per-panel limits ====
 pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NULL,
-                       xlim_override = NULL, ylim_override = NULL, palette_name = "Batch") {
+                       xlim_override = NULL, ylim_override = NULL, palette_name = "Batch",
+                       show_legend = TRUE, return_legend = FALSE) {
   mbecCols <- c("#9467bd","#BCBD22","#2CA02C","#E377C2","#1F77B4","#FF7F0E",
                 "#AEC7E8","#FFBB78","#98DF8A","#D62728","#FF9896","#C5B0D5",
                 "#8C564B","#C49C94","#F7B6D2","#7F7F7F","#C7C7C7","#DBDB8D",
@@ -403,12 +404,14 @@ pcoa_panel <- function(plot.df, metric.df, model.vars, axes = c(1,2), label = NU
       axis.ticks = element_blank(),
       axis.title.x = element_text(size = 12, face = "plain"),
       axis.title.y = element_text(size = 12, face = "plain"),
-      legend.position = 'bottom',
+      legend.position = if (isTRUE(show_legend)) 'bottom' else 'none',
       legend.direction = 'horizontal',
       legend.box = 'vertical',
       legend.text = element_text(size = 12, face = "plain"),
       legend.title = element_text(size = 13, face = "plain")
     )
+
+  if (isTRUE(return_legend)) return(extract_plot_legend(pMain))
   
   pTop <- ggplot(plot.df, aes(x = !!sym(xcol))) +
     geom_density(aes(fill = !!sym(var.color)),
@@ -511,7 +514,8 @@ for (nm in names(file_list_tss)) {
   frames_cache_tss[[nm]] <- fr
 }
 
-build_pcoa_plot_list <- function(frames_cache, geometry_label, color_var, palette_label) {
+build_pcoa_plot_list <- function(frames_cache, geometry_label, color_var, palette_label,
+                                 show_legend = TRUE, return_legend = FALSE) {
   if (!length(frames_cache) || is.null(color_var) || !nzchar(color_var)) return(list())
   plots <- lapply(names(frames_cache), function(nm) {
     fr <- frames_cache[[nm]]
@@ -545,7 +549,9 @@ build_pcoa_plot_list <- function(frames_cache, geometry_label, color_var, palett
     pcoa_panel(fr$plot.df, fr$metric.df, c(color_var),
                axes = axes_to_plot, label = label_nm,
                xlim_override = x_override, ylim_override = y_override,
-               palette_name = palette_label)
+               palette_name = palette_label,
+               show_legend = show_legend,
+               return_legend = return_legend)
   })
   Filter(function(x) !is.null(x), plots)
 }
@@ -577,7 +583,8 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
     frames_cache,
     geometry_label,
     color_var,
-    palette_label
+    palette_label,
+    show_legend = n_panels == 1L
   )
   if (!length(plot_list)) return(invisible(NULL))
   if (n_panels == 1L) {
@@ -590,26 +597,32 @@ save_pcoa_plot_set <- function(frames_cache, geometry_label, color_var, palette_
         legend.title     = element_text(size = 13, face = "plain")
       ) +
       plot_annotation(
-        title = "Principal Coordinates Analysis"
+        title = "Principal Coordinates Analysis",
+        theme = theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
       )
   } else {
-    plot_list <- lapply(plot_list, function(p) {
-      p + theme(
-        legend.position  = "bottom",
-        legend.direction = "horizontal",
-        legend.box       = "vertical",
-        legend.text      = element_text(size = 12, face = "plain"),
-        legend.title     = element_text(size = 14, face = "plain")
-      )
-    })
-    combined <- wrap_plots(plot_list, ncol = panel_cols)
-    combined <- combined + plot_annotation(
-      title = "Principal Coordinates Analysis"
+    legend_list <- build_pcoa_plot_list(
+      frames_cache,
+      geometry_label,
+      color_var,
+      palette_label,
+      show_legend = TRUE,
+      return_legend = TRUE
+    )
+    legend_grob <- if (length(legend_list)) legend_list[[1]] else grid::nullGrob()
+    combined <- assemble_panel_grid(
+      plot_list,
+      panel_cols,
+      panel_rows,
+      fig_dims,
+      "Principal Coordinates Analysis",
+      legend_grob
     )
   }
   tif_path <- file.path(output_folder, paste0(filename_stub, ".tif"))
   ggsave(tif_path,
-         plot = combined, width = fig_dims$width, height = fig_dims$height, dpi = fig_dims$dpi, compression = "lzw")
+         plot = combined, width = fig_dims$width, height = fig_dims$height,
+         dpi = fig_dims$dpi, compression = "lzw", bg = "white")
   rm(combined, plot_list)
   gc()
 }
