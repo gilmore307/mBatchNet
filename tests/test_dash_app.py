@@ -11,6 +11,7 @@ from dash import Dash
 
 import server
 from _0_main import _build_download_bundle
+from _0_main import _download_bundle_kind_from_click
 from _2_utils import write_session_manifests
 from _1_components import build_navbar
 from _6_correction import _PARAMETER_CONFIG
@@ -66,6 +67,16 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Download outputs", text)
         self.assertIn("Repro bundle", text)
         self.assertNotIn("Full " + "session", text)
+
+    def test_download_requires_explicit_button_click(self):
+        self.assertIsNone(_download_bundle_kind_from_click("download-results-btn", None, None))
+        self.assertIsNone(_download_bundle_kind_from_click("download-results-btn", 0, None))
+        self.assertIsNone(_download_bundle_kind_from_click("download-reproducibility-btn", None, 0))
+        self.assertEqual(_download_bundle_kind_from_click("download-results-btn", 1, None), "outputs")
+        self.assertEqual(
+            _download_bundle_kind_from_click("download-reproducibility-btn", None, 1),
+            "reproducibility",
+        )
 
     def test_correction_layout_contains_method_guide(self):
         text = _component_text(correction_layout("/correction"))

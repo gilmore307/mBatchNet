@@ -79,6 +79,8 @@ run_method("MetaDICT", {
   beta <- suppressWarnings(as.numeric(get_param("beta", 0.20)))
   if (!is.finite(beta)) beta <- 0.20
   normalization <- as.character(get_param("normalization", "uq"))
+  max_iter <- suppressWarnings(as.integer(get_param("max_iter", 2000)))
+  if (!is.finite(max_iter) || max_iter < 1L) max_iter <- 2000L
 
   res <- MetaDICT(
     count = O,
@@ -87,7 +89,7 @@ run_method("MetaDICT", {
     customize_parameter = TRUE,
     alpha = alpha, beta = beta,
     normalization = normalization,
-    max_iter = 2000,
+    max_iter = max_iter,
     verbose = TRUE
   )
   

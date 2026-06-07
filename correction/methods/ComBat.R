@@ -6,11 +6,12 @@ run_method("ComBat", {
   require(sva)
   X_log <- get_input_for("ComBat", base_M, base_form)
   par_prior <- isTRUE(get_param("par.prior", FALSE))
+  mean_only <- isTRUE(get_param("mean.only", FALSE))
   adj_t <- ComBat(
     dat = t(X_log),
     batch = batch,
     mod = if (ncol(covar) > 0) model.matrix(~ ., data = covar) else NULL,
-    par.prior = par_prior, prior.plots = FALSE
+    par.prior = par_prior, mean.only = mean_only, prior.plots = FALSE
   )
   adj <- t(adj_t)
   write_tss_clr("ComBat", adj, "log", "normalized_combat.csv")

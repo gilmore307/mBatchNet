@@ -168,12 +168,21 @@ run_method("ComBat-Seq", {
   }
   
   ## 8. 最终调用 ComBat_seq（不会再出现 covariates are confounded 报错） ------
+  full_mod <- isTRUE(get_param("full_mod", TRUE))
+  shrink <- isTRUE(get_param("shrink", FALSE))
+  shrink_disp <- isTRUE(get_param("shrink.disp", FALSE))
+  gene_subset_n <- suppressWarnings(as.integer(get_param("gene.subset.n", 1000)))
+  if (!is.finite(gene_subset_n) || gene_subset_n < 1L) gene_subset_n <- 1000L
+
   adj <- ComBat_seq(
     counts    = t(counts),                # gene x sample
     batch     = batch,
     group     = group,
-    covar_mod = covar_mod                 # 可能为 NULL
-    # full_mod 用默认 TRUE
+    covar_mod = covar_mod,                # 可能为 NULL
+    full_mod = full_mod,
+    shrink = shrink,
+    shrink.disp = shrink_disp,
+    gene.subset.n = gene_subset_n
   )
   
   out_counts <- t(adj)

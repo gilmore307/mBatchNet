@@ -175,6 +175,56 @@ _PARAMETER_CONFIG = {
             ],
             "default": False,
             "description": "Use ComBat's empirical Bayes parametric prior. False uses the non-parametric prior and is more conservative for heterogeneous microbiome-like data.",
+        },
+        {
+            "name": "mean.only",
+            "type": "dropdown",
+            "options": [
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
+            ],
+            "default": False,
+            "description": "Only adjust batch-specific means in ComBat. Enable this when variance adjustment looks too aggressive for the study design.",
+        },
+    ],
+    "ComBatSeq": [
+        {
+            "name": "full_mod",
+            "type": "dropdown",
+            "options": [
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
+            ],
+            "default": True,
+            "description": "Include the biological group term in ComBat-Seq's model. Keep True when preserving target signal is important.",
+        },
+        {
+            "name": "shrink",
+            "type": "dropdown",
+            "options": [
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
+            ],
+            "default": False,
+            "description": "Use ComBat-Seq's empirical Bayes shrinkage for batch effect estimates. Can stabilize small batches but may increase runtime.",
+        },
+        {
+            "name": "shrink.disp",
+            "type": "dropdown",
+            "options": [
+                {"label": "True", "value": True},
+                {"label": "False", "value": False},
+            ],
+            "default": False,
+            "description": "Shrink ComBat-Seq dispersion estimates. Useful for noisy count data, but can be slower on large feature tables.",
+        },
+        {
+            "name": "gene.subset.n",
+            "type": "number",
+            "default": 1000,
+            "min": 1,
+            "step": 1,
+            "description": "Feature subset size used by ComBat-Seq shrinkage estimation. Relevant only when shrinkage is enabled.",
         }
     ],
     "ConQuR": [
@@ -254,6 +304,14 @@ _PARAMETER_CONFIG = {
             "step": 1,
             "description": "Maximum number of batch factors FAbatch may estimate. Higher values can model more structure but risk over-correction.",
         },
+        {
+            "name": "maxiter",
+            "type": "number",
+            "default": 100,
+            "min": 1,
+            "step": 1,
+            "description": "Maximum number of FAbatch optimization iterations. Increase if convergence is difficult; lower it for faster exploratory runs.",
+        },
     ],
     "MetaDICT": [
         {
@@ -285,6 +343,14 @@ _PARAMETER_CONFIG = {
             ],
             "default": "uq",
             "description": "Normalization strategy used inside MetaDICT before adjustment. Upper quartile is the default wrapper setting.",
+        },
+        {
+            "name": "max_iter",
+            "type": "number",
+            "default": 2000,
+            "min": 1,
+            "step": 100,
+            "description": "Maximum MetaDICT optimization iterations. Increase for harder convergence cases; decrease for quicker test runs.",
         },
     ],
     "MMUPHin": [

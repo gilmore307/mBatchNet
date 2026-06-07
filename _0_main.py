@@ -439,6 +439,23 @@ def _build_download_bundle(session_dir: Path, bundle_kind: str) -> Path:
     return target_zip
 
 
+def _download_bundle_kind_from_click(
+    triggered_id: str,
+    output_clicks: int | None,
+    reproducibility_clicks: int | None,
+) -> str | None:
+    click_lookup = {
+        "download-results-btn": output_clicks,
+        "download-reproducibility-btn": reproducibility_clicks,
+    }
+    if not click_lookup.get(triggered_id):
+        return None
+    return {
+        "download-results-btn": "outputs",
+        "download-reproducibility-btn": "reproducibility",
+    }.get(triggered_id)
+
+
 @app.callback(
     Output("download-results", "data"),
     Input("download-results-btn", "n_clicks"),
@@ -455,6 +472,9 @@ def download_results(
     triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
     if not triggered_id:
         raise dash.exceptions.PreventUpdate
+    bundle_kind = _download_bundle_kind_from_click(triggered_id, output_clicks, reproducibility_clicks)
+    if not bundle_kind:
+        raise dash.exceptions.PreventUpdate
     # Only proceed if the session directory already exists
     if not session_id:
         raise dash.exceptions.PreventUpdate
@@ -462,12 +482,6 @@ def download_results(
     if not session_dir.exists() or not session_dir.is_dir():
         raise dash.exceptions.PreventUpdate
     write_session_manifests(session_dir)
-    bundle_kind = {
-        "download-results-btn": "outputs",
-        "download-reproducibility-btn": "reproducibility",
-    }.get(triggered_id)
-    if not bundle_kind:
-        raise dash.exceptions.PreventUpdate
     target_zip = _build_download_bundle(session_dir, bundle_kind)
     return dcc.send_file(str(target_zip))
 
