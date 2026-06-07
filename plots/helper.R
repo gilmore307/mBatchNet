@@ -40,12 +40,13 @@ assemble_panel_grid <- function(plot_list, panel_cols, panel_rows, fig_dims, tit
   )
   title_grob <- grid::textGrob(title, gp = grid::gpar(fontsize = 20, fontface = "bold"))
   if (is.null(legend_grob)) legend_grob <- grid::nullGrob()
+  legend_height <- if (inherits(legend_grob, "nullGrob")) grid::unit(0, "in") else grid::unit(0.65, "in")
   gridExtra::arrangeGrob(
     title_grob,
     panel_grob,
     legend_grob,
     ncol = 1,
-    heights = grid::unit.c(grid::unit(0.35, "in"), grid::unit(1, "null"), grid::unit(0.45, "in"))
+    heights = grid::unit.c(grid::unit(0.35, "in"), grid::unit(1, "null"), legend_height)
   )
 }
 

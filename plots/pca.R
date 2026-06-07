@@ -321,7 +321,7 @@ mbecPCAPlot <- function(plot.df, metric.df, model.vars, pca.axes, label=NULL, pa
     stat_ellipse(aes(group = !!sym(var.color)),
                  type = "norm", level = 0.95,
                  linewidth = 0.7, linetype = 1, show.legend = FALSE, na.rm = TRUE) +
-    scale_color_manual(values = mbecCols, name = palette_name) +
+    scale_color_manual(values = mbecCols, name = NULL, drop = FALSE) +
     guides(
       colour = guide_legend(order = 1, nrow = 1, byrow = TRUE)  # many batches on one row
     ) +

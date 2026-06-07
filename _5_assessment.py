@@ -948,7 +948,9 @@ def register_pre_post_callbacks(app):
                     _add("fig-dpi", fig_dpi, int)
                     if _has_ncol and fig_ncol is not None:
                         _add("fig-ncol", fig_ncol, int)
-                    if _stage == "post" and _has_ncol:
+                    if _key in {"pca", "pcoa", "nmds"}:
+                        flags.append("--fig-per-panel=true")
+                    elif _stage == "post" and _has_ncol:
                         flags.append("--fig-per-panel=true")
 
                 def _worker():
