@@ -1,0 +1,106 @@
+\documentclass[webpdf,contemporary,large,numbered]{oup-authoring-template}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{xcolor}
+\providecommand{\rev}[1]{\textcolor{red}{#1}}
+\makeatletter
+\global\@numbibtrue
+\NAT@numberstrue
+\setcitestyle{numbers,square}
+\makeatother
+
+\begin{document}
+
+\journaltitle{Bioinformatics}
+\DOI{DOI added during production}
+\copyrightyear{2026}
+\pubyear{2026}
+\vol{XX}
+\issue{X}
+\access{Advance Access Publication Date: XX Month 2026}
+\appnotes{Application Note}
+\firstpage{1}
+\lastpage{4}
+
+\title[mBatchNet]{mBatchNet: an interactive web server for diagnosis, correction and benchmarking of batch effects in microbiome data}
+
+\author[1,2]{Chentong Sun}
+\author[1]{Shiyuan Wang}
+\author[1]{Qiwei Zhang}
+\author[3]{Ruishan Liu}
+\author[1,$\ast$]{Yuxuan Du}
+
+\address[1]{\orgdiv{Department of Electrical Engineering}, \orgname{The University of Texas at San Antonio}, \orgaddress{\street{San Antonio}, \state{Texas}, \postcode{78249}, \country{USA}}}
+\address[2]{\orgdiv{College of Engineering and Applied Science}, \orgname{University of Colorado Boulder}, \orgaddress{\street{Boulder}, \state{Colorado}, \postcode{80309}, \country{USA}}}
+\address[3]{\orgdiv{Department of Computer Science}, \orgname{University of Southern California}, \orgaddress{\street{Los Angeles}, \state{California}, \postcode{90089}, \country{USA}}}
+
+\corresp[$\ast$]{Corresponding author. \href{mailto:yuxuan.du@utsa.edu}{yuxuan.du@utsa.edu}}
+
+% NOTE: Bioinformatics Application Notes use a short abstract.
+% Replace the Zenodo DOI placeholder below with the DOI of the archived release
+% of the exact submitted software version before submission.
+\abstract{
+\textbf{Summary:} \rev{Batch effects remain a major obstacle to reproducible microbiome analysis and cross-study integration, and applying existing correction methods in practice is complicated by heterogeneous input requirements, model assumptions and assessment outputs. Here, we present mBatchNet, an interactive web server that operationalizes established batch-effect correction methods within a guided microbiome workflow for diagnosis, correction and post-correction assessment. The server integrates representative microbiome-specific and general-purpose correction methods, standardized visual and statistical diagnostics, input validation, downloadable outputs and a built-in example dataset with contextual guidance. In a 16S rRNA anaerobic digestion case study, mBatchNet revealed method-dependent differences in batch attenuation and phenotype preservation, illustrating its use as a decision-support platform for comparing correction outcomes rather than as a new correction algorithm.}\\
+\textbf{Availability and implementation:} \rev{mBatchNet is freely available without login at \href{https://mbatchnet.com/}{https://mbatchnet.com/}. Source code is available at \href{https://github.com/gilmore307/mBatchNet}{https://github.com/gilmore307/mBatchNet}. The server is implemented with a Python/Dash front end and coordinated Python/R back-end analysis scripts.}\\
+\textbf{Contact:} \href{mailto:yuxuan.du@utsa.edu}{yuxuan.du@utsa.edu}\\
+\textbf{Supplementary information:} Supplementary data are available at Bioinformatics online.\\
+}
+
+\maketitle
+
+\section{Introduction}
+High-throughput microbiome studies are increasingly integrated across cohorts, centers and time points, but abundance profiles are highly susceptible to batch effects arising from sample handling, DNA extraction, library preparation, sequencing runs and preprocessing pipelines~\citep{Costea2017FecalProcessing,McLaren2019MetagenomicBias,Sinha2017MBQC}. \rev{These effects are difficult to assess because microbiome feature tables are sparse, compositional and often zero-inflated: low-abundance features may be inconsistently observed, relative abundances are constrained by the total library composition, and technical shifts can therefore alter both apparent community structure and downstream association signals. These issues become especially important when batch and phenotype are only partially separable~\citep{Ling2022ConQuR}.}
+
+\rev{Recent microbiome-oriented batch-effect correction methods, including ConQuR \citep{Ling2022ConQuR}, MMUPHin \citep{Ma2022MMUPHin}, PLSDA-batch \citep{Wang2023PLSDABatch}, DEBIAS-M \citep{Austin2025DEBIASM} and MetaDICT \citep{Yuan2025MetaDICT}, offer complementary modeling assumptions and input requirements. However, practical correction and evaluation remain challenging because users must often move between separate method implementations, parameter conventions and diagnostic outputs. Existing omics web servers and R packages address parts of this workflow~\citep{Zhu2021BatchServer,Olbrich2023MBECS}, but a browser-based platform focused on microbiome abundance data, recent microbiome-specific correction methods and harmonized pre- and post-correction diagnostics has been lacking.}
+
+\rev{We developed mBatchNet to fill this workflow gap. The server combines data upload, input validation, study-design inspection, execution of representative correction methods, standardized benchmarking of correction outcomes, and export of corrected matrices and figures within a reproducible session-based workflow. The public deployment includes loadable example data, help pages and a tutorial so that users can reproduce the complete analysis from data upload to result interpretation.}
+
+\section{Features and implementation}
+mBatchNet uses a Python/Dash web interface with Bootstrap components, Dash AG Grid tables and client-side callbacks for responsive navigation; computational routines are executed through coordinated Python and R back-end scripts. Each analysis run is session scoped. The server records user-selected variables and parameters, writes intermediate and final results to an isolated working directory, streams logs to the browser, and packages outputs for download as a ZIP archive. \rev{The interface also reports validation messages and output summaries so that users can trace the analysis configuration and locate corrected matrices, figures, metric tables and logs.}
+
+\rev{The upload module accepts a count or abundance table together with matching sample metadata in CSV format. Consistent with the public code and example data, the feature table is organized with features as rows and samples as columns. The metadata must contain batch and target variables and may include additional covariates. Before correction, mBatchNet checks basic input integrity, including sample matching and invalid numeric entries, and summarizes the study design with preview tables and a batch-versus-target mosaic plot to flag potential imbalance.}
+
+The correction module implements microbiome-oriented methods, including ConQuR \citep{Ling2022ConQuR}, MMUPHin \citep{Ma2022MMUPHin}, PLSDA-batch \citep{Wang2023PLSDABatch}, DEBIAS-M \citep{Austin2025DEBIASM}, and MetaDICT \citep{Yuan2025MetaDICT}, together with commonly used adjustment frameworks adapted from gene-expression studies, namely ComBat \citep{Johnson2007ComBat}, limma \citep{Ritchie2015limma}, ComBat-seq \citep{Zhang2020ComBatSeq}, and FAbatch \citep{Hornung2016FAbatch}.
+Users can run one or more batch-effect correction methods while specifying method-specific parameters.
+
+
+\rev{The assessment module applies the same metrics before and after correction, allowing direct method comparison under a common framework. For compositional analyses, abundances are transformed using the centered log-ratio (CLR) transformation and Euclidean distance on CLR-transformed profiles is used as the Aitchison distance; Bray--Curtis analyses operate on relative abundances. The diagnostics are organized around complementary questions: PCA, PCoA and NMDS summarize dominant sample structure; ANOSIM \citep{Clarke1993ANOSIM} and PERMANOVA \citep{Anderson2001PERMANOVA} quantify batch-associated separation; feature-wise ANOVA, pRDA and PVCA summarize variance attribution; and neighborhood-based metrics such as alignment, entropy of batch mixing and silhouette summaries evaluate local batch mixing and target separation. The server also provides an example dataset and contextual help to facilitate rapid trial runs and interpretation.}
+Full descriptions of these analyses and metrics are provided in Supplementary Note 1.
+
+
+\section{Results}
+\subsection{Illustrative case study}
+We demonstrated mBatchNet using the anaerobic digestion 16S rRNA dataset from a phenol-perturbation experiment, following the benchmark setup of PLSDA-batch~\citep{Chapleur2016Phenol,Wang2023PLSDABatch}. This example is bundled in the server so that users can reproduce the analysis directly from the web interface. The dataset comprises 231 OTUs measured across 75 samples. The target phenotype was initial phenol concentration (0--0.5 versus 1--2), the batch factor represented five processing dates, and treatment duration was included as an optional covariate where supported. After data upload, mBatchNet generates a mosaic plot summarizing the joint distribution of samples across batch and phenotype groups. The resulting plot for this dataset is shown in Supplementary Figure~S1.
+
+\rev{Pre-correction diagnostics showed batch-associated structure in the example dataset (Figure~\ref{fig1}). In Aitchison ordinations, the uncorrected data clustered by processing date (Figure~\ref{fig1}A), and Bray--Curtis distance-based analyses indicated batch association (Figure~\ref{fig1}B; ANOSIM $R=0.637$; PERMANOVA $R^2=0.401$). After correction, mBatchNet revealed method-dependent differences in batch attenuation and phenotype preservation. ConQuR, MMUPHin, DEBIAS-M, and MetaDICT increased overlap across batches while maintaining phenotype separation, whereas PLSDA-batch preserved phenotype-associated structure but retained more visible residual batch separation (Figure~\ref{fig1}A,B; Supplementary Figures~S2--S6). Variance-partitioning analyses, including feature-wise ANOVA $R^2$ (Figure~\ref{fig1}C), pRDA (Figure~\ref{fig1}D), and PVCA (Supplementary Figure~S7), together with mixing and separation metrics (Supplementary Figure~S8), were consistent with these patterns. Among the displayed methods and diagnostics for this dataset, ConQuR produced the largest attenuation of batch-associated structure while preserving phenotype separation. All generated figures, corrected tables, and run outputs can be downloaded directly from the server for downstream analysis and reporting.}
+
+This case study illustrates the main role of mBatchNet, namely to provide a harmonized environment in which users can inspect study design, compare multiple correction outputs, and interpret correction trade-offs using consistent visual and statistical evidence.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{Fig.pdf}
+\caption{Representative mBatchNet outputs for the anaerobic digestion example. (A) Aitchison PCoA plots colored by batch. (B) Bray--Curtis batch-association summaries across correction methods. (C) Per-feature ANOVA $R^2$ values for batch and phenotype. (D) pRDA variance partitioning into phenotype, batch, shared and residual components.}
+{\color{red}\smallskip\noindent\textbf{Alt text:} Multi-panel figure showing representative mBatchNet outputs for the anaerobic digestion case study, including ordination plots, batch-association summaries, feature-wise variance summaries and multivariate variance partitioning before and after batch correction.\par}
+\label{fig1}
+\end{figure*}
+
+\section{Conclusion}
+\rev{mBatchNet provides an accessible and reproducible web-based framework for diagnosing, correcting and benchmarking batch effects in microbiome data. By integrating established correction methods with input validation, study-design inspection, harmonized pre- and post-correction diagnostics, example data and downloadable outputs, the server enables transparent comparison of correction outcomes and supports more reproducible microbiome data integration and downstream analysis.}
+
+\section*{Supplementary data}
+Supplementary data are available at Bioinformatics online.
+
+\section*{Data availability}
+\rev{The public mBatchNet web server is hosted at \url{https://mbatchnet.com/}. The site is free and open to all users and does not require login. Source code is available at \url{https://github.com/gilmore307/mBatchNet}. The anaerobic digestion 16S rRNA amplicon dataset used in the case study is available through the PLSDA-batch repository~\citep{Wang2023PLSDABatch} at \url{https://github.com/EvaYiwenWang/PLSDAbatch/}.}
+
+
+\section*{Funding}
+This work was partially supported by the University of Texas Systems STARs Program.
+
+\section*{Conflict of interest}
+None declared.
+
+\bibliographystyle{oup-plain}
+\bibliography{reference}
+
+\end{document}
