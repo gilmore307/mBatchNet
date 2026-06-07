@@ -71,6 +71,22 @@ PARAMETER_CONFIG = {
 }
 
 
+METHOD_RUNTIME_REQUIREMENTS = {
+    "BMC": {"r": ("pamr",)},
+    "limma": {"r": ("limma",)},
+    "ConQuR": {"r": ("ConQuR", "doParallel")},
+    "PLSDA": {"r": ("PLSDAbatch",)},
+    "ComBat": {"r": ("sva",)},
+    "FSQN": {"r": ()},
+    "MMUPHin": {"r": ("MMUPHin",)},
+    "RUV": {"r": ("ruvIIInb",)},
+    "MetaDICT": {"r": ("MetaDICT", "vegan")},
+    "FAbatch": {"r": ("bapred",)},
+    "ComBatSeq": {"r": ("sva",)},
+    "DEBIAS": {"r": ("reticulate",), "python": ("numpy", "debiasm")},
+}
+
+
 def load_methods() -> list[MethodInfo]:
     reference = {}
     if METHODS_REFERENCE_PATH.exists():

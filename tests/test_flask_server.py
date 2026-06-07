@@ -67,6 +67,8 @@ class FlaskServerTests(unittest.TestCase):
             response = client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertIn(expected, response.data)
+        correction = client.get(f"/sessions/{session_id}/correction")
+        self.assertIn(b"Ready", correction.data)
         shutil.rmtree(session_dir, ignore_errors=True)
 
 

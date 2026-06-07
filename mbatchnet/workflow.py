@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .methods import DISPLAY_BY_CODE, load_methods
+from .dependencies import method_runtime_status
 from .runtime import generate_previews, run_method, run_plot_script
 
 
@@ -121,7 +122,15 @@ def method_status(session_dir: Path) -> list[dict[str, object]]:
             name.startswith("normalized_") and normalized in name.lower().replace("-", "").replace("_", "")
             for name in outputs
         )
-        rows.append({"method": method, "selected": has_output})
+        runtime_status = method_runtime_status(method.code)
+        rows.append(
+            {
+                "method": method,
+                "selected": has_output,
+                "available": runtime_status.available,
+                "unavailable_reason": runtime_status.reason,
+            }
+        )
     return rows
 
 

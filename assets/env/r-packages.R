@@ -40,7 +40,7 @@ cran_pkgs <- unique(c(cran_core, cran_graphics))
 # ---- Bioconductor packages ----
 bioc_pkgs <- c(
   "limma","sva","MMUPHin",
-  "TreeSummarizedExperiment","mixOmics",
+  "mixOmics",
   "scater","SummarizedExperiment","SingleCellExperiment","S4Vectors"
 )
 
@@ -49,7 +49,7 @@ github_pkgs <- c(
   "wdl2459/ConQuR",
   "jenniferfranks/FSQN",
   "limfuxing/ruvIIInb",
-  "EvaYiwenWang/PLSDAbatch",
+  "EvaYiwenWang/PLSDAbatch@f06c7e4",
   "BoYuan07/MetaDICT"
 )
 
@@ -65,7 +65,7 @@ miss_bioc <- install_if_missing(bioc_pkgs, BiocManager::install, ask = FALSE, up
 
 rule("Installing GitHub packages")
 for (repo in github_pkgs) {
-  pkg <- sub(".*/", "", repo)
+  pkg <- sub("@.*$", "", sub(".*/", "", repo))
   if (!requireNamespace(pkg, quietly = TRUE)) {
     msg("→ Installing GitHub package %s", repo)
     remotes::install_github(repo, upgrade = "never", build_vignettes = FALSE)
@@ -77,7 +77,8 @@ for (repo in github_pkgs) {
 # Summary
 rule("Summary")
 installed <- rownames(installed.packages())
-wanted <- unique(c(cran_pkgs, bioc_pkgs, sub(".*/", "", github_pkgs)))
+github_pkg_names <- sub("@.*$", "", sub(".*/", "", github_pkgs))
+wanted <- unique(c(cran_pkgs, bioc_pkgs, github_pkg_names))
 missing <- setdiff(wanted, installed)
 
 if (length(missing)) {

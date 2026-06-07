@@ -114,6 +114,12 @@ def resolve_method_script(method: str) -> Optional[Path]:
 
 
 def run_method(session_dir: Path, method: str, params: Optional[dict[str, object]] = None) -> bool:
+    from .dependencies import method_runtime_status
+
+    runtime_status = method_runtime_status(method)
+    if not runtime_status.available:
+        append_run_log(session_dir / "run.log", f"{method} is not available: {runtime_status.reason}", icon="ERROR")
+        return False
     script = resolve_method_script(method)
     if script is None:
         append_run_log(session_dir / "run.log", f"Unknown method: {method}", icon="ERROR")

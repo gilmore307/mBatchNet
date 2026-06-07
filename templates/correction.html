@@ -30,8 +30,10 @@
           <span class="me-3 fw-semibold">{{ method.display }}</span>
           {% if row.selected %}
             <span class="badge text-bg-success">Selected</span>
+          {% elif not row.available %}
+            <span class="badge text-bg-warning">Dependency needed</span>
           {% else %}
-            <span class="badge text-bg-secondary">Not selected</span>
+            <span class="badge text-bg-secondary">Ready</span>
           {% endif %}
         </button>
       </h2>
@@ -59,7 +61,10 @@
                 {% else %}
                   <p class="text-muted">No configurable parameters available for this method.</p>
                 {% endif %}
-                <button class="btn btn-success btn-sm be-wide-button mt-3" type="submit" {% if row.selected %}disabled{% endif %}>Run Correction</button>
+                {% if not row.available %}
+                  <p class="small text-warning-emphasis mt-3 mb-0">{{ row.unavailable_reason }}</p>
+                {% endif %}
+                <button class="btn btn-success btn-sm be-wide-button mt-3" type="submit" {% if row.selected or not row.available %}disabled{% endif %}>Run Correction</button>
               </form>
             </div>
             <div class="col-lg-5">

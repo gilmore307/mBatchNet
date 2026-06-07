@@ -16,9 +16,13 @@ run_method("DEBIAS", {
   have_np <- py_module_available("numpy")
   have_dm <- py_module_available("debiasm")
   if (!have_np || !have_dm) {
-    system2(py, c("-m","pip","install","--upgrade","pip"), stdout = TRUE, stderr = TRUE)
-    if (!have_np) system2(py, c("-m","pip","install","numpy"), stdout = TRUE, stderr = TRUE)
-    if (!have_dm) system2(py, c("-m","pip","install","DEBIAS-M"), stdout = TRUE, stderr = TRUE)
+    fail_step(
+      "DEBIAS",
+      paste(
+        "DEBIAS-M requires Python modules numpy and debiasm in the configured project environment.",
+        "Install the optional DEBIAS-M dependency before running this method."
+      )
+    )
   }
 
   np <- import("numpy", delay_load = TRUE)
