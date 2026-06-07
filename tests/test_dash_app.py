@@ -91,7 +91,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Samples: 1000 or fewer", text)
         self.assertIn("Features: 1000 or fewer", text)
         self.assertIn("CSV size: 10.0 MB or smaller", text)
-        self.assertIn("Matrix cells: 1,000,000 or fewer", text)
+        self.assertNotIn("Matrix cells: 1,000,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
         self.assertIn("All-zero sample rows are blocked", text)
         self.assertIn("Columns: 5 or fewer", text)
