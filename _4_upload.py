@@ -644,6 +644,9 @@ def upload_layout(active_path: str):
                                             f"Metadata limit: {MAX_METADATA_COLUMNS} columns or fewer, including batch, target, and optional covariates."
                                         ),
                                         html.Li(
+                                            "Confounding check: mBatchNet reports a warning when batch and target are strongly associated, because batch removal may also remove biological signal."
+                                        ),
+                                        html.Li(
                                             "For larger studies, run mBatchNet locally or split the feature table before upload."
                                         ),
                                     ],

@@ -90,6 +90,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("10.0 MB per CSV", text)
         self.assertIn("1,000,000 matrix cells", text)
         self.assertIn("Metadata limit: 5 columns or fewer", text)
+        self.assertIn("Confounding check", text)
+        self.assertIn("batch removal may also remove biological signal", text)
 
     def test_public_upload_limits_match_server_contract(self):
         self.assertEqual(MAX_SAMPLES, 1000)
