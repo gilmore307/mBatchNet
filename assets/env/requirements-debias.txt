@@ -1,0 +1,4 @@
+# Optional dependency for the DEBIAS-M correction method.
+# This package pulls PyTorch and related machine-learning dependencies, so it is
+# intentionally kept out of the base server environment.
+DEBIAS-M>=0.0.2

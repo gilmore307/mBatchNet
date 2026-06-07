@@ -12,6 +12,3 @@ flask-sock>=0.7.0
 numpy>=1.23
 pandas>=1.5
 Pillow>=10.0.0
-
-# Algorithm dependency used by DEBIAS method through reticulate
-DEBIAS-M>=0.1.6

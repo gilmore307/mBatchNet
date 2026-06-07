@@ -22,14 +22,15 @@ The current lightweight server entry point is `server.py`. It uses Flask/Jinja f
 From the repository root:
 
 ```bash
-python -m pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 ### 3) Install R dependencies (recommended)
 Use the provided bootstrap script:
 
 ```bash
-bash assets/env/setup.sh python3 Rscript
+bash assets/env/setup.sh .venv/bin/python Rscript
 ```
 
 This script will:
@@ -40,6 +41,13 @@ If Python dependencies are already installed from the root `requirements.txt`, y
 
 ```bash
 Rscript assets/env/r-packages.R
+```
+
+### 4) Optional DEBIAS-M Python dependency
+The DEBIAS-M method depends on PyTorch and can install a large machine-learning stack. Install it only when that method is needed:
+
+```bash
+.venv/bin/python -m pip install -r assets/env/requirements-debias.txt
 ```
 
 ## Dependency Notes
@@ -55,7 +63,6 @@ Core packages:
 - `numpy`
 - `pandas`
 - `Pillow`
-- `DEBIAS-M`
 
 See full package list in `requirements.txt`.
 
@@ -71,7 +78,7 @@ Rscript assets/env/r-packages.R
 2. Start the app:
 
 ```bash
-python server.py
+.venv/bin/python server.py
 ```
 
 3. Open the app in your browser:
@@ -88,7 +95,7 @@ python server.py
 During the migration period, the legacy Dash app can still be started with:
 
 ```bash
-python _0_main.py
+.venv/bin/python _0_main.py
 ```
 
 ## Input / Output Specification
