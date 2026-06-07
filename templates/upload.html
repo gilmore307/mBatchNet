@@ -1,58 +1,103 @@
 {% extends "base.html" %}
 {% block title %}Upload Data · mBatchNet{% endblock %}
+{% macro preview_table(title, preview) %}
+  <div class="border rounded-3 bg-white p-3 h-100">
+    <div class="fw-semibold mb-2">{{ title }}</div>
+    {% if preview and preview.columns %}
+      <div class="table-responsive be-preview-table">
+        <table class="table table-sm table-striped align-middle mb-1">
+          <thead>
+            <tr>
+              {% for column in preview.columns %}
+                <th scope="col">{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in preview.rows %}
+              <tr>
+                {% for value in row %}
+                  <td>{{ value }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if preview.truncated_columns %}
+        <div class="text-muted small mt-2">Additional columns are hidden by the current preview limit.</div>
+      {% endif %}
+    {% else %}
+      <div class="text-muted">No preview available.</div>
+    {% endif %}
+  </div>
+{% endmacro %}
 {% block body %}
 <div class="row mb-3">
   <div class="col-12">
     <h2 class="fw-bold be-section-title">Upload Data</h2>
-    <p class="text-muted">Upload clean microbiome data, or load the bundled example to inspect the full workflow.</p>
+    <p class="text-muted">Choose a local dataset or inspect the bundled example before preprocessing.</p>
   </div>
 </div>
 
 <ul class="nav nav-tabs mb-3" role="tablist">
   <li class="nav-item" role="presentation">
-    <a class="nav-link {{ 'active' if active_tab != 'example' else '' }}" href="/upload">Manual Upload</a>
+    <a class="nav-link {{ 'active' if active_tab != 'example' else '' }}" href="/upload{% if session_id and active_tab != 'example' %}?session_id={{ session_id }}{% endif %}">Manual Upload</a>
   </li>
   <li class="nav-item" role="presentation">
-    <a class="nav-link {{ 'active' if active_tab == 'example' else '' }}" href="/upload?tab=example">Example Dataset</a>
+    <a class="nav-link {{ 'active' if active_tab == 'example' else '' }}" href="/upload?tab=example{% if session_id %}&session_id={{ session_id }}{% endif %}">Example Dataset</a>
   </li>
 </ul>
 
 {% if active_tab == "example" %}
 <div class="row g-3 mb-4">
   <div class="col-lg-8">
-    <form class="card h-100 be-content-card" method="post" action="/sessions/example">
+    <div class="card h-100 be-content-card">
       <div class="card-body">
         <h5 class="fw-semibold mb-2">Quick Start: Example Data</h5>
         <div class="fw-semibold mb-2">Example dataset: Anaerobic Digestion</div>
-        <p class="text-muted">Columns are mapped as Batch, Initial Phenol Concentration as target, and Treatment Duration as a covariate when available.</p>
+        <p class="text-muted">The example uses <code>{{ example_mapping.batch }}</code> as batch, <code>{{ example_mapping.target }}</code> as target, and <code>{{ example_mapping.covariates|join(', ') }}</code> as covariate.</p>
         <ul class="small text-muted">
           {% for item in upload_guidance.example %}
             <li>{{ item }}</li>
           {% endfor %}
         </ul>
-        <div class="row g-3 mb-3">
-          <div class="col-sm-6">
-            <label class="form-label">Rows to preview</label>
-            <input class="form-control" type="number" value="10" min="1" disabled>
+        <form class="row g-3 mb-3" method="get" action="/upload">
+          <input type="hidden" name="tab" value="example">
+          {% if session_id %}<input type="hidden" name="session_id" value="{{ session_id }}">{% endif %}
+          <div class="col-sm-5">
+            <label class="form-label" for="preview-rows">Rows to preview</label>
+            <input class="form-control" id="preview-rows" name="preview_rows" type="number" value="{{ preview_rows }}" min="1" max="50">
           </div>
-          <div class="col-sm-6">
-            <label class="form-label">Columns to preview</label>
-            <input class="form-control" type="number" value="8" min="1" disabled>
+          <div class="col-sm-5">
+            <label class="form-label" for="preview-columns">Columns to preview</label>
+            <input class="form-control" id="preview-columns" name="preview_columns" type="number" value="{{ preview_columns }}" min="1" max="100">
           </div>
-        </div>
-        <button class="btn btn-success btn-sm be-wide-button" type="submit">Load Selected Example</button>
+          <div class="col-sm-2 d-flex align-items-end">
+            <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Preview</button>
+          </div>
+        </form>
+        <form method="post" action="/sessions/example">
+          <button class="btn btn-success btn-sm be-wide-button" type="submit">Load Selected Example</button>
+        </form>
+        {% if session_id %}
+          <div class="text-success small mt-2">Example files are loaded in this session. Review the preview and process settings below.</div>
+        {% endif %}
       </div>
-    </form>
+    </div>
   </div>
   <div class="col-lg-4">
     <div class="card h-100 be-content-card">
       <div class="card-body">
-        <h5 class="fw-semibold mb-2">Example preview</h5>
-        <p class="text-muted">The example workflow uses the bundled anaerobic digestion dataset so users can inspect the interface before uploading their own study.</p>
+        <h5 class="fw-semibold mb-2">Mosaic preview</h5>
         <img class="img-fluid rounded border" src="/assets/Figure/mosaic_plot.png" alt="Mosaic plot example">
       </div>
     </div>
   </div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-xl-6">{{ preview_table("Example count matrix", example_raw_preview) }}</div>
+  <div class="col-xl-6">{{ preview_table("Example metadata", example_metadata_preview) }}</div>
 </div>
 {% else %}
 <form class="row g-3 mb-4" method="post" action="/sessions/upload" enctype="multipart/form-data">
@@ -83,9 +128,15 @@
     </div>
   </div>
   <div class="col-12">
-      <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload and pre-check</button>
+    <button class="btn btn-success btn-sm be-wide-button" type="submit">Upload files</button>
   </div>
 </form>
+{% if session_id %}
+<div class="row g-3 mb-4">
+  <div class="col-xl-6">{{ preview_table("Uploaded count matrix", raw_preview) }}</div>
+  <div class="col-xl-6">{{ preview_table("Uploaded metadata", metadata_preview) }}</div>
+</div>
+{% endif %}
 {% endif %}
 
 <section class="card be-content-card mb-4">
@@ -106,30 +157,107 @@
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
       <div>
         <h5 class="fw-semibold mb-1">Process</h5>
-        <p class="text-muted mb-0">Review metadata columns and run preprocessing.</p>
+        <p class="text-muted mb-0">Review detected metadata columns, confirm mapping, and run preprocessing.</p>
       </div>
-      <button class="btn btn-secondary btn-sm be-wide-button" disabled>Process</button>
+      {% if not session_id %}
+        <button class="btn btn-secondary btn-sm be-wide-button" disabled>Process</button>
+      {% endif %}
     </div>
-    <div class="row g-3">
-      <div class="col-lg-4">
-        <div class="border rounded-3 p-3 h-100">
-          <div class="fw-semibold mb-2">Metadata columns</div>
-          <p class="text-muted mb-0">Upload files or load the example dataset to inspect detected metadata fields.</p>
+    {% if session_id and report %}
+      <div class="row g-3 mb-3">
+        <div class="col-lg-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Input summary</div>
+            <p class="mb-1"><strong>Status:</strong> <span class="badge text-bg-{{ 'danger' if report.status == 'error' else 'warning' if report.status == 'warning' else 'success' }}">{{ report.status }}</span></p>
+            <p class="mb-1"><strong>Samples:</strong> {{ report.n_samples }}</p>
+            <p class="mb-0"><strong>Features:</strong> {{ report.n_features }}</p>
+          </div>
+        </div>
+        <div class="col-lg-8">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Metadata columns</div>
+            {% for column in report.metadata_columns %}
+              <span class="badge text-bg-secondary me-1 mb-1">{{ column }}</span>
+            {% endfor %}
+          </div>
         </div>
       </div>
-      <div class="col-lg-4">
-        <div class="border rounded-3 p-3 h-100">
-          <div class="fw-semibold mb-2">Study settings</div>
-          <p class="text-muted mb-0">Map batch, target, and covariate fields before running correction workflows.</p>
+      {% if report.messages %}
+        <div class="alert alert-{{ 'danger' if report.status == 'error' else 'warning' }}">
+          <ul class="mb-0">
+            {% for item in report.messages %}
+              <li>{{ item.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      <form class="border rounded-3 p-3" method="post" action="/sessions/{{ session_id }}/preprocess">
+        {% if active_tab == "example" %}
+          <div class="fw-semibold mb-2">Metadata mapping</div>
+          <input type="hidden" name="batch_column" value="{{ example_mapping.batch }}">
+          <input type="hidden" name="target_column" value="{{ example_mapping.target }}">
+          {% for covariate in example_mapping.covariates %}
+            <input type="hidden" name="covariates" value="{{ covariate }}">
+          {% endfor %}
+          <ul class="mb-3">
+            <li><code>{{ example_mapping.batch }}</code> → batch</li>
+            <li><code>{{ example_mapping.target }}</code> → target_binary</li>
+            <li><code>{{ example_mapping.covariates|join(', ') }}</code> → covariates</li>
+          </ul>
+        {% else %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold" for="batch-column">Batch ID column</label>
+              <select class="form-select" id="batch-column" name="batch_column" required>
+                <option value="">Select batch column</option>
+                {% for column in report.metadata_columns %}
+                  <option value="{{ column }}" {% if selected.batch == column %}selected{% endif %}>{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold" for="target-column">Target column</label>
+              <select class="form-select" id="target-column" name="target_column" required>
+                <option value="">Select target column</option>
+                {% for column in report.metadata_columns %}
+                  <option value="{{ column }}" {% if selected.target == column %}selected{% endif %}>{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold" for="covariates">Optional covariate columns</label>
+              <select class="form-select" id="covariates" name="covariates" multiple size="5">
+                {% for column in report.metadata_columns %}
+                  <option value="{{ column }}" {% if selected.covariates and column in selected.covariates %}selected{% endif %}>{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        {% endif %}
+        <button class="btn btn-success btn-sm be-wide-button mt-3" type="submit" {% if report.status == "error" %}disabled{% endif %}>Process</button>
+      </form>
+    {% else %}
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Metadata columns</div>
+            <p class="text-muted mb-0">Upload files or load the example dataset to inspect detected metadata fields.</p>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Study settings</div>
+            <p class="text-muted mb-0">Map batch, target, and covariate fields before running correction workflows.</p>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="fw-semibold mb-2">Mosaic preview</div>
+            <p class="text-muted mb-0">Preview batch-by-target structure and confounding warnings after validation.</p>
+          </div>
         </div>
       </div>
-      <div class="col-lg-4">
-        <div class="border rounded-3 p-3 h-100">
-          <div class="fw-semibold mb-2">Mosaic preview</div>
-          <p class="text-muted mb-0">Preview batch-by-target structure and confounding warnings after validation.</p>
-        </div>
-      </div>
-    </div>
+    {% endif %}
   </div>
 </section>
 

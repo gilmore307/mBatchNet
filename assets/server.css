@@ -112,3 +112,13 @@
   object-fit: contain;
   background: #ffffff;
 }
+
+.be-preview-table {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.be-preview-table table {
+  min-width: 640px;
+  white-space: nowrap;
+}

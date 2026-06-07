@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import csv
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote
 
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
@@ -30,6 +32,16 @@ from mbatchnet.workflow import (
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 128 * 1024 * 1024
 
+EXAMPLE_COLUMN_MAP = {
+    "batch": "Batch",
+    "target": "Initial Phenol Concentration",
+    "covariates": ["Treatment Duration"],
+}
+DEFAULT_PREVIEW_ROWS = 5
+DEFAULT_PREVIEW_COLUMNS = 50
+MAX_PREVIEW_ROWS = 50
+MAX_PREVIEW_COLUMNS = 100
+
 
 def _example_pair() -> tuple[Path, Path]:
     raw = EXAMPLE_DIR / "raw_ad.csv"
@@ -41,6 +53,69 @@ def _example_pair() -> tuple[Path, Path]:
 
 def _session(session_id: str) -> Path:
     return get_session_dir(session_id)
+
+
+def _bounded_int(value: str | None, default: int, maximum: int) -> int:
+    try:
+        parsed = int(value or default)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, min(parsed, maximum))
+
+
+def _preview_csv(path: Path, *, rows: int, columns: int, header: bool) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.reader(handle)
+        if header:
+            try:
+                source_columns = [str(item) for item in next(reader)]
+            except StopIteration:
+                source_columns = []
+            preview_columns = source_columns[:columns]
+            preview_rows = [[str(item) for item in row[:columns]] for _, row in zip(range(rows), reader)]
+            total_columns = len(source_columns)
+        else:
+            preview_rows = [[str(item) for item in row[:columns]] for _, row in zip(range(rows), reader)]
+            total_columns = max((len(row) for row in preview_rows), default=0)
+            preview_columns = [f"Feature {index + 1}" for index in range(min(columns, total_columns))]
+    return {
+        "columns": preview_columns,
+        "rows": preview_rows,
+        "total_columns": total_columns,
+        "truncated_columns": total_columns > len(preview_columns),
+    }
+
+
+def _selected_columns(report) -> dict[str, Any]:
+    columns = set(report.metadata_columns)
+    return {
+        "batch": "Batch" if "Batch" in columns else "batch" if "batch" in columns else "",
+        "target": "Initial Phenol Concentration" if "Initial Phenol Concentration" in columns else "phenotype" if "phenotype" in columns else "",
+        "covariates": ["Treatment Duration"] if "Treatment Duration" in columns else [],
+    }
+
+
+def _session_upload_context(session_id: str | None, *, rows: int, columns: int) -> dict[str, Any]:
+    if not session_id:
+        return {}
+    session_dir = _session(session_id)
+    raw_path = session_dir / "raw.csv"
+    metadata_path = session_dir / "metadata_origin.csv"
+    if not raw_path.exists() or not metadata_path.exists():
+        return {"session_id": session_id, "session_dir": session_dir}
+
+    report = validate_uploaded_inputs(raw_path, metadata_path)
+    write_validation_report(session_dir, report)
+    return {
+        "session_id": session_id,
+        "session_dir": session_dir,
+        "report": report,
+        "selected": _selected_columns(report),
+        "raw_preview": _preview_csv(raw_path, rows=rows, columns=columns, header=False),
+        "metadata_preview": _preview_csv(metadata_path, rows=rows, columns=columns, header=True),
+    }
 
 
 def _job_next_url(job) -> str:
@@ -88,7 +163,26 @@ def home():
 @app.get("/upload")
 def upload():
     active_tab = request.args.get("tab", "manual")
-    return render_template("upload.html", active_path="/upload", active_tab=active_tab, upload_guidance=UPLOAD_GUIDANCE)
+    preview_rows = _bounded_int(request.args.get("preview_rows"), DEFAULT_PREVIEW_ROWS, MAX_PREVIEW_ROWS)
+    preview_columns = _bounded_int(request.args.get("preview_columns"), DEFAULT_PREVIEW_COLUMNS, MAX_PREVIEW_COLUMNS)
+    raw, meta = _example_pair()
+    session_context = _session_upload_context(
+        request.args.get("session_id"),
+        rows=preview_rows,
+        columns=preview_columns,
+    )
+    return render_template(
+        "upload.html",
+        active_path="/upload",
+        active_tab=active_tab,
+        upload_guidance=UPLOAD_GUIDANCE,
+        preview_rows=preview_rows,
+        preview_columns=preview_columns,
+        example_mapping=EXAMPLE_COLUMN_MAP,
+        example_raw_preview=_preview_csv(raw, rows=preview_rows, columns=preview_columns, header=False),
+        example_metadata_preview=_preview_csv(meta, rows=preview_rows, columns=preview_columns, header=True),
+        **session_context,
+    )
 
 
 @app.get("/help")
@@ -139,7 +233,7 @@ def create_example_session():
     raw, meta = _example_pair()
     shutil.copy2(raw, session_dir / "raw.csv")
     shutil.copy2(meta, session_dir / "metadata_origin.csv")
-    return redirect(url_for("configure_session", session_id=session_id, example="1"))
+    return redirect(url_for("upload", tab="example", session_id=session_id))
 
 
 @app.post("/sessions/upload")
@@ -152,7 +246,7 @@ def create_uploaded_session():
     session_dir = get_session_dir(session_id)
     matrix.save(session_dir / "raw.csv")
     metadata.save(session_dir / "metadata_origin.csv")
-    return redirect(url_for("configure_session", session_id=session_id))
+    return redirect(url_for("upload", session_id=session_id))
 
 
 @app.get("/sessions/<session_id>/configure")

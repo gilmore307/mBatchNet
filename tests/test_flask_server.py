@@ -71,6 +71,24 @@ class FlaskServerTests(unittest.TestCase):
         self.assertIn(b"Ready", correction.data)
         shutil.rmtree(session_dir, ignore_errors=True)
 
+    def test_example_load_stays_on_upload_with_preview_and_process(self):
+        client = app.test_client()
+
+        response = client.post("/sessions/example")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/upload?tab=example&session_id=", response.headers["Location"])
+
+        page = client.get(response.headers["Location"])
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Example count matrix", page.data)
+        self.assertIn(b"Example metadata", page.data)
+        self.assertIn(b"Metadata mapping", page.data)
+        self.assertIn(b">Process</button>", page.data)
+
+        session_id = response.headers["Location"].split("session_id=", 1)[1].split("&", 1)[0]
+        shutil.rmtree(get_session_dir(session_id), ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
