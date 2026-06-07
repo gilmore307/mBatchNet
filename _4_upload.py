@@ -632,7 +632,9 @@ def upload_layout(active_path: str):
                                                                 html.Li(
                                                                     "Use a sample-by-feature numeric table with matched sample metadata."
                                                                 ),
-                                                                html.Li("Raw sequencing reads are not accepted; run upstream profiling first."),
+                                                                html.Li(
+                                                                    "Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table."
+                                                                ),
                                                             ],
                                                             className="mb-0",
                                                         )
@@ -697,9 +699,6 @@ def upload_layout(active_path: str):
                                                             [
                                                                 html.Li(
                                                                     "mBatchNet reports a warning when batch and target are strongly associated."
-                                                                ),
-                                                                html.Li(
-                                                                    "Interpret correction results carefully because batch removal may also remove biological signal."
                                                                 ),
                                                                 html.Li(
                                                                     "For larger studies, run mBatchNet locally or split the feature table before upload."

@@ -106,7 +106,7 @@ The Upload page expects two CSV files:
 1. **Feature table / count matrix (CSV)**
    - Rows: samples
    - Columns: profiled features (for example OTU/ASV/gene/pathway columns)
-   - Raw sequencing reads are not accepted; upload a numeric sample-by-feature table that has already been generated upstream.
+   - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
 
 2. **Metadata (CSV)**
    - Must include at least:

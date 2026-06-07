@@ -88,6 +88,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
         self.assertIn("sample-by-feature numeric table", text)
+        self.assertIn("FASTQ", text)
         self.assertNotIn("shotgun metagenomics", text)
         self.assertIn("Samples in rows", text)
         self.assertIn("Samples: 1000 or fewer", text)
@@ -96,7 +97,6 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Matrix cells: 1,000,000 or fewer", text)
         self.assertIn("Columns: 5 or fewer", text)
         self.assertIn("mBatchNet reports a warning when batch and target are strongly associated", text)
-        self.assertIn("batch removal may also remove biological signal", text)
 
     def test_public_upload_limits_match_server_contract(self):
         self.assertEqual(MAX_SAMPLES, 1000)
