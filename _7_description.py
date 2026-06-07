@@ -150,7 +150,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "The matrix must use samples as rows and profiled features as columns. Metadata must have one row per sample in the same order."
                             ),
                             html.Li(
-                                "Raw sequencing reads are not accepted. Use an upstream profiler first for amplicon, shotgun metagenomics, metatranscriptomic, or similar data."
+                                "Raw sequencing reads are not accepted. Upload a numeric sample-by-feature table that has already been generated upstream."
                             ),
                             html.Li(
                                 "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariance columns (keep the count modest to avoid slow runs)."

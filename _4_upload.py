@@ -630,7 +630,7 @@ def upload_layout(active_path: str):
                                                             [
                                                                 html.Li("Upload CSV files only."),
                                                                 html.Li(
-                                                                    "Use profiled amplicon, shotgun metagenomics, metatranscriptomic, or similar feature tables."
+                                                                    "Use a sample-by-feature numeric table with matched sample metadata."
                                                                 ),
                                                                 html.Li("Raw sequencing reads are not accepted; run upstream profiling first."),
                                                             ],

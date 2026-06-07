@@ -87,7 +87,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
-        self.assertIn("shotgun metagenomics", text)
+        self.assertIn("sample-by-feature numeric table", text)
+        self.assertNotIn("shotgun metagenomics", text)
         self.assertIn("Samples in rows", text)
         self.assertIn("Samples: 1000 or fewer", text)
         self.assertIn("Features: 1000 or fewer", text)
@@ -465,7 +466,7 @@ class DashAppTests(unittest.TestCase):
             self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 1.0)
             self.assertTrue(any("strongly associated" in warning for warning in report["warnings"]))
 
-    def test_shotgun_profile_table_contract_is_accepted(self):
+    def test_profile_table_contract_is_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
