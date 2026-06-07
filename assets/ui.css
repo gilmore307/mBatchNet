@@ -3,64 +3,258 @@ body {
   overflow-x: hidden;
 }
 
+/* Keep parameter inputs a consistent width, before and after running */
+.be-param-col { flex: 0 0 250px !important; max-width: 250px !important; }
+.be-param-input { width: 100%; }
+
+/* On small screens, let them stack full width */
+@media (max-width: 576px) {
+  .be-param-col { flex: 0 0 100% !important; max-width: 100% !important; }
+}
+
+/* --- Pipeline navbar as full-width tab-like steps with arrows --- */
 .be-pipeline-container {
   width: 100%;
-  min-height: 60px;
-  gap: 40px;
+  height: 60px;            /* requested fixed height */
+  gap: 40px;               /* larger space between buttons for arrows */
 }
 
 .be-pipeline-step.btn {
   flex: 1 1 0;
-  min-width: 0;
-  border-radius: 0;
-  margin: 0;
+  min-width: 0;         /* allow text to truncate */
+  border-radius: 0;      /* tab look */
+  margin: 0;             /* no outer margins so arrows connect */
   position: relative;
   text-align: center;
   white-space: nowrap;
-  min-height: 60px;
-  display: flex;
+  height: 60px;          /* match container height */
+  display: flex;         /* center text vertically */
   align-items: center;
   justify-content: center;
-  font-size: 1.08rem;
-  overflow: visible;
+  font-size: 1.2rem;    /* slightly larger text */
 }
 
+/* Make buttons the same height and vertically centered */
+.be-pipeline-step.btn > * {
+  pointer-events: none; /* keep whole step clickable */
+}
+
+/* Right-pointing arrow using triangle; added to all but last */
 .be-pipeline-step.btn:not(:last-child)::after {
   content: "";
   position: absolute;
   top: 0;
-  right: -33px;
+  right: -33px;          /* arrow width; sits inside the gap */
   width: 0;
   height: 0;
-  border-top: 30px solid transparent;
+  border-top: 30px solid transparent;   /* half of 60px height */
   border-bottom: 30px solid transparent;
   border-left: 24px solid var(--be-step-bg, var(--bs-light));
   z-index: 2;
 }
 
-.be-pipeline-step.btn-light {
-  --be-step-bg: var(--bs-light);
+/* With gap reserved for arrows, no extra left padding needed */
+.be-pipeline-step.btn:not(:first-child) { padding-left: 0; }
+
+/* Background color source for the arrow tip per variant */
+.be-pipeline-step.btn-light { --be-step-bg: var(--bs-light); }
+.be-pipeline-step.btn-success { --be-step-bg: var(--bs-success); }
+
+/* Outline variants: give a subtle translucent arrow using the theme color */
+.be-pipeline-step.btn-outline-light { --be-step-bg: rgba(var(--bs-light-rgb, 248,249,250), 0.4); }
+.be-pipeline-step.btn-outline-success { --be-step-bg: rgba(var(--bs-success-rgb, 25,135,84), 0.35); }
+
+/* Disabled state dimming still uses Bootstrap's disabled styles */
+.be-pipeline-step.btn:disabled {
+  cursor: not-allowed;
+  opacity: .65;
 }
 
-.be-pipeline-step.btn-outline-light {
-  --be-step-bg: rgba(var(--bs-light-rgb, 248, 249, 250), 0.4);
+/* Allow arrow pseudo-element to render outside button box */
+.be-pipeline-step.btn { overflow: visible; }
+
+/* Assessment subtabs content should fill available width */
+.be-subtab-content {
+  width: 100%;
+}
+.be-subtab-content > * {
+  width: 100%;
+}
+.be-subtab-content .dash-table-container,
+.be-subtab-content .table {
+  width: 100%;
 }
 
-@media (max-width: 900px) {
-  .be-pipeline-container {
-    gap: 0.5rem;
-    flex-wrap: wrap !important;
-    min-height: auto;
-  }
+.be-run-button:disabled,
+.be-run-button.disabled {
+  background-color: var(--bs-secondary);
+  border-color: var(--bs-secondary);
+  color: #fff;
+}
 
-  .be-pipeline-step.btn {
-    flex: 1 1 calc(50% - 0.5rem);
-    border-radius: 0.35rem;
-    min-height: 44px;
-    font-size: 0.92rem;
-  }
+/* Subtab card styling to keep tabs and visuals together */
+.be-subtab-card {
+  width: 83vw;
+  min-width: 83vw;
+  max-width: 83vw;
+  margin-top: 8px;
+  margin-left: 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid #dee2e6;
+}
 
-  .be-pipeline-step.btn::after {
-    display: none;
-  }
+.be-subtab-card-header {
+  background-color: #f8f9fa;
+  padding: 0;
+}
+
+.be-subtab-card-header .be-subtabs {
+  width: 100%;
+  margin: 0;
+}
+
+.be-subtab-card-body {
+  padding: 1rem 1.25rem;
+}
+
+/* Constrain overall page width */
+#page-content {
+  width: 98vw;
+  max-width: 98vw;
+  margin-right: 2vw;
+  margin-left: 0;
+}
+
+/* Pre/Post stage tab layout */
+.be-stage-tabs {
+  display: flex;
+  align-items: stretch;
+}
+
+.be-stage-tabs .tab-list {
+  flex: 0 0 12vw;
+  width: 12vw;
+  min-width: 12vw;
+  max-width: 12vw;
+  margin-right: 1vw;
+  display: flex;
+  flex-direction: column;
+}
+
+.be-stage-tabs .tab {
+  width: 100%;
+  max-width: 100%;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.be-stage-tabs .tab--selected {
+  width: 100%;
+  max-width: 100%;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.be-stage-tabs .tab-content {
+  width: 83vw;
+  max-width: 83vw;
+}
+
+.be-stage-tabs > div:first-child {
+  flex: 0 0 12vw;
+  width: 12vw;
+  min-width: 12vw;
+  max-width: 12vw;
+  margin-right: 1vw;
+}
+
+.be-stage-tabs > div:last-child {
+  flex: 0 0 83vw;
+  width: 83vw;
+  max-width: 83vw;
+}
+
+/* AG Grid defaults for table replacements */
+.be-ag-grid.ag-theme-alpine,
+.ag-theme-alpine.be-ag-grid {
+  --ag-font-size: 13px;
+  --ag-row-height: 32px;
+  --ag-header-height: 38px;
+  --ag-grid-size: 4px;
+  --ag-border-color: #dee2e6;
+  border-radius: 0.5rem;
+  border: 1px solid #dee2e6;
+}
+
+.be-ag-grid .ag-root-wrapper {
+  border-radius: 0.5rem;
+}
+
+.be-ag-grid .ag-header-cell-label {
+  justify-content: center;
+}
+
+/* Ensure correction action columns occupy full cell width during loading */
+
+.be-column-loading {
+  display: block;
+  width: 100%;
+}
+
+.be-column-loading .dash-loading-spinner {
+  margin: 0 auto;
+}
+
+.be-method-actions-loading {
+  display: block;
+  position: relative;
+}
+
+.be-method-actions-loading.dash-loading-parent {
+  position: relative;
+}
+
+.be-method-actions-loading .dash-loading-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.be-method-actions-loading .dash-loading-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: auto;
+  width: min(100%, 540px);
+  background-color: rgba(255, 255, 255, 0.65);
+  border-radius: 0.5rem;
+}
+
+.be-method-table-wrapper {
+  position: relative;
+}
+
+.be-run-cell,
+.be-delete-cell {
+  position: relative;
+}
+
+.be-ag-grid .ag-cell {
+  line-height: 1.3;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
 }

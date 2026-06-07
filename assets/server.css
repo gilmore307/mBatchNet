@@ -6,11 +6,6 @@
   width: 250px;
 }
 
-.be-page-shell {
-  background: #f4f6f8;
-  min-height: calc(100vh - 100px);
-}
-
 .be-hero {
   background: linear-gradient(135deg, #31475e 0%, #2b3f52 55%, #243545 100%);
   box-shadow: 0 14px 34px rgba(24, 35, 48, 0.20);
@@ -23,102 +18,4 @@
 
 .text-white-75 {
   color: rgba(255,255,255,0.88);
-}
-
-.be-section-title {
-  color: #223242;
-}
-
-.be-content-card {
-  background-color: #ffffff;
-  border: 1px solid #e8eef3;
-  box-shadow: 0 8px 20px rgba(31, 45, 61, 0.06);
-}
-
-.be-icon-circle {
-  width: 56px;
-  height: 56px;
-  margin-bottom: 1rem;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(31, 191, 168, 0.10);
-  color: #1fbfa8;
-  font-size: 1.35rem;
-}
-
-.be-step-number,
-.be-step-icon,
-.be-link {
-  color: #1fbfa8;
-}
-
-.be-resource-button {
-  width: 190px;
-}
-
-.be-github-button {
-  width: 190px;
-  background: #2f4358;
-  color: #ffffff;
-}
-
-.be-github-button:hover {
-  background: #26384a;
-  color: #ffffff;
-}
-
-.be-upload-box {
-  width: 100%;
-  min-height: 180px;
-  border: 1px dashed #b8c6d3;
-  border-radius: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: #5f7285;
-  background: #fbfcfd;
-  cursor: pointer;
-}
-
-.be-upload-box i {
-  color: #1fbfa8;
-  font-size: 2rem;
-}
-
-.be-upload-box:hover {
-  border-color: #1fbfa8;
-  background: #f4fffd;
-}
-
-.be-sticky-toc {
-  position: sticky;
-  top: 120px;
-}
-
-.be-help-figure {
-  max-height: 520px;
-  object-fit: contain;
-  background: #ffffff;
-}
-
-.be-help-thumb {
-  max-height: 220px;
-  width: 100%;
-  object-fit: contain;
-  background: #ffffff;
-}
-
-.be-preview-table {
-  max-height: 360px;
-  overflow: auto;
-}
-
-.be-preview-table table {
-  min-width: 640px;
-  white-space: nowrap;
 }
