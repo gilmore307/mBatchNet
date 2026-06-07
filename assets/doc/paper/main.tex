@@ -65,7 +65,7 @@ Users can run one or more batch-effect correction methods while specifying metho
 
 
 The assessment module applies the same metrics before and after correction, allowing direct method comparison under a common framework. For compositional analyses, abundances are transformed using the centered log-ratio \rev{(CLR)} transformation; \rev{Aitchison distance is the Euclidean distance between CLR-transformed profiles, whereas Bray--Curtis dissimilarity is computed on relative-abundance profiles.} Diagnostics include PCA, PCoA and NMDS in Aitchison and Bray--Curtis spaces, ANOSIM \citep{Clarke1993ANOSIM} and PERMANOVA \citep{Anderson2001PERMANOVA}, feature-wise ANOVA, pRDA, PVCA and neighborhood-based metrics such as alignment, entropy of batch mixing and silhouette summaries. \rev{Ordination plots summarize dominant sample structure and show whether points group by batch or by target. ANOSIM and PERMANOVA test distance-based batch association and report effect-size statistics. Feature-wise ANOVA, pRDA and PVCA summarize how variation is apportioned to batch, target, their overlap and residual components. Alignment and entropy of batch mixing describe local cross-batch mixing, whereas silhouette summaries describe separation with respect to the target labels.} The server also provides an example dataset and contextual help to facilitate rapid trial runs and interpretation.
-Full descriptions of these analyses and metrics are provided in Supplementary Note 1.
+Full descriptions of these analyses and metrics, \rev{including category mappings for correction methods and diagnostic outputs}, are provided in Supplementary Note 1.
 
 
 \section{Results}
