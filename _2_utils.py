@@ -471,10 +471,12 @@ def _load_method_reference() -> Tuple[Tuple[Tuple[str, str], ...], Dict[str, Dic
                 method_name = (row.get("Methods") or "").strip()
                 if not method_name:
                     continue
+                description = (row.get("Description") or "").strip()
                 citation = (row.get("Citations") or "").strip()
                 url = (row.get("Url") or "").strip()
                 package = (row.get("Package") or "").strip()
                 reference[method_name] = {
+                    "description": description,
                     "citation": citation,
                     "url": url,
                     "package": package,
@@ -486,7 +488,7 @@ def _load_method_reference() -> Tuple[Tuple[Tuple[str, str], ...], Dict[str, Dic
     for code, display in _METHOD_DISPLAY_NAMES.items():
         if code not in seen_codes:
             supported.append((code, display))
-            reference.setdefault(display, {"citation": "", "url": "", "package": ""})
+            reference.setdefault(display, {"description": "", "citation": "", "url": "", "package": ""})
     return tuple(supported), reference
 
 
@@ -497,7 +499,7 @@ SUPPORTED_METHODS = tuple(SUPPORTED_METHODS)
 METHOD_REFERENCE_BY_DISPLAY = dict(METHOD_REFERENCE_BY_DISPLAY)
 
 METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
-    code: METHOD_REFERENCE_BY_DISPLAY.get(display, {"citation": "", "url": "", "package": ""})
+    code: METHOD_REFERENCE_BY_DISPLAY.get(display, {"description": "", "citation": "", "url": "", "package": ""})
     for code, display in SUPPORTED_METHODS
 }
 

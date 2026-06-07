@@ -13,6 +13,7 @@ import server
 from _0_main import _build_download_bundle
 from _0_main import _download_bundle_kind_from_click
 from _2_utils import write_session_manifests
+from _2_utils import METHOD_REFERENCE_BY_CODE
 from _1_components import build_navbar
 from _6_correction import _PARAMETER_CONFIG
 from _6_correction import _build_method_explanation_layout
@@ -91,6 +92,7 @@ class DashAppTests(unittest.TestCase):
             _build_method_explanation_layout(
                 "ComBat",
                 {
+                    "description": "ComBat uses empirical Bayes frameworks for adjusting known batch effects in genomic data.",
                     "package": "https://rdrr.io/bioc/sva/man/ComBat.html",
                     "citation": "Johnson WE, Li C, Rabinovic A. <i>Biostatistics.</i> 2007;8(1):118-127.",
                     "url": "https://academic.oup.com/nargab/article/2/3/lqaa078/5909519",
@@ -99,11 +101,17 @@ class DashAppTests(unittest.TestCase):
         )
 
         self.assertIn("Method Explanation", text)
+        self.assertIn("Description", text)
+        self.assertIn("empirical Bayes", text)
         self.assertIn("Package", text)
         self.assertIn("Citation", text)
         self.assertIn("Reference", text)
         self.assertIn("Johnson WE", text)
         self.assertNotIn("Suggested methods", text)
+
+    def test_method_reference_csv_provides_descriptions(self):
+        for method_code, metadata in METHOD_REFERENCE_BY_CODE.items():
+            self.assertTrue(metadata.get("description"), method_code)
 
     def test_correction_parameters_match_r_scripts_and_have_tooltips(self):
         method_files = {

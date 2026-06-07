@@ -464,6 +464,7 @@ _PARAMETER_CONFIG = {
 
 
 def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> object:
+    description = (metadata.get("description") or "").strip()
     package_url = (metadata.get("package") or "").strip()
     citation_text = (metadata.get("citation") or "").strip()
     citation_url = (metadata.get("url") or "").strip()
@@ -471,6 +472,8 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     rows: List[html.Tr] = [
         html.Tr([html.Th("Method"), html.Td(display)]),
     ]
+    if description:
+        rows.append(html.Tr([html.Th("Description"), html.Td(description)]))
     if package_url:
         rows.append(
             html.Tr(
