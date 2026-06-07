@@ -95,6 +95,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Features: 1000 or fewer", text)
         self.assertIn("CSV size: 10.0 MB or smaller", text)
         self.assertIn("Matrix cells: 1,000,000 or fewer", text)
+        self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
+        self.assertIn("All-zero sample rows are blocked", text)
         self.assertIn("Columns: 5 or fewer", text)
         self.assertIn("mBatchNet reports a warning when batch and target are strongly associated", text)
 
@@ -447,6 +449,36 @@ class DashAppTests(unittest.TestCase):
 
             self.assertFalse(report["valid"])
             self.assertTrue(any("5 columns or fewer" in err for err in report["errors"]))
+
+    def test_matrix_na_and_all_zero_rows_are_blocked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("f1,f2\n1,NA\n0,0\n", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertFalse(report["valid"])
+            self.assertTrue(
+                any("NA" in err or "non-numeric" in err for err in report["errors"]),
+                report["errors"],
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("f1,f2\n1,2\n0,0\n", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertFalse(report["valid"])
+            self.assertTrue(any("all-zero sample row" in err for err in report["errors"]))
 
     def test_strong_batch_target_confounding_is_warned(self):
         with tempfile.TemporaryDirectory() as tmp:

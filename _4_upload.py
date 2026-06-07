@@ -657,6 +657,8 @@ def upload_layout(active_path: str):
                                                                 html.Li(f"Features: {MAX_FEATURES} or fewer."),
                                                                 html.Li(f"Matrix cells: {MAX_MATRIX_CELLS:,} or fewer."),
                                                                 html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
+                                                                html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
                                                             ],
                                                             className="mb-0",
                                                         )

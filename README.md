@@ -107,6 +107,8 @@ The Upload page expects two CSV files:
    - Rows: samples
    - Columns: profiled features (for example OTU/ASV/gene/pathway columns)
    - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
+   - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
+   - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
 
 2. **Metadata (CSV)**
    - Must include at least:
