@@ -61,6 +61,13 @@ def _blank(value: object) -> bool:
     return value is None or str(value).strip() == ""
 
 
+def _metadata_missing(value: object) -> bool:
+    if _blank(value):
+        return True
+    token = str(value).strip().lower()
+    return token in {"na", "n/a", "nan", "null", "none", "inf", "+inf", "-inf"}
+
+
 def _as_float(value: object) -> Optional[float]:
     if _blank(value):
         return None
@@ -330,6 +337,20 @@ def validate_session_inputs(
         )
     if not metadata_rows or not metadata_header:
         errors.append("Metadata must include a header and at least one data row.")
+    if metadata_header and metadata_rows:
+        for column in metadata_header:
+            missing_rows = [
+                row_idx
+                for row_idx, row in enumerate(metadata_rows, start=2)
+                if _metadata_missing(row.get(column))
+            ]
+            if missing_rows:
+                preview = ", ".join(str(row_idx) for row_idx in missing_rows[:5])
+                suffix = "..." if len(missing_rows) > 5 else ""
+                errors.append(
+                    f"Metadata column '{column}' contains blank or NA-like value(s) "
+                    f"at CSV row(s) {preview}{suffix}."
+                )
     if batch_col:
         if batch_col not in metadata_header:
             errors.append(f"Selected batch column '{batch_col}' is missing from metadata.")
@@ -340,8 +361,6 @@ def validate_session_inputs(
                 dimensions["max_batch_size"] = max(batch_counts.values())
             if len(batch_counts) < 2:
                 errors.append("Batch column must contain at least two non-empty levels.")
-            if any(_blank(row.get(batch_col)) for row in metadata_rows):
-                errors.append("Batch column contains blank values.")
     if target_col:
         if target_col not in metadata_header:
             errors.append(f"Selected target column '{target_col}' is missing from metadata.")
@@ -350,8 +369,6 @@ def validate_session_inputs(
             dimensions["target_levels"] = len(target_counts)
             if len(target_counts) != 2:
                 errors.append("Target column must contain exactly two non-empty levels for current binary assessments.")
-            if any(_blank(row.get(target_col)) for row in metadata_rows):
-                errors.append("Target column contains blank values.")
     if batch_col and target_col and batch_col == target_col:
         errors.append("Batch and target columns must be different.")
     if batch_col and target_col and batch_col in metadata_header and target_col in metadata_header:
@@ -360,8 +377,12 @@ def validate_session_inputs(
             dimensions["batch_target_cramers_v"] = round(v, 4)
             if v >= STRONG_CONFOUNDING_V:
                 warnings.append(
-                    "Batch and target are strongly associated. Interpret correction results with this confounding in mind because "
-                    "batch removal may also remove biological signal."
+                    f"Batch and target are strongly associated (Cramer's V = {v:.2f}; "
+                    f"advisory threshold = {STRONG_CONFOUNDING_V:.2f}). This is an "
+                    "effect-size warning for study-design imbalance, not a formal hypothesis test. "
+                    "Interpret correction results carefully because removing batch-associated structure "
+                    "may also affect target-associated signal. Use the mosaic plot after study-setting "
+                    "confirmation to inspect the batch-target composition visually."
                 )
     if matrix and batch_col and batch_col in metadata_header:
         batch_counts = _level_counts(metadata_rows, batch_col)
@@ -695,12 +716,16 @@ def upload_layout(active_path: str):
                                                 dbc.Col(
                                                     dbc.Card(
                                                         [
-                                                            dbc.CardHeader(html.Strong("Count matrix (CSV)")),
+                                                            dbc.CardHeader(html.Strong("Microbiome feature table (CSV)")),
                                                             dbc.CardBody(
                                                                 [
                                                                     html.Ul(
                                                                         [
-                                                                            html.Li("Processed sample-by-feature numeric CSV table."),
+                                                                            html.Li(
+                                                                                "Processed sample-by-feature numeric table, including "
+                                                                                "16S-derived OTU/ASV tables or shotgun-derived "
+                                                                                "taxonomic/functional profiles after upstream profiling."
+                                                                            ),
                                                                             html.Li("Raw sequencing files such as FASTQ are not accepted."),
                                                                             html.Li("Samples in rows and profiled features in columns."),
                                                                             html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
@@ -718,7 +743,7 @@ def upload_layout(active_path: str):
                                                                     ),
                                                                     dcc.Upload(
                                                                         id="upload-matrix",
-                                                                        children=html.Div(["Drag & drop or click to upload count matrix"]),
+                                                                        children=html.Div(["Drag & drop or click to upload feature table"]),
                                                                         multiple=False,
                                                                         className="border border-secondary rounded p-4 text-center bg-light",
                                                                         accept=".csv,text/csv",
@@ -748,6 +773,7 @@ def upload_layout(active_path: str):
                                                                                 f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
                                                                             ),
                                                                             html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                            html.Li("No blank, NA, NaN, Inf, or NA-like metadata values."),
                                                                             html.Li(
                                                                                 "mBatchNet reports a warning when batch and target are strongly associated."
                                                                             ),
@@ -1302,11 +1328,11 @@ def register_upload_callbacks(app):
 
         return dbc.Card(
             [
-                dbc.CardHeader(html.Strong("Map Metadata Columns")),
+                dbc.CardHeader(html.Strong("Study settings")),
                 dbc.CardBody(
                     [
                         html.P(
-                            "Select the control phenotype (will be treated as Negative) and the reference batch before generating the mosaic plot.",
+                            "Select the control/negative target label and reference batch before generating the mosaic plot.",
                             className="text-muted",
                         ),
                         dbc.Row([control_dropdown, reference_dropdown], className="gy-2"),

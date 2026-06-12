@@ -40,7 +40,7 @@ def _method_help_cards() -> List:
         else:
             parameter_items.append(
                 html.Li(
-                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, selected covariates, and study settings from the session."
+                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, additional metadata covariates, and study settings from the session."
                 )
             )
 
@@ -136,7 +136,7 @@ HELP_MODAL_SECTIONS: List = [
         [
             html.H4("Upload Files"),
             html.P(
-                "Upload a profiled count/abundance table with a matching metadata table, pick one of the curated examples, or restore a session from a Repro bundle."
+                "Upload a processed microbiome feature table with a matching metadata table, pick one of the curated examples, or restore a session from a Repro bundle."
             ),
             html.Div(
                 [
@@ -150,10 +150,13 @@ HELP_MODAL_SECTIONS: List = [
                                 "The matrix must use samples as rows and profiled features as columns. Metadata must have one row per sample in the same order."
                             ),
                             html.Li(
-                                "Raw sequencing files such as FASTQ are not accepted. Upload a processed sample-by-feature numeric table."
+                                "Raw sequencing files such as FASTQ are not accepted. Upload a processed sample-by-feature numeric table, such as a 16S-derived OTU/ASV table or a shotgun-derived taxonomic/functional profile after upstream profiling."
                             ),
                             html.Li(
-                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariance columns (keep the count modest to avoid slow runs)."
+                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariate columns (keep the count modest to avoid slow runs)."
+                            ),
+                            html.Li(
+                                "Metadata values are checked for blank, NA, NaN, Inf, and NA-like entries before preprocessing."
                             ),
                             html.Li(
                                 "The Upload page writes validation_report.json and blocks core input errors before preprocessing."
@@ -168,7 +171,7 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "Example datasets auto-populate every mapping field with that dataset's Batch, target, and covariance selections."
+                                "Example datasets auto-populate every mapping field with that dataset's Batch, target, and covariate selections."
                             ),
                             html.Li(
                                 "Use the Example Dataset tab to preview rows and columns before loading the included AD example into the session."
@@ -199,10 +202,10 @@ HELP_MODAL_SECTIONS: List = [
                 [
                     html.H5("Mosaic plot", className="mb-2 mt-4", id="help-upload-mosaic"),
                     html.P(
-                        "The mosaic plot cross-tabulates the Batch and target mappings so you "
-                        "can confirm how many samples fall into each batch/label combination "
-                        "before running corrections. It acts as a quick imbalance diagnostic "
-                        "before investing time in lengthy methods."
+                        "The mosaic plot cross-tabulates the Batch and target mappings after metadata "
+                        "mapping and study-setting confirmation, showing how many samples fall into "
+                        "each batch/label combination before running corrections. It acts as a quick "
+                        "imbalance diagnostic before lengthy methods."
                     ),
                 ]
             ),

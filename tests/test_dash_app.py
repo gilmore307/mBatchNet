@@ -77,7 +77,7 @@ class DashAppTests(unittest.TestCase):
     def test_upload_layout_contains_original_example_flow(self):
         text = _component_text(upload_layout("/upload"))
 
-        self.assertIn("Count matrix (CSV)", text)
+        self.assertIn("Microbiome feature table (CSV)", text)
         self.assertIn("Metadata", text)
         self.assertIn("Quick Start: Example Data", text)
         self.assertIn("Preview rows", text)
@@ -90,15 +90,18 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Click Repro bundle in the navbar", text)
         self.assertIn("Repro bundle", text)
         self.assertIn("Process", text)
-        self.assertIn("Processed sample-by-feature numeric CSV table", text)
+        self.assertIn("Processed sample-by-feature numeric table", text)
+        self.assertIn("16S-derived OTU/ASV", text)
+        self.assertIn("shotgun-derived taxonomic/functional profiles", text)
         self.assertIn("FASTQ", text)
-        self.assertNotIn("shotgun metagenomics", text)
+        self.assertNotIn("shotgun metagenomics raw data", text)
         self.assertIn("Samples in rows", text)
         self.assertIn("Samples: 500 or fewer", text)
         self.assertIn("Features: 300 or fewer", text)
         self.assertIn("CSV size: 10.0 MB or smaller", text)
         self.assertNotIn("Matrix cells: 150,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
+        self.assertIn("No blank, NA, NaN, Inf, or NA-like metadata values", text)
         self.assertIn("All-zero sample rows are blocked", text)
         self.assertIn("FAbatch requires retained features", text)
         self.assertIn("marked unavailable for the session", text)
@@ -134,6 +137,8 @@ class DashAppTests(unittest.TestCase):
 
         self.assertNotIn("Method guide", text)
         self.assertNotIn("Phenotype-aware correction", text)
+        self.assertIn("microbiome-oriented, count-aware, and continuous/transformed matrix frameworks", text)
+        self.assertIn("ComBat-seq, RUV-III-NB", text)
         self.assertIn("package or source reference", text)
 
     def test_help_modal_matches_repro_bundle_download_flow(self):
@@ -537,6 +542,23 @@ class DashAppTests(unittest.TestCase):
             self.assertFalse(report["valid"])
             self.assertTrue(any("5 columns or fewer" in err for err in report["errors"]))
 
+    def test_metadata_missing_values_are_blocked_across_all_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text("f1,f2\n1,2\n3,4\n", encoding="utf-8")
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype,Covariate\nA,case,1\nB,control,NA\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertFalse(report["valid"])
+            self.assertTrue(
+                any("Metadata column 'Covariate'" in err and "NA-like" in err for err in report["errors"]),
+                report["errors"],
+            )
+
     def test_matrix_na_and_all_zero_rows_are_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
@@ -583,7 +605,12 @@ class DashAppTests(unittest.TestCase):
 
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 1.0)
-            self.assertTrue(any("strongly associated" in warning for warning in report["warnings"]))
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("strongly associated", warning_text)
+            self.assertIn("Cramer's V = 1.00", warning_text)
+            self.assertIn("advisory threshold = 0.85", warning_text)
+            self.assertIn("not a formal hypothesis test", warning_text)
+            self.assertIn("mosaic plot after study-setting confirmation", warning_text)
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):
         with tempfile.TemporaryDirectory() as tmp:

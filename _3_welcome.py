@@ -366,7 +366,7 @@ def welcome_layout(active_path: str):
                                     dbc.Col(
                                         _resource_card(
                                             "bi-question-circle",
-                                            "Help and tutorials",
+                                            "Help and examples",
                                             "Built-in guidance, inline parameter descriptions, and example-based help pages support users through each analysis stage.",
                                             dbc.Button(
                                                 [html.I(className="bi bi-question-circle me-2"), "Open help page"],

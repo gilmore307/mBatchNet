@@ -4,7 +4,7 @@
 mBatchNet is a browser-based application for batch-effect correction and post-correction evaluation in microbiome/omics count or abundance analysis workflows.
 
 The app supports an end-to-end pipeline:
-1. Upload count matrix and metadata
+1. Upload feature table and metadata
 2. Run preprocessing and selected batch-correction methods
 3. Run pre-/post-correction visual and statistical assessments
 4. Download an output bundle or a reproducibility bundle
@@ -103,9 +103,9 @@ The Dash app can also be started directly with:
 ### Inputs
 The Upload page expects two CSV files:
 
-1. **Feature table / count matrix (CSV)**
+1. **Microbiome feature table (CSV)**
    - Rows: samples
-   - Columns: profiled features (for example OTU/ASV/gene/pathway columns)
+   - Columns: profiled features, including 16S-derived OTU/ASV tables or shotgun-derived taxonomic/functional profiles after upstream profiling
    - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
    - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
@@ -117,7 +117,7 @@ The Upload page expects two CSV files:
    - Optional:
      - covariate columns
 
-After upload, map batch/target/covariate columns in the UI.
+After upload, map batch/target columns in the UI. Additional metadata columns are treated as covariates by methods that support covariates or design matrices.
 
 Public server limits:
 - CSV size: 10.0 MB per uploaded CSV
@@ -125,12 +125,13 @@ Public server limits:
 - Features: 300
 - Matrix cells: 150,000
 - Metadata columns: 5 or fewer, including batch, target, and optional covariates
+- Metadata values: blank, NA, NaN, Inf, and NA-like entries are blocked before preprocessing
 
 ## Correction Methods and Parameters
 
 Method descriptions in the app are loaded from `assets/doc/methods.csv`, which also stores package/source links, citation text, and reference URLs. The exposed parameter list below mirrors the current Correction page controls.
 
-Methods without method-specific controls still use the uploaded matrix, metadata mapping, selected covariates, reference batch, and target/control settings from the session.
+Methods without method-specific controls still use the uploaded matrix, metadata mapping, additional metadata covariates, reference batch, and target/control settings from the session.
 
 ### DEBIAS-M
 DEBIAS-M treats processing protocols, studies, or batches as domains for microbiome count or relative-abundance profiles. It learns taxon- and batch-specific multiplicative coefficients together with phenotype-prediction parameters and returns corrected count-derived TSS and CLR outputs.
@@ -168,7 +169,7 @@ Exposed parameters:
 - `taus` (default: `seq(0.05,0.95,0.05)`): quantile grid.
 
 ### MMUPHin
-MMUPHin is a statistical framework for meta-analysis of microbial community studies using taxonomic, functional, or other abundance profiles. In mBatchNet it uses the package batch-adjustment component on a feature-abundance table with batch labels and selected covariates.
+MMUPHin is a statistical framework for meta-analysis of microbial community studies using taxonomic, functional, or other abundance profiles. In mBatchNet it uses the package batch-adjustment component on a feature-abundance table with batch labels and additional metadata covariates.
 
 Exposed parameters:
 - `zero_inflation` (default: `False`): MMUPHin zero-inflation control path.
@@ -241,7 +242,7 @@ For each session, intermediate and final outputs are generated under `output/<se
 Bundled example datasets are available in `assets/example/` and can be loaded directly from the **Example Dataset** tab.
 
 - AD example:
-  - Count matrix: [`assets/example/raw_ad.csv`](assets/example/raw_ad.csv)
+  - Feature table: [`assets/example/raw_ad.csv`](assets/example/raw_ad.csv)
   - Metadata: [`assets/example/metadata_ad.csv`](assets/example/metadata_ad.csv)
 
 Additional bundled RData examples:

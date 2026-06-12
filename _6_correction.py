@@ -138,7 +138,7 @@ def _build_parameter_layout(code: str) -> object | None:
                     [html.H6("Correction Parameters", className="mb-0 p-3 bg-light border-bottom")]
                 ),
                 html.Div(
-                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, selected covariates, and study settings from the session.",
+                    "No method-specific parameters are exposed for this method. The run uses the uploaded matrix, metadata mapping, additional metadata covariates, and study settings from the session.",
                     className="p-3 text-muted",
                 ),
             ],
@@ -579,6 +579,23 @@ def correction_layout(active_path: str):
                     html.H2("Batch Effect Correction"),
                     html.P(
                         "Review available correction methods along with their runtime for this session and citation details."
+                    ),
+                    dbc.Alert(
+                        [
+                            html.Div(
+                                "Methods span microbiome-oriented, count-aware, and continuous/transformed matrix frameworks.",
+                                className="fw-semibold mb-1",
+                            ),
+                            html.Div(
+                                "Microbiome-oriented: ConQuR, MMUPHin, PLSDA-batch, DEBIAS-M, MetaDICT."
+                            ),
+                            html.Div("Count-aware: ComBat-seq, RUV-III-NB."),
+                            html.Div(
+                                "Continuous/transformed matrix frameworks: ComBat, limma, FAbatch, FSQN, BMC."
+                            ),
+                        ],
+                        color="light",
+                        className="border mb-3",
                     ),
                     html.P(
                         "Click a method name to open its package or source reference."
