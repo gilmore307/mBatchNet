@@ -176,7 +176,7 @@ class DashAppTests(unittest.TestCase):
         text = Path("README.md").read_text(encoding="utf-8")
 
         self.assertIn("## Correction Methods and Parameters", text)
-        self.assertIn("assets/doc/methods.csv", text)
+        self.assertIn("assets/methods.csv", text)
         self.assertIn("### DEBIAS-M", text)
         self.assertIn("### MetaDICT", text)
         self.assertIn("### ComBat-seq", text)

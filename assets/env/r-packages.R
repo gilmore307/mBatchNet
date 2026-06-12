@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Install the R package stack required by the Batch Effect Correction app.
+# Install the R package stack required by mBatchNet.
 
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 # Try to speed up source builds
@@ -8,7 +8,7 @@ try({ ncpu <- parallel::detectCores(logical = TRUE); if (!is.na(ncpu) && ncpu > 
 msg <- function(...) cat(sprintf(...), "\n")
 rule <- function(t) { cat("\n", paste(rep("=", 55), collapse=""), "\n", t, "\n", paste(rep("=", 55), collapse=""), "\n\n", sep="") }
 
-rule("Batch Effect Correction R dependency installer")
+rule("mBatchNet R dependency installer")
 
 install_if_missing <- function(pkgs, install_fun, ..., quiet = FALSE) {
   pkgs <- unique(pkgs)

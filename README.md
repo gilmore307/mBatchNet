@@ -9,7 +9,9 @@ The app supports an end-to-end pipeline:
 3. Run pre-/post-correction visual and statistical assessments
 4. Download an output bundle or a reproducibility bundle
 
-The current app is the Dash interface. The primary implementation lives in `_0_main.py` and the numbered page modules (`_1_components.py` through `_7_description.py`). `server.py` is a compatibility entry point that imports and serves the same Dash app.
+The current app is the Dash interface. The primary implementation lives in `_0_main.py` and the numbered page modules (`_1_components.py` through `_7_description.py`). `server.py` is the deployment-compatible entry point that imports and serves the same Dash app.
+
+This repository is scoped to runnable source code, method wrappers, app assets, environment manifests, tests, and bundled example inputs. Manuscript drafts, response letters, revision planning files, and generated runtime outputs are intentionally excluded from the archived code repository.
 
 ## Installation
 
@@ -18,7 +20,7 @@ The current app is the Dash interface. The primary implementation lives in `_0_m
 - R 4.2+
 - `Rscript` available in PATH
 
-### 2) Install Python dependencies
+### 2) Create the Python environment
 From the repository root:
 
 ```bash
@@ -26,24 +28,21 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-### 3) Install R dependencies (recommended)
-Use the provided bootstrap script:
-
-```bash
-bash assets/env/setup.sh .venv/bin/python Rscript
-```
-
-This script will:
-- Install Python packages from `assets/env/requirements.txt`
-- Install R packages via `assets/env/r-packages.R`
-
-If Python dependencies are already installed from the root `requirements.txt`, you can install only R dependencies with:
+### 3) Install R dependencies
+Install the R package set used by preprocessing, correction wrappers, and assessment plots:
 
 ```bash
 Rscript assets/env/r-packages.R
 ```
 
-### 4) Optional DEBIAS-M Python dependency
+### 4) Bootstrap both Python and R dependencies
+The bootstrap script installs the root Python `requirements.txt` and then runs the R installer:
+
+```bash
+bash assets/env/setup.sh .venv/bin/python Rscript
+```
+
+### 5) Optional DEBIAS-M Python dependency
 The DEBIAS-M method depends on PyTorch and can install a large machine-learning stack. Install it only when that method is needed:
 
 ```bash
@@ -64,7 +63,7 @@ Core packages:
 - `pandas`
 - `Pillow`
 
-See full package list in `requirements.txt`.
+The canonical Python dependency file is [`requirements.txt`](requirements.txt).
 
 ### R
 Batch-correction and plotting scripts require multiple R packages. Install them with:
@@ -129,7 +128,7 @@ Public server limits:
 
 ## Correction Methods and Parameters
 
-Method descriptions in the app are loaded from `assets/doc/methods.csv`, which also stores package/source links, citation text, and reference URLs. The exposed parameter list below mirrors the current Correction page controls.
+Method descriptions in the app are loaded from `assets/methods.csv`, which also stores package/source links, citation text, and reference URLs. The exposed parameter list below mirrors the current Correction page controls.
 
 Methods without method-specific controls still use the uploaded matrix, metadata mapping, additional metadata covariates, reference batch, and target/control settings from the session.
 

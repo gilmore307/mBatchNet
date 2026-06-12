@@ -1,4 +1,4 @@
-name: Deploy BatchFX
+name: Deploy mBatchNet
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     concurrency:
-      group: deploy-batchfx
+      group: deploy-mbatchnet
       cancel-in-progress: false
 
     steps:
@@ -27,4 +27,3 @@ jobs:
           export GITHUB_REF_NAME=${GITHUB_REF_NAME:-}
           export GITHUB_RUN_NUMBER=${GITHUB_RUN_NUMBER:-}
           /usr/local/bin/deploy-batchfx.sh main
-
