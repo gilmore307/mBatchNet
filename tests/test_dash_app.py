@@ -623,6 +623,33 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["dimensions"]["header_detected"])
             self.assertTrue(report["dimensions"]["sample_id_column"])
 
+    def test_public_server_accepts_maximum_dummy_matrix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            with (session_dir / "raw.csv").open("w", encoding="utf-8", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow([f"feature_{idx}" for idx in range(MAX_FEATURES)])
+                for sample_idx in range(MAX_SAMPLES):
+                    writer.writerow(
+                        [1 + ((sample_idx + feature_idx) % 7) for feature_idx in range(MAX_FEATURES)]
+                    )
+            with (session_dir / "metadata_origin.csv").open("w", encoding="utf-8", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Batch", "Phenotype"])
+                for sample_idx in range(MAX_SAMPLES):
+                    writer.writerow([f"B{sample_idx % 4}", "case" if sample_idx % 2 else "control"])
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"]["samples"], MAX_SAMPLES)
+            self.assertEqual(report["dimensions"]["features"], MAX_FEATURES)
+            self.assertEqual(report["dimensions"]["matrix_cells"], MAX_MATRIX_CELLS)
+            self.assertFalse(
+                any("exceeds public-server limits" in err for err in report["errors"]),
+                report["errors"],
+            )
+
     def test_session_manifests_are_written_for_download_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
