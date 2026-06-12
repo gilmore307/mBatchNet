@@ -250,15 +250,17 @@ class DashAppTests(unittest.TestCase):
         text = _component_text(
             _header_with_tooltip(
                 "Expected time (s)",
-                "Average elapsed seconds from previous successful runs on this server. Actual runtime depends on data size, method parameters, and server load; use this estimate as a reference only and check Logs for detailed run progress.",
+                "Reference elapsed seconds from recorded successful runs on this server, including the bundled example input when available. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
                 "method-expected-time-help-test",
             )
         )
 
         self.assertIn("Expected time (s)", text)
         self.assertIn("?", text)
-        self.assertIn("previous successful runs", text)
-        self.assertIn("data size", text)
+        self.assertIn("recorded successful runs", text)
+        self.assertIn("bundled example input", text)
+        self.assertIn("input size", text)
+        self.assertIn("selected methods", text)
         self.assertIn("method parameters", text)
         self.assertIn("Logs", text)
 

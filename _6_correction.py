@@ -649,7 +649,7 @@ def register_correction_callbacks(app):
                     html.Th(
                         _header_with_tooltip(
                             "Expected time (s)",
-                            "Average elapsed seconds from previous successful runs on this server. Actual runtime depends on data size, method parameters, and server load; use this estimate as a reference only and check Logs for detailed run progress.",
+                            "Reference elapsed seconds from recorded successful runs on this server, including the bundled example input when available. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
                             "method-expected-time-help",
                         ),
                         className="text-center",
