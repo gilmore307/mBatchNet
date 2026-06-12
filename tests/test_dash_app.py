@@ -94,10 +94,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("FASTQ", text)
         self.assertNotIn("shotgun metagenomics", text)
         self.assertIn("Samples in rows", text)
-        self.assertIn("Samples: 300 or fewer", text)
+        self.assertIn("Samples: 500 or fewer", text)
         self.assertIn("Features: 300 or fewer", text)
         self.assertIn("CSV size: 10.0 MB or smaller", text)
-        self.assertNotIn("Matrix cells: 90,000 or fewer", text)
+        self.assertNotIn("Matrix cells: 150,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
         self.assertIn("All-zero sample rows are blocked", text)
         self.assertIn("FAbatch requires retained features", text)
@@ -106,10 +106,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("mBatchNet reports a warning when batch and target are strongly associated", text)
 
     def test_public_upload_limits_match_server_contract(self):
-        self.assertEqual(MAX_SAMPLES, 300)
+        self.assertEqual(MAX_SAMPLES, 500)
         self.assertEqual(MAX_FEATURES, 300)
         self.assertEqual(MAX_UPLOAD_BYTES, 10 * 1024 * 1024)
-        self.assertEqual(MAX_MATRIX_CELLS, 90_000)
+        self.assertEqual(MAX_MATRIX_CELLS, 150_000)
         self.assertEqual(MAX_METADATA_COLUMNS, 5)
 
     def test_navbar_exposes_two_download_entries(self):
