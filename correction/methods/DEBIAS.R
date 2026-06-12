@@ -5,13 +5,18 @@ prepare_method("DEBIAS")
 run_method("DEBIAS", {
   suppressPackageStartupMessages(library(reticulate))
   py <- Sys.getenv("RETICULATE_PYTHON")
-  if (!nzchar(py)) {
+  project_venv <- ".venv"
+  if (nzchar(py)) {
+    reticulate::use_python(py, required = TRUE)
+  } else if (dir.exists(project_venv)) {
+    reticulate::use_virtualenv(normalizePath(project_venv, winslash = "/", mustWork = TRUE), required = TRUE)
+  } else {
     cand <- Sys.which(c("python3", "python"))
-    cand <- unname(cand[cand != ""])  
+    cand <- unname(cand[cand != ""])
     if (length(cand) > 0) py <- cand[[1]]
+    if (!nzchar(py)) py <- "python"
+    reticulate::use_python(py, required = TRUE)
   }
-  if (!nzchar(py)) py <- "python"
-  reticulate::use_python(py, required = TRUE)
 
   have_np <- py_module_available("numpy")
   have_dm <- py_module_available("debiasm")

@@ -48,11 +48,10 @@ done
 ## Summary
 
 - Preprocessing succeeded in 0.46 s with 73,576 KiB peak RSS.
-- Correction batch elapsed time was 60.58 s with 632,308 KiB peak RSS.
-- 11 of 12 supported method scripts completed successfully.
-- DEBIAS-M failed before correction because the optional Python `debiasm` dependency is not installed in the configured project environment.
-- The highest successful method peak RSS was FAbatch at 632,308 KiB.
-- The slowest successful method was MetaDICT at 24.56 s.
+- Correction batch elapsed time was 71.47 s with 1,123,124 KiB peak RSS.
+- 12 of 12 supported method scripts completed successfully.
+- DEBIAS-M used the project `.venv` Python environment with `debiasm` available.
+- The highest method peak RSS was DEBIAS-M at 1,123,124 KiB.
+- The slowest method was MetaDICT at 24.65 s.
 
 Detailed per-method measurements are in `example_input_memory_benchmark_20260612.csv`.
-
