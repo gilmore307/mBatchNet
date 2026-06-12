@@ -228,7 +228,7 @@ For each session, intermediate and final outputs are generated under `output/<se
 - assessment figures (PCA/PCoA/NMDS/PERMANOVA/PVCA, etc.)
 - run log (`run.log`)
 - output summary (`output_summary.json`)
-- validation report (`validation_report.json`)
+- validation report (`validation_report.json`) with input validity, dimensions, limits, validation timestamp, and validation elapsed seconds
 - runtime summary (`runtime_summary.json`)
 - parameter manifest (`parameter_manifest.json`)
 - reproducibility manifest (`reproducibility_manifest.json`)

@@ -652,6 +652,8 @@ class DashAppTests(unittest.TestCase):
             )
             validation_report = json.loads((session_dir / "validation_report.json").read_text(encoding="utf-8"))
             self.assertEqual(validation_report["valid"], report["valid"])
+            self.assertRegex(validation_report["validated_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
+            self.assertGreaterEqual(validation_report["validation_elapsed_sec"], 0)
             self.assertEqual(validation_report["dimensions"]["samples"], MAX_SAMPLES)
             self.assertEqual(validation_report["dimensions"]["features"], MAX_FEATURES)
             self.assertEqual(validation_report["limits"]["max_matrix_cells"], MAX_MATRIX_CELLS)

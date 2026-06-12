@@ -5,6 +5,8 @@ from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import csv
 import math
+import time
+from datetime import datetime
 from io import BytesIO
 import shutil
 import zipfile
@@ -212,6 +214,30 @@ def _write_validation_report(session_dir: Path, report: Dict[str, object]) -> No
         pass
 
 
+def _build_validation_report(
+    errors: List[str],
+    warnings: List[str],
+    dimensions: Dict[str, object],
+    started_at: float,
+) -> Dict[str, object]:
+    return {
+        "valid": not errors,
+        "validated_at": datetime.now().isoformat(timespec="seconds"),
+        "validation_elapsed_sec": round(time.perf_counter() - started_at, 6),
+        "errors": errors,
+        "warnings": warnings,
+        "dimensions": dimensions,
+        "limits": {
+            "max_upload_bytes": MAX_UPLOAD_BYTES,
+            "max_samples": MAX_SAMPLES,
+            "max_features": MAX_FEATURES,
+            "max_matrix_cells": MAX_MATRIX_CELLS,
+            "max_metadata_columns": MAX_METADATA_COLUMNS,
+        },
+        "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
+    }
+
+
 def validate_session_inputs(
     session_dir: Path,
     *,
@@ -220,6 +246,7 @@ def validate_session_inputs(
 ) -> Dict[str, object]:
     """Validate the server-side upload contract before running R preprocessing."""
 
+    started_at = time.perf_counter()
     raw_path = session_dir / "raw.csv"
     meta_path = session_dir / "metadata_origin.csv"
     errors: List[str] = []
@@ -231,7 +258,7 @@ def validate_session_inputs(
     if not meta_path.exists():
         errors.append("Missing metadata_origin.csv.")
     if errors:
-        report = {"valid": False, "errors": errors, "warnings": warnings, "dimensions": dimensions}
+        report = _build_validation_report(errors, warnings, dimensions, started_at)
         _write_validation_report(session_dir, report)
         return report
 
@@ -350,20 +377,7 @@ def validate_session_inputs(
                     f"({retained}) is not greater than the largest batch size ({max_batch_size})."
                 )
 
-    report = {
-        "valid": not errors,
-        "errors": errors,
-        "warnings": warnings,
-        "dimensions": dimensions,
-        "limits": {
-            "max_upload_bytes": MAX_UPLOAD_BYTES,
-            "max_samples": MAX_SAMPLES,
-            "max_features": MAX_FEATURES,
-            "max_matrix_cells": MAX_MATRIX_CELLS,
-            "max_metadata_columns": MAX_METADATA_COLUMNS,
-        },
-        "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
-    }
+    report = _build_validation_report(errors, warnings, dimensions, started_at)
     _write_validation_report(session_dir, report)
     return report
 
