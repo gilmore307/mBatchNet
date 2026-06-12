@@ -82,6 +82,8 @@ The correction-method categories described in the main text are used as practica
 
 The diagnostic categories are mapped as follows. Ordination diagnostics include PCA, PCoA and NMDS. Distance-matrix tests and summaries include ANOSIM, PERMANOVA and dissimilarity heatmaps. Variance-partitioning analyses include feature-wise ANOVA $R^2$, pRDA and PVCA. Neighborhood and embedding-based summaries include alignment score, entropy of batch mixing and target-label silhouette.
 
+For CLR/Aitchison analyses, non-negative count or abundance matrices are first converted to total-sum-scaled relative-abundance profiles. Zeros are replaced within each sample by a small positive value before taking logarithms; in the preprocessing output, the replacement is based on the smallest positive value in that sample with a lower bound of $10^{-6}$. The log-transformed profile is then centered by subtracting the sample-wise mean log abundance. Aitchison distance is computed as Euclidean distance between these CLR-transformed profiles. Bray--Curtis dissimilarity is computed separately on non-negative relative-abundance profiles and does not use CLR-transformed values.
+
 \begin{enumerate}
 \renewcommand{\labelenumi}{(\roman{enumi})}
 
@@ -104,7 +106,9 @@ In the anaerobic digestion case study, these diagnostics were interpreted jointl
 \subsection*{Supplementary Note 2. Input validation and data-cleaning boundary}
 \label{sec:supp-validation}
 
-mBatchNet is designed for processed microbiome abundance or count tables with matching sample metadata. It is not intended to replace upstream quality control, feature filtering, missing-value handling, or outlier review. During upload, the server validates core input requirements before preprocessing and writes a validation report for the session. Blocking errors include missing upload files, malformed numeric matrices, blank, non-numeric, NA, NaN or Inf matrix values, metadata row-count mismatch, missing selected batch or target metadata variables, insufficient batch or target levels, identical batch and target selections, all-zero sample rows, and matrices exceeding the public-server size limits. The server also reports warnings for large uploads, all-zero feature columns, high sparsity, negative or transformed-looking values, and strong batch-target association. mBatchNet does not impute missing values, remove outliers, or automatically decide which samples or features should be excluded; users should perform those data-cleaning steps before upload when they are needed.
+mBatchNet is designed for processed microbiome abundance or count tables with matching sample metadata. It is not intended to replace upstream quality control, feature filtering, missing-value handling, or outlier review. During upload, the server validates core input requirements before preprocessing and writes a validation report for the session. Blocking errors include missing upload files, malformed numeric matrices, blank, non-numeric, NA, NaN or Inf matrix values, metadata row-count mismatch, missing selected batch or target metadata variables, insufficient batch or target levels, identical batch and target selections, all-zero sample rows, and matrices exceeding the public-server size limits. The public server currently limits each CSV upload to 10 MB, feature matrices to at most 1,000 samples, 1,000 features and 1,000,000 matrix cells, and metadata tables to at most five columns. The server also reports warnings for large uploads, all-zero feature columns, high sparsity, negative or transformed-looking values, and strong batch-target association. mBatchNet does not impute missing values, remove outliers, or automatically decide which samples or features should be excluded; users should perform those data-cleaning steps before upload when they are needed.
+
+The downloadable output bundle records the server-side run in machine-readable files. These include validation_report.json for input checks and dimensions, output_summary.json for locating generated tables and figures, runtime_summary.json for elapsed-time information, parameter_manifest.json for selected methods and parameters, and reproducibility_manifest.json for the reloadable reproducibility bundle. These records are intended to make the web-server workflow inspectable even when users do not review the interactive interface after the run.
 
 
 \newpage
@@ -218,6 +222,30 @@ MetaDICT & 0.039 & 0.109 & 0.093 & 0.009 \\
 MMUPHin & -0.010 & 0.648 & 0.069 & 0.148 \\
 PLSDA-batch & 0.377 & 0.001 & 0.377 & 0.001 \\
 RUV-III-NB & 0.639 & 0.001 & 0.460 & 0.001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{\textbf{Supplementary Table S2. Coverage of correction methods supported by mBatchNet.} The main figure is kept compact for Application Note readability; the table documents all supported methods and how each is represented in the manuscript or supplement.}
+\label{tab:method-coverage}
+\begin{tabular}{llll}
+\toprule
+Method & Method category & Main figure & Manuscript/supplement representation \\
+\midrule
+ConQuR & Microbiome-oriented count model & Yes & Case-study statistics in Supplementary Table S1 \\
+MMUPHin & Microbiome-oriented meta-analysis & Yes & Case-study statistics in Supplementary Table S1 \\
+PLSDA-batch & Microbiome-oriented latent-component method & Yes & Case-study statistics in Supplementary Table S1 \\
+DEBIAS-M & Microbiome-oriented processing-bias model & Yes & Case-study statistics in Supplementary Table S1 \\
+MetaDICT & Microbiome-oriented dictionary-learning method & Yes & Case-study statistics in Supplementary Table S1 \\
+RUV-III-NB & Count-aware unwanted-variation model & No & Case-study statistics in Supplementary Table S1 \\
+ComBat & General empirical-Bayes adjustment & No & Listed and categorized; run when input assumptions are met \\
+limma & General linear-model adjustment & No & Listed and categorized; run when input assumptions are met \\
+ComBat-seq & Count-aware empirical-Bayes adjustment & No & Listed and categorized; run when input assumptions are met \\
+FAbatch & General latent-factor adjustment & No & Listed and categorized; run when input assumptions are met \\
+FSQN & General quantile-normalization framework & No & Listed and categorized; run when input assumptions are met \\
+BMC & General multiplicative-bias correction & No & Listed and categorized; run when input assumptions are met \\
 \bottomrule
 \end{tabular}
 \end{table}

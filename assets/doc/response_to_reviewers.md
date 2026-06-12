@@ -11,15 +11,19 @@ We thank the Associate Editor and reviewers for the constructive comments. We ha
 Major changes include:
 
 - We clarified that mBatchNet integrates established batch-correction methods in a unified web-server workflow and does not claim a new statistical correction algorithm.
+- We clarified the data scope: the case study and manuscript-level validation use a 16S rRNA OTU table, while the server accepts compatible preprocessed microbiome feature tables, including shotgun-derived taxonomic or functional profiles after upstream profiling. We also state that raw-read processing, taxonomic profiling, assembly, and functional annotation are outside the scope of mBatchNet.
 - We revised the Methods/Features text to describe all 12 correction methods currently supported by the server and to group them by practical implementation category.
 - We expanded the explanation of diagnostic categories, including ordination, distance-matrix tests, variance partitioning, and neighborhood or embedding-based metrics.
-- We added concise definitions of CLR/Aitchison and Bray-Curtis analyses in workflow terms.
+- We added concise definitions of CLR/Aitchison and Bray-Curtis analyses in workflow terms, including zero handling before CLR transformation.
 - We expanded the anaerobic digestion case-study description, including sample/feature counts, target variable, batch variable, covariate, and batch-target balance.
 - We added numerical ANOSIM/PERMANOVA effect sizes and p-values for the displayed case-study outputs in the Results and Supplementary Table S1.
-- We strengthened server-side validation and user-facing guidance for upload limits, malformed inputs, missing/invalid values, all-zero samples/features, high sparsity warnings, and batch-target imbalance warnings.
-- We added method explanations and parameter help in the web interface, as well as separate output and reproducibility bundles.
+- We strengthened server-side validation and user-facing guidance for upload limits, malformed inputs, missing/invalid values, all-zero samples/features, high sparsity warnings, and batch-target imbalance warnings. The public-server limits are now documented as 10 MB per CSV file, no more than 1,000 samples, 1,000 features, 1,000,000 matrix cells, and five metadata columns.
+- We added method explanations and parameter help in the web interface, as well as separate output and reproducibility bundles. The manuscript/supplement now anchors the corresponding server outputs, including validation_report.json, output_summary.json, runtime_summary.json, parameter_manifest.json, and reproducibility_manifest.json.
+- We added a supplementary method-coverage table listing all 12 supported correction methods and indicating which methods are shown in the compact case-study figure or supplementary statistics.
 - We standardized terminology across the manuscript and interface, using "metadata variables", "target", "batch", "covariates", and "method parameters" consistently.
 - We standardized the public URL as https://mbatchnet.com/ and corrected minor wording/capitalization issues.
+
+One remaining item before final resubmission is to insert measured runtime and peak-memory values into the response letter and supplement. We will complete these measurements under a stated hardware/software environment before submission rather than reporting unmeasured estimates.
 
 Before final resubmission, we will archive the exact revised code snapshot and insert the archival DOI in the Availability statement as requested by Bioinformatics. Placeholder: [ARCHIVAL DOI TO BE INSERTED].
 
@@ -31,7 +35,9 @@ Reviewer comment: The reviewer suggested adding a clear statement about computat
 
 Response: We agree. We have revised the server to make public-server limits explicit and to validate uploaded files before preprocessing or method execution. The upload page now states file-size, sample, feature, matrix-cell, and metadata-column limits. Uploaded matrices and metadata are checked before analysis so oversized or malformed inputs fail early with an informative message. The correction page also reports elapsed time from the current session and displays available average elapsed-time information from previous successful runs. In the manuscript, we now describe the session-scoped workflow, logs, downloadable outputs, and method-dependent runtime behavior more clearly.
 
-Changes made: Upload limits and validation are implemented in the web server; runtime information is displayed in the correction interface; manuscript text was revised in the Summary and Features/Implementation sections.
+The current public-server limits are 10 MB per CSV file, no more than 1,000 samples, 1,000 features, or 1,000,000 matrix cells, and no more than five metadata columns. These limits are written to validation_report.json together with the uploaded matrix dimensions. In response to the request for measured performance, we will add a compact supplementary performance table with the bundled example dataset and two representative larger matrices, reporting runtime and peak memory under the final benchmark environment. We will not rely only on the website runtime display in the final resubmission.
+
+Changes made: Upload limits and validation are implemented in the web server; runtime information is displayed in the correction interface; validation_report.json and runtime_summary.json are included in downloadable outputs; manuscript and supplement text now document the server limits and runtime/output summaries. Before final submission, measured runtime and peak-memory values will be inserted into the performance table.
 
 ### Major comment 2
 
@@ -83,7 +89,7 @@ Reviewer comment: The website should provide an "Export Script" function to repr
 
 Response: We agree with the goal of reproducibility. Instead of generating a standalone script that may not reproduce the exact server environment, we added a server-centered reproducibility bundle. The bundle records session inputs, selected metadata variables, method parameters, validation metadata, run metadata, and session state, and can be uploaded back to mBatchNet to restore and rerun the analysis. For users who prefer local execution, the full source code remains available through GitHub.
 
-Changes made: The web server now provides separate "Download outputs" and "Repro bundle" actions. The upload page can restore a previously exported reproducibility_bundle.zip.
+Changes made: The web server now provides separate "Download outputs" and "Repro bundle" actions. The output bundle contains corrected matrices, diagnostic figures, metric tables, logs, validation_report.json, output_summary.json, runtime_summary.json, parameter_manifest.json, and reproducibility_manifest.json. The upload page can restore a previously exported reproducibility_bundle.zip.
 
 ## Reviewer 3
 
@@ -167,9 +173,9 @@ Reviewer comment: The web server supports more correction methods than those dis
 
 Response: We agree that the manuscript should not appear to omit server-supported methods. We revised the main text to describe all 12 correction methods currently supported by mBatchNet: ConQuR, MMUPHin, PLSDA-batch, DEBIAS-M, MetaDICT, ComBat, limma, ComBat-seq, FAbatch, RUV-III-NB, FSQN, and BMC. We also added references for RUV-III-NB, FSQN, and BMC.
 
-The displayed anaerobic digestion case study focuses on a compact set of microbiome-oriented correction outputs to keep the main figure readable within the Application Note page limit. The server itself can execute the full supported method set, and the supplementary note now maps all supported methods by category. We also include numerical statistics for the displayed outputs in the main Results and Supplementary Table S1.
+The displayed anaerobic digestion case study focuses on a compact set of correction outputs to keep the main figure readable within the Application Note page limit. To make the relationship between the website and manuscript explicit, we added a supplementary method-coverage table listing all 12 supported methods and indicating whether each method is displayed in the main figure, included in supplementary case-study statistics, or documented as a supported method that can be run when its input assumptions are met. We also include numerical statistics for the displayed outputs in the main Results and Supplementary Table S1.
 
-Changes made: The Summary now states "12 supported" correction methods; the Features/Implementation section lists all 12 methods and groups them; Supplementary Note 1 maps method categories; reference entries were added for RUV-III-NB, FSQN, and BMC.
+Changes made: The Summary now states "12 supported" correction methods; the Features/Implementation section lists all 12 methods and groups them; Supplementary Note 1 maps method categories; Supplementary Table S2 documents method coverage; reference entries were added for RUV-III-NB, FSQN, and BMC.
 
 ### Minor comment 1
 
@@ -211,7 +217,7 @@ Reviewer comment: Clarify whether the server and protocol are applicable to shot
 
 Response: We clarified the input boundary conservatively. mBatchNet operates on processed feature tables and matching metadata. Therefore, it can accept compatible taxonomic or functional abundance/count tables derived from 16S or shotgun metagenomic profiling after upstream processing. It does not process raw sequencing reads and the current illustrative benchmark is a 16S rRNA amplicon dataset.
 
-Changes made: The upload guidance and validation policy clarify that mBatchNet expects processed count or abundance feature tables with matching metadata. We avoided claiming full biological validation on a shotgun benchmark not included in the manuscript.
+Changes made: The manuscript now states that the case study and manuscript-level validation are based on a 16S rRNA OTU table, while compatible preprocessed microbiome feature tables, including shotgun-derived taxonomic or functional profiles, can be used as inputs when method assumptions are met. The upload guidance and validation policy clarify that raw sequencing reads and upstream profiling steps are outside the scope of mBatchNet. We avoided claiming full biological validation on a shotgun benchmark not included in the manuscript.
 
 ### Comment 3
 
@@ -249,17 +255,17 @@ Changes made: The Introduction now distinguishes BatchServer as a general omics 
 
 Reviewer comment: Provide information on scalability, performance, expected runtime, memory usage, and practical constraints.
 
-Response: We added practical public-server constraints to the upload workflow and runtime information to the correction workflow. The current server enforces upload and table-size limits and reports current-session elapsed times for method runs, with average elapsed-time information where available. This gives users a concrete pre-check before analysis and a runtime reference during method execution.
+Response: We added practical public-server constraints to the upload workflow and runtime information to the correction workflow. The current public server enforces 10 MB per CSV file, 1,000 samples, 1,000 features, 1,000,000 matrix cells, and five metadata columns. It also reports current-session elapsed times for method runs, with average elapsed-time information where available. This gives users a concrete pre-check before analysis and a runtime reference during method execution. In addition, before final submission we will include a small measured performance table reporting runtime and peak memory for the bundled example dataset and representative larger matrices under a stated hardware/software environment.
 
-Changes made: The upload interface now states public-server limits and validates file/table size before preprocessing. The correction interface reports elapsed time from session logs and available average elapsed-time information.
+Changes made: The upload interface now states public-server limits and validates file/table size before preprocessing. The correction interface reports elapsed time from session logs and available average elapsed-time information. The supplement now documents the public-server limits and runtime/output summary files; measured runtime and peak-memory values will be filled after benchmark completion.
 
 ### Comment 8
 
 Reviewer comment: Explain Aitchison distance and why it is appropriate for compositional microbiome data.
 
-Response: We added a concise workflow definition.
+Response: We added a concise workflow definition and explicit zero-handling detail.
 
-Changes made: The assessment section now states that abundances are transformed using CLR and that Aitchison distance is Euclidean distance between CLR-transformed profiles. Supplementary Note 1 provides a longer explanation in the diagnostic section.
+Changes made: The assessment section now states that abundances are transformed using CLR and that Aitchison distance is Euclidean distance between CLR-transformed profiles. Supplementary Note 1 states that non-negative count or abundance matrices are first converted to relative-abundance profiles and that zeros are replaced with a small positive value before log transformation and centering.
 
 ### Comment 9
 
@@ -287,4 +293,3 @@ We also addressed the submission instructions in the decision letter as follows:
 - The Availability statement includes the GitHub source-code repository and will include the archival DOI once the exact revised code snapshot is archived before final submission.
 
 We again thank the reviewers for their helpful comments.
-
