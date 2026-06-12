@@ -41,3 +41,17 @@ plsda_full,assets/example/data_plsda.R,PLSDAbatch FullData count table,75,567,42
 plsda_full,assets/example/data_plsda.R,PLSDAbatch FullData count table,75,567,42525,88.40,1.50,correction_method,ConQuR,0,15.94,389496,380.37,Success
 plsda_full,assets/example/data_plsda.R,PLSDAbatch FullData count table,75,567,42525,88.40,1.50,correction_method,DEBIAS-M,0,10.34,1131428,1104.91,Success using project .venv Python environment
 plsda_full,assets/example/data_plsda.R,PLSDAbatch FullData count table,75,567,42525,88.40,1.50,correction_method,MetaDICT,0,86.91,401092,391.69,Success; slowest method for this wider feature table
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,preprocess,preprocess,0,0.39,81328,79.42,Generated directly from MetaDICT exampleData object and validated under the public upload contract
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_batch,all_supported_corrections,0,52.30,1133696,1107.13,Ran all 12 supported method scripts sequentially; FAbatch failed due method-specific p > max batch size requirement
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,ComBat,0,4.64,583480,569.80,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,limma,0,0.49,85740,83.73,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,ComBatSeq,0,4.57,568284,554.96,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,FAbatch,1,4.01,550688,537.78,Failed: after feature filtering p=125 was not greater than max batch size 200
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,BMC,0,0.97,223200,217.97,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,FSQN,0,0.41,83624,81.66,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,RUV-III-NB,0,4.55,332452,324.66,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,MMUPHin,0,0.98,171600,167.58,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,PLSDA-batch,0,2.23,297064,290.10,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,ConQuR,0,10.12,396684,387.39,Success
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,DEBIAS-M,0,5.53,1133696,1107.13,Success using project .venv Python environment
+metadict_full,assets/example/data_metadict.R,MetaDICT package exampleData full table,400,131,52400,110.68,13.30,correction_method,MetaDICT,0,13.69,375276,366.48,Success
