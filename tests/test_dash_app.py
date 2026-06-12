@@ -31,6 +31,7 @@ from _6_correction import _build_parameter_layout
 from _6_correction import _header_with_tooltip
 from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
+from _6_correction import _fabatch_unavailable_reason
 from _6_correction import correction_layout
 from _7_description import HELP_MODAL_SECTIONS
 from _7_description import HELP_SECTION_TOC
@@ -98,6 +99,8 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Matrix cells: 1,000,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
         self.assertIn("All-zero sample rows are blocked", text)
+        self.assertIn("FAbatch requires retained features", text)
+        self.assertIn("marked unavailable for the session", text)
         self.assertIn("Columns: 5 or fewer", text)
         self.assertIn("mBatchNet reports a warning when batch and target are strongly associated", text)
 
@@ -317,6 +320,10 @@ class DashAppTests(unittest.TestCase):
             self.assertGreaterEqual(len(description), 180, method_code)
             self.assertGreaterEqual(description.count("."), 3, method_code)
             self.assertIn("In mBatchNet", description, method_code)
+        self.assertIn(
+            "retained feature count after low-variance filtering",
+            METHOD_REFERENCE_BY_CODE["FAbatch"]["description"],
+        )
 
     def test_pre_post_assessment_figures_use_distinct_stage_outputs(self):
         pre_outputs = set(_expected_figure_files("pre", "pca"))
@@ -576,6 +583,27 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 1.0)
             self.assertTrue(any("strongly associated" in warning for warning in report["warnings"]))
+
+    def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2\n1,2\n2,3\n3,4\n4,5\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,case\nB,control\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"].get("fabatch_retained_features"), 2)
+            self.assertEqual(report["dimensions"].get("fabatch_max_batch_size"), 2)
+            self.assertFalse(report["dimensions"].get("fabatch_available"))
+            self.assertTrue(any("FAbatch is unavailable" in warning for warning in report["warnings"]))
+            self.assertIn("retained feature count", _fabatch_unavailable_reason(session_dir))
 
     def test_profile_table_contract_is_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:

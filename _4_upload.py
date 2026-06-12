@@ -4,6 +4,7 @@
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 import csv
+import math
 from io import BytesIO
 import shutil
 import zipfile
@@ -165,6 +166,42 @@ def _cramers_v(rows: List[Dict[str, str]], col_a: str, col_b: str) -> Optional[f
     return (chi2 / denom) ** 0.5 if denom else None
 
 
+def _fabatch_retained_feature_count(matrix: List[List[float]]) -> Optional[int]:
+    if not matrix or not matrix[0]:
+        return None
+    n_rows = len(matrix)
+    n_cols = len(matrix[0])
+    if n_rows < 2 or n_cols < 1:
+        return None
+
+    has_negative = any(value < 0 for row in matrix for value in row)
+    transformed: List[List[float]] = []
+    if has_negative:
+        transformed = [list(row) for row in matrix]
+    else:
+        tss_rows: List[List[float]] = []
+        positive_values: List[float] = []
+        for row in matrix:
+            clean = [value if value > 0 else 0.0 for value in row]
+            row_sum = sum(clean) or 1.0
+            tss = [value / row_sum for value in clean]
+            tss_rows.append(tss)
+            positive_values.extend(value for value in tss if value > 0)
+        if not positive_values:
+            return 0
+        eps = max(min(positive_values) * 0.65, 1e-6)
+        transformed = [[math.log(value if value > 0 else eps) for value in row] for row in tss_rows]
+
+    retained = 0
+    for col in range(n_cols):
+        values = [row[col] for row in transformed]
+        mean_val = sum(values) / n_rows
+        variance = sum((value - mean_val) ** 2 for value in values) / max(1, n_rows - 1)
+        if variance > 1e-12:
+            retained += 1
+    return retained
+
+
 def _write_validation_report(session_dir: Path, report: Dict[str, object]) -> None:
     try:
         (session_dir / "validation_report.json").write_text(
@@ -272,6 +309,8 @@ def validate_session_inputs(
         else:
             batch_counts = _level_counts(metadata_rows, batch_col)
             dimensions["batch_levels"] = len(batch_counts)
+            if batch_counts:
+                dimensions["max_batch_size"] = max(batch_counts.values())
             if len(batch_counts) < 2:
                 errors.append("Batch column must contain at least two non-empty levels.")
             if any(_blank(row.get(batch_col)) for row in metadata_rows):
@@ -296,6 +335,19 @@ def validate_session_inputs(
                 warnings.append(
                     "Batch and target are strongly associated. Interpret correction results with this confounding in mind because "
                     "batch removal may also remove biological signal."
+                )
+    if matrix and batch_col and batch_col in metadata_header:
+        batch_counts = _level_counts(metadata_rows, batch_col)
+        max_batch_size = max(batch_counts.values()) if batch_counts else None
+        retained = _fabatch_retained_feature_count(matrix)
+        if retained is not None and max_batch_size is not None:
+            dimensions["fabatch_retained_features"] = retained
+            dimensions["fabatch_max_batch_size"] = max_batch_size
+            dimensions["fabatch_available"] = retained > max_batch_size
+            if retained <= max_batch_size:
+                warnings.append(
+                    "FAbatch is unavailable for this input because retained feature count after low-variance filtering "
+                    f"({retained}) is not greater than the largest batch size ({max_batch_size})."
                 )
 
     report = {
@@ -642,6 +694,11 @@ def upload_layout(active_path: str):
                                                                             html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
                                                                             html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
                                                                             html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
+                                                                            html.Li(
+                                                                                "FAbatch requires retained features after low-variance filtering "
+                                                                                "to be greater than the largest batch size; otherwise FAbatch is "
+                                                                                "marked unavailable for the session."
+                                                                            ),
                                                                         ],
                                                                         className="mb-3",
                                                                     ),

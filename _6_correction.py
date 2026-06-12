@@ -544,6 +544,31 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     )
 
 
+def _fabatch_unavailable_reason(session_dir) -> str | None:
+    if not session_dir:
+        return None
+    report_path = session_dir / "validation_report.json"
+    if not report_path.exists():
+        return None
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    dimensions = payload.get("dimensions")
+    if not isinstance(dimensions, dict):
+        return None
+    if dimensions.get("fabatch_available") is not False:
+        return None
+    retained = dimensions.get("fabatch_retained_features")
+    max_batch = dimensions.get("fabatch_max_batch_size")
+    if retained is not None and max_batch is not None:
+        return (
+            "FAbatch unavailable: retained feature count after low-variance filtering "
+            f"({retained}) is not greater than the largest batch size ({max_batch})."
+        )
+    return "FAbatch unavailable for this input under its feature-count and batch-size requirement."
+
+
 def correction_layout(active_path: str):
     return html.Div(
         [
@@ -696,13 +721,16 @@ def register_correction_callbacks(app):
             time_display = "-" if elapsed in (None, "") else f"{float(elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
             failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
+            fabatch_reason = _fabatch_unavailable_reason(session_dir) if code == "FAbatch" else None
             if outputs_present:
                 status_text = "Selected"
+            elif fabatch_reason:
+                status_text = "Unavailable"
             elif failed_state:
                 status_text = "Failed"
             else:
                 status_text = "Not selected"
-            run_disabled = not session_ready or outputs_present
+            run_disabled = not session_ready or outputs_present or bool(fabatch_reason)
             delete_disabled = not outputs_present
             status_cell = html.Td(
                 dcc.Loading(
@@ -815,6 +843,16 @@ def register_correction_callbacks(app):
                             ),
                             colSpan=8,
                             className="p-0",
+                        )
+                    )
+                )
+            if fabatch_reason:
+                body_rows.append(
+                    html.Tr(
+                        html.Td(
+                            dbc.Alert(fabatch_reason, color="warning", className="mb-0"),
+                            colSpan=8,
+                            className="p-2",
                         )
                     )
                 )
@@ -960,6 +998,18 @@ def register_correction_callbacks(app):
                 "secondary",
                 payload,
             )
+        if method_code == "FAbatch":
+            reason = _fabatch_unavailable_reason(session_dir)
+            if reason:
+                payload = {"message": reason}
+                return (
+                    "Unavailable",
+                    True,
+                    "secondary",
+                    True,
+                    "secondary",
+                    payload,
+                )
         log_path = session_dir / "run.log"
         record_method_parameters(session_dir, method_code, params)
         success, _ = run_single_method(session_dir, method_code, log_path=log_path, params=params)
