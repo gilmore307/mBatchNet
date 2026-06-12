@@ -1,6 +1,7 @@
 import unittest
 import base64
 import csv
+import json
 import os
 import tempfile
 import shutil
@@ -648,6 +649,15 @@ class DashAppTests(unittest.TestCase):
             self.assertFalse(
                 any("exceeds public-server limits" in err for err in report["errors"]),
                 report["errors"],
+            )
+            validation_report = json.loads((session_dir / "validation_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(validation_report["valid"], report["valid"])
+            self.assertEqual(validation_report["dimensions"]["samples"], MAX_SAMPLES)
+            self.assertEqual(validation_report["dimensions"]["features"], MAX_FEATURES)
+            self.assertEqual(validation_report["limits"]["max_matrix_cells"], MAX_MATRIX_CELLS)
+            self.assertEqual(
+                validation_report["input_contract"],
+                "sample-feature numeric matrix: rows are samples and columns are profiled features",
             )
 
     def test_session_manifests_are_written_for_download_bundle(self):
