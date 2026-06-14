@@ -191,9 +191,10 @@ METHOD_MATCHING_SOURCE_NOTE = (
 )
 
 METHOD_MATCHING_PREPROCESS_NOTE = (
-    "mBatchNet preprocessing converts uploaded matrices into method-ready count, TSS, CLR, "
-    "or log-scale inputs before correction. A count upload can therefore run a log-scale method; "
-    "converted inputs can perform differently from data originally prepared for that method's native scale."
+    "mBatchNet preprocessing adaptively derives method-ready count, TSS, CLR, and log-scale "
+    "inputs from the uploaded matrix so each correction method can run when its other "
+    "requirements are met. This cross-scale adaptation makes mismatched uploads runnable, "
+    "but performance can differ from data originally prepared for a method's native input scale."
 )
 
 METHOD_CATEGORY_GROUPS = (

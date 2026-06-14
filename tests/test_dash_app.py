@@ -143,9 +143,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("ComBat-seq, RUV-III-NB", text)
         self.assertIn("Objective method matching", text)
         self.assertIn("official method files", text)
-        self.assertIn("mBatchNet preprocessing converts uploaded matrices", text)
-        self.assertIn("count upload can therefore run a log-scale method", text)
-        self.assertIn("converted inputs can perform differently", text)
+        self.assertIn("mBatchNet preprocessing adaptively derives", text)
+        self.assertIn("each correction method can run", text)
+        self.assertIn("mismatched uploads runnable", text)
+        self.assertIn("performance can differ", text)
         self.assertIn("not a performance ranking", text)
         self.assertIn("package or source reference", text)
 
@@ -188,7 +189,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("No method-specific parameters are exposed", text)
         self.assertIn("package/source documentation", text)
         self.assertIn("official method files", text)
-        self.assertIn("method-ready count, TSS, CLR, or log-scale inputs", text)
+        self.assertIn("method-ready count, TSS, CLR, and log-scale inputs", text)
         self.assertIn("Additional documented dimensions can be added", text)
 
     def test_readme_documents_correction_methods_and_parameters(self):
