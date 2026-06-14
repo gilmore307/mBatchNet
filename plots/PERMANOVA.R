@@ -98,13 +98,13 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     if (nrow(df) == nrow(meta)) df$sample_id <- meta$sample_id else stop("need sample_id")
   }
   dfx <- dplyr::inner_join(df |> mutate(sample_id = as.character(sample_id)), meta, by = "sample_id")
-  if (!nrow(dfx)) return(c(`R²` = NA_real_))
+  if (!nrow(dfx)) return(c(`R²` = NA_real_, `p-value` = NA_real_))
 
   X <- safe_numeric_matrix(dfx[, setdiff(names(df), "sample_id"), drop = FALSE])
-  if (nrow(X) < 3 || ncol(X) < 2) return(c(`R²` = NA_real_))
+  if (nrow(X) < 3 || ncol(X) < 2) return(c(`R²` = NA_real_, `p-value` = NA_real_))
 
   g <- factor(dfx[[batch_col]])
-  if (nlevels(g) < 2) return(c(`R²` = 0))
+  if (nlevels(g) < 2) return(c(`R²` = 0, `p-value` = NA_real_))
 
   if (geometry == "aitchison") {
     has_neg <- any(X < 0, na.rm = TRUE)
@@ -115,14 +115,15 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     Xbc[!is.finite(Xbc)] <- 0
     Xbc[Xbc < 0] <- 0
     Xtss <- safe_closure(Xbc)
-    if (!ncol(Xtss)) return(c(`R²` = NA_real_))
+    if (!ncol(Xtss)) return(c(`R²` = NA_real_, `p-value` = NA_real_))
     D <- tryCatch(vegan::vegdist(Xtss, method = "bray"), error = function(e) NULL)
-    if (is.null(D)) return(c(`R²` = NA_real_))
+    if (is.null(D)) return(c(`R²` = NA_real_, `p-value` = NA_real_))
   }
 
   Dm <- as.matrix(D)
-  if (!length(Dm) || any(!is.finite(Dm))) return(c(`R²` = NA_real_))
+  if (!length(Dm) || any(!is.finite(Dm))) return(c(`R²` = NA_real_, `p-value` = NA_real_))
 
+  set.seed(1)
   ad <- tryCatch(
     vegan::adonis2(D ~ g, permutations = permutations, by = "terms"),
     error = function(e) {
@@ -133,11 +134,13 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
   if (is.null(ad)) return(c(`R²` = NA_real_))
   ad_df <- as.data.frame(ad)
   if (!("g" %in% rownames(ad_df)) || !("R2" %in% colnames(ad_df))) {
-    return(c(`R²` = NA_real_))
+    return(c(`R²` = NA_real_, `p-value` = NA_real_))
   }
   R2 <- ad_df["g", "R2"]
   if (!is.finite(R2)) R2 <- NA_real_
-  c(`R²` = unname(R2))
+  p_value <- ad_df["g", "Pr(>F)"]
+  if (!is.finite(p_value)) p_value <- NA_real_
+  c(`R²` = unname(R2), `p-value` = unname(p_value))
 }
 
 # --------- Compute PERMANOVA per method (both geometries) ---------
@@ -177,7 +180,7 @@ for (idx in seq_len(nrow(geometry_specs))) {
   geom_key   <- geometry_specs$geometry_key[[idx]]
   geom_arg   <- geometry_specs$arg_value[[idx]]
 
-  geom_tbl <- tibble(Method = character(), Geometry = character(), `R²` = numeric())
+  geom_tbl <- tibble(Method = character(), Geometry = character(), `R²` = numeric(), `p-value` = numeric())
 
   for (nm in names(file_list)) {
     cat("PERMANOVA (", geom_label, "): ", nm, "\n", sep = "")
@@ -188,7 +191,8 @@ for (idx in seq_len(nrow(geometry_specs))) {
       geom_tbl,
       tibble(Method = nm,
              Geometry = geom_label,
-             `R²` = v[["R²"]])
+             `R²` = v[["R²"]],
+             `p-value` = v[["p-value"]])
     )
   }
 

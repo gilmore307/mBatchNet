@@ -394,8 +394,64 @@ class DashAppTests(unittest.TestCase):
             )
 
         self.assertIn("R²", fields)
+        self.assertIn("p-value", fields)
         self.assertEqual(rows[0]["Method"], "Before correction")
         self.assertEqual(rows[0]["R²"], "NA")
+        self.assertEqual(rows[0]["p-value"], "NA")
+
+    def test_dissimilarity_script_writes_anosim_p_values(self):
+        rscript = shutil.which("Rscript")
+        if not rscript:
+            self.skipTest("Rscript is not available")
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw_clr.csv").write_text(
+                "\n".join(
+                    [
+                        "sample_id,F1,F2,F3",
+                        "S1,0.4,-0.1,-0.3",
+                        "S2,0.3,0.0,-0.3",
+                        "S3,-0.2,0.2,0.0",
+                        "S4,-0.3,0.3,0.0",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (session_dir / "raw_tss.csv").write_text(
+                "\n".join(
+                    [
+                        "sample_id,F1,F2,F3",
+                        "S1,0.6,0.3,0.1",
+                        "S2,0.5,0.4,0.1",
+                        "S3,0.2,0.5,0.3",
+                        "S4,0.1,0.5,0.4",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata.csv").write_text(
+                "sample_id,batch,target_binary\nS1,A,0\nS2,A,1\nS3,B,0\nS4,B,1\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [rscript, "plots/Dissimilarity_Heatmaps.R", str(session_dir)],
+                cwd=Path(__file__).resolve().parents[1],
+                text=True,
+                capture_output=True,
+                timeout=90,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            fields, rows = _read_csv_records_for_test(
+                session_dir / "dissimilarity_aitchison_raw_assessment_pre.csv"
+            )
+
+        self.assertIn("ANOSIM R", fields)
+        self.assertIn("ANOSIM p", fields)
+        self.assertEqual(rows[0]["Method"], "Before correction")
 
     def test_method_explanation_uses_reference_fields(self):
         text = _component_text(

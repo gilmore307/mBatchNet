@@ -319,13 +319,14 @@ upper_mean <- function(M) {
 }
 
 safe_anosim <- function(dist_obj, grouping) {
-  default <- c(ANOSIM_R = NA_real_)
+  default <- c(ANOSIM_R = NA_real_, ANOSIM_p = NA_real_)
   if (is.null(dist_obj) || is.null(grouping)) return(default)
   grouping <- droplevels(factor(grouping))
   if (nlevels(grouping) < 2) return(default)
-  out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping, permutations = 10), error = function(e) NULL)
+  set.seed(1)
+  out <- tryCatch(vegan::anosim(dist_obj, grouping = grouping, permutations = 999), error = function(e) NULL)
   if (is.null(out)) return(default)
-  c(ANOSIM_R = unname(out$statistic))
+  c(ANOSIM_R = unname(out$statistic), ANOSIM_p = unname(out$signif))
 }
 
 # ==== A) Aitchison RMSE heatmaps ====
@@ -552,6 +553,7 @@ build_assessment_row <- function(method, geometry, between, within, dist_obj, gr
     Method = method,
     Geometry = geometry,
     `ANOSIM R` = anosim_vals[["ANOSIM_R"]],
+    `ANOSIM p` = anosim_vals[["ANOSIM_p"]]
   )
 }
 
