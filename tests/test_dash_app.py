@@ -767,24 +767,26 @@ class DashAppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
-                "f1,f2\n1,2\n2,3\n3,4\n4,5\n",
+                "f1,f2\n1,2\n2,3\n3,4\n4,5\n5,6\n6,7\n7,8\n8,9\n",
                 encoding="utf-8",
             )
             (session_dir / "metadata_origin.csv").write_text(
-                "Batch,Phenotype\nA,case\nA,case\nB,control\nB,control\n",
+                "Batch,Phenotype\n"
+                "A,case\nA,case\nA,case\nA,case\n"
+                "B,case\nB,control\nB,control\nB,control\n",
                 encoding="utf-8",
             )
 
             report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
 
             self.assertTrue(report["valid"], report)
-            self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 1.0)
+            self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 0.7746)
             warning_text = " ".join(report["warnings"])
             self.assertIn("strongly associated", warning_text)
-            self.assertIn("Cramer's V = 1.00", warning_text)
-            self.assertIn("strong-confounding threshold = 0.80", warning_text)
+            self.assertIn("Cramer's V = 0.77", warning_text)
+            self.assertIn("strong-confounding threshold = 0.60", warning_text)
             self.assertIn("Cramer's V >= 0.50 triggers a cautionary warning", warning_text)
-            self.assertIn("Cramer's V >= 0.80 triggers a strong-confounding warning", warning_text)
+            self.assertIn("Cramer's V >= 0.60 triggers a strong-confounding warning", warning_text)
             self.assertIn("not a formal hypothesis test", warning_text)
             self.assertIn("mosaic plot after study-setting confirmation", warning_text)
 
@@ -808,7 +810,7 @@ class DashAppTests(unittest.TestCase):
             self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 0.5)
             warning_text = " ".join(report["warnings"])
             self.assertIn("cautionary threshold = 0.50", warning_text)
-            self.assertIn("Cramer's V >= 0.80 triggers a strong-confounding warning", warning_text)
+            self.assertIn("Cramer's V >= 0.60 triggers a strong-confounding warning", warning_text)
             self.assertNotIn("strongly associated", warning_text)
 
     def test_outlier_detection_warning_is_reported(self):
