@@ -740,6 +740,86 @@ def _fabatch_unavailable_reason(session_dir) -> str | None:
     return "FAbatch unavailable for this input under its feature-count and batch-size requirement."
 
 
+def _runtime_stats_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _coerce_elapsed(value: object) -> float | None:
+    try:
+        elapsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if elapsed < 0:
+        return None
+    return elapsed
+
+
+def _historical_mean_excluding_current(
+    payload: Dict[str, object] | None, current_elapsed: float | None
+) -> tuple[float | None, int | None]:
+    if not isinstance(payload, dict):
+        return None, None
+    try:
+        count = int(payload.get("count"))
+        mean_sec = float(payload.get("mean_sec"))
+    except (TypeError, ValueError):
+        return None, None
+    if count <= 0 or mean_sec < 0:
+        return None, None
+    if current_elapsed is None:
+        return mean_sec, count
+    remaining_count = count - 1
+    if remaining_count <= 0:
+        return None, 0
+    remaining_total = max(0.0, (mean_sec * count) - current_elapsed)
+    return remaining_total / remaining_count, remaining_count
+
+
+def _build_method_timing_summary(session_dir) -> Dict[str, Dict[str, object]]:
+    runtime_averages = load_method_runtime_averages()
+    log_timings = extract_method_timings_from_log(session_dir)
+    method_timings: Dict[str, Dict[str, object]] = {}
+    current_elapsed_by_code: Dict[str, float] = {}
+
+    for code, elapsed in log_timings.items():
+        elapsed_float = _coerce_elapsed(elapsed)
+        if elapsed_float is None:
+            continue
+        method_timings.setdefault(code, {})["elapsed_sec"] = elapsed_float
+        current_elapsed_by_code[code] = elapsed_float
+
+    try:
+        session_summary = _load_session_summary(session_dir)
+    except Exception:
+        session_summary = None
+    if session_summary and isinstance(session_summary, dict):
+        methods_block = session_summary.get("methods")
+        if isinstance(methods_block, list):
+            for entry in methods_block:
+                if not isinstance(entry, dict):
+                    continue
+                name = entry.get("name")
+                if not name:
+                    continue
+                code = _method_code_from_display(str(name)) or str(name)
+                elapsed_float = _coerce_elapsed(entry.get("elapsed_sec"))
+                if elapsed_float is None:
+                    continue
+                method_timings.setdefault(code, {})["elapsed_sec"] = elapsed_float
+                current_elapsed_by_code[code] = elapsed_float
+
+    for code, _ in SUPPORTED_METHODS:
+        payload = runtime_averages.get(_runtime_stats_key(code))
+        expected_mean, expected_count = _historical_mean_excluding_current(
+            payload,
+            current_elapsed_by_code.get(code),
+        )
+        if expected_mean is not None:
+            method_timings.setdefault(code, {})["expected_elapsed_sec"] = expected_mean
+            method_timings[code]["expected_elapsed_n"] = expected_count
+    return method_timings
+
+
 def correction_layout(active_path: str):
     return html.Div(
         [
@@ -784,37 +864,7 @@ def register_correction_callbacks(app):
         session_dir = get_session_dir(session_id) if session_id else None
         if not session_dir or not session_dir.exists():
             return {"methods": {}}
-        runtime_averages = load_method_runtime_averages()
-        log_timings = extract_method_timings_from_log(session_dir)
-        method_timings: Dict[str, Dict[str, object]] = {
-            code: {"elapsed_sec": elapsed} for code, elapsed in log_timings.items()
-        }
-        for code, payload in runtime_averages.items():
-            method_timings.setdefault(code, {})
-            method_timings[code]["expected_elapsed_sec"] = payload.get("mean_sec")
-            method_timings[code]["expected_elapsed_n"] = payload.get("count")
-        try:
-            session_summary = _load_session_summary(session_dir)
-        except Exception:
-            session_summary = None
-        if session_summary and isinstance(session_summary, dict):
-            methods_block = session_summary.get("methods")
-            if isinstance(methods_block, list):
-                for entry in methods_block:
-                    if not isinstance(entry, dict):
-                        continue
-                    name = entry.get("name")
-                    if not name:
-                        continue
-                    code = _method_code_from_display(str(name)) or str(name)
-                    if code in method_timings:
-                        continue
-                    elapsed_val = entry.get("elapsed_sec")
-                    try:
-                        elapsed_float = float(elapsed_val)
-                    except (TypeError, ValueError):
-                        elapsed_float = None
-                    method_timings[code] = {"elapsed_sec": elapsed_float}
+        method_timings = _build_method_timing_summary(session_dir)
         return {"methods": method_timings}
 
     @app.callback(
@@ -846,7 +896,7 @@ def register_correction_callbacks(app):
                     html.Th(
                         _header_with_tooltip(
                             "Expected time (s)",
-                            "Reference elapsed seconds from recorded successful runs on this server, including the bundled example input when available. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
+                            "Reference elapsed seconds from prior recorded successful runs on this server, excluding the current session's completed run. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
                             "method-expected-time-help",
                         ),
                         className="text-center",

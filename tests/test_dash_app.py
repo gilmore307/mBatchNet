@@ -35,7 +35,9 @@ from _6_correction import _build_method_explanation_layout
 from _6_correction import _objective_method_matches
 from _6_correction import _parameter_input
 from _6_correction import _fabatch_unavailable_reason
+from _6_correction import _build_method_timing_summary
 from _6_correction import correction_layout
+import _6_correction
 from _7_description import HELP_MODAL_SECTIONS
 from _7_description import HELP_SECTION_TOC
 from _4_upload import upload_layout
@@ -295,19 +297,54 @@ class DashAppTests(unittest.TestCase):
         text = _component_text(
             _header_with_tooltip(
                 "Expected time (s)",
-                "Reference elapsed seconds from recorded successful runs on this server, including the bundled example input when available. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
+                "Reference elapsed seconds from prior recorded successful runs on this server, excluding the current session's completed run. Actual runtime depends on input size, selected methods, method parameters, and server load; use this value only as a guide and check Logs for run-specific progress.",
                 "method-expected-time-help-test",
             )
         )
 
         self.assertIn("Expected time (s)", text)
         self.assertIn("?", text)
-        self.assertIn("recorded successful runs", text)
-        self.assertIn("bundled example input", text)
+        self.assertIn("prior recorded successful runs", text)
+        self.assertIn("excluding the current session", text)
         self.assertIn("input size", text)
         self.assertIn("selected methods", text)
         self.assertIn("method parameters", text)
         self.assertIn("Logs", text)
+
+    def test_expected_time_excludes_current_session_run(self):
+        original_load_averages = _6_correction.load_method_runtime_averages
+        original_extract_timings = _6_correction.extract_method_timings_from_log
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "session_summary.json").write_text(
+                json.dumps(
+                    {
+                        "methods": [
+                            {
+                                "name": "ComBat",
+                                "status": "success",
+                                "elapsed_sec": 20.0,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            try:
+                _6_correction.load_method_runtime_averages = lambda: {
+                    "combat": {"mean_sec": 15.0, "count": 2}
+                }
+                _6_correction.extract_method_timings_from_log = lambda _session_dir: {
+                    "ComBat": 20.0
+                }
+                summary = _build_method_timing_summary(session_dir)
+            finally:
+                _6_correction.load_method_runtime_averages = original_load_averages
+                _6_correction.extract_method_timings_from_log = original_extract_timings
+
+        self.assertEqual(summary["ComBat"]["elapsed_sec"], 20.0)
+        self.assertEqual(summary["ComBat"]["expected_elapsed_n"], 1)
+        self.assertAlmostEqual(summary["ComBat"]["expected_elapsed_sec"], 10.0)
 
     def test_method_runtime_averages_record_successful_runs(self):
         original_path = _2_utils.METHOD_RUNTIME_STATS_PATH
