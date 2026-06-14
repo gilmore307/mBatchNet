@@ -3,6 +3,7 @@ import base64
 import csv
 import json
 import os
+import subprocess
 import tempfile
 import shutil
 import re
@@ -361,6 +362,40 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("combat", stats)
         self.assertEqual(stats["combat"]["count"], 2)
         self.assertAlmostEqual(stats["combat"]["mean_sec"], 15.0)
+
+    def test_permanova_script_handles_insufficient_data_without_failing(self):
+        rscript = shutil.which("Rscript")
+        if not rscript:
+            self.skipTest("Rscript is not available")
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw_clr.csv").write_text(
+                "sample_id,F1,F2\nS1,0.1,-0.1\nS2,0.2,-0.2\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata.csv").write_text(
+                "sample_id,batch,target_binary\nS1,A,0\nS2,A,1\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [rscript, "plots/PERMANOVA.R", str(session_dir)],
+                cwd=Path(__file__).resolve().parents[1],
+                text=True,
+                capture_output=True,
+                timeout=60,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((session_dir / "permanova_aitchison.tif").exists())
+            self.assertTrue((session_dir / "permanova_braycurtis.tif").exists())
+            fields, rows = _read_csv_records_for_test(
+                session_dir / "permanova_aitchison_raw_assessment_pre.csv"
+            )
+
+        self.assertIn("R²", fields)
+        self.assertEqual(rows[0]["Method"], "Before correction")
+        self.assertEqual(rows[0]["R²"], "NA")
 
     def test_method_explanation_uses_reference_fields(self):
         text = _component_text(

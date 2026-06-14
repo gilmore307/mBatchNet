@@ -120,8 +120,23 @@ permanova_one <- function(df, meta, geometry = c("aitchison", "bray-curtis"),
     if (is.null(D)) return(c(`R²` = NA_real_))
   }
 
-  ad <- vegan::adonis2(D ~ g, permutations = permutations, by = "terms")
-  R2 <- as.data.frame(ad)["g", "R2"]
+  Dm <- as.matrix(D)
+  if (!length(Dm) || any(!is.finite(Dm))) return(c(`R²` = NA_real_))
+
+  ad <- tryCatch(
+    vegan::adonis2(D ~ g, permutations = permutations, by = "terms"),
+    error = function(e) {
+      warning(sprintf("PERMANOVA skipped for %s geometry: %s", geometry, conditionMessage(e)))
+      NULL
+    }
+  )
+  if (is.null(ad)) return(c(`R²` = NA_real_))
+  ad_df <- as.data.frame(ad)
+  if (!("g" %in% rownames(ad_df)) || !("R2" %in% colnames(ad_df))) {
+    return(c(`R²` = NA_real_))
+  }
+  R2 <- ad_df["g", "R2"]
+  if (!is.finite(R2)) R2 <- NA_real_
   c(`R²` = unname(R2))
 }
 
@@ -203,10 +218,10 @@ for (idx in seq_len(nrow(geometry_specs))) {
 
   plot_df <- geom_tbl %>% mutate(Method = factor(as.character(Method), levels = method_levels))
   y_max <- max(plot_df$`R²`, na.rm = TRUE)
-  y_upper <- if (is.finite(y_max)) y_max * 1.2 else NA_real_
+  y_upper <- if (is.finite(y_max) && y_max > 0) y_max * 1.2 else 1
   p <- ggplot(plot_df, aes(x = Method, y = `R²`, fill = Method)) +
     geom_col(width = 0.72, color = "white", linewidth = 0.4, show.legend = FALSE) +
-    geom_text(aes(label = sprintf("%.3f", `R²`)), vjust = -0.4, size = 3.2) +
+    geom_text(aes(label = ifelse(is.finite(`R²`), sprintf("%.3f", `R²`), "NA")), vjust = -0.4, size = 3.2) +
     scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = "PERMANOVA R\u00B2",
