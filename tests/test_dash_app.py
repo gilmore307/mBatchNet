@@ -193,6 +193,14 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("official method files", text)
         self.assertIn("method-ready count, TSS, CLR, and log-scale inputs", text)
         self.assertIn("Additional documented dimensions can be added", text)
+        self.assertIn("Expected time (s)", text)
+        self.assertIn("excluding the current session", text)
+        self.assertIn("Cramer's V >= 0.60", text)
+        self.assertIn("ANOSIM p", text)
+        self.assertIn("permutation p-value column", text)
+        self.assertIn("recorded as NA rather than failing the whole assessment", text)
+        self.assertIn("receives CLR-transformed data", text)
+        self.assertIn("protects the mapped target label through the design matrix", text)
 
     def test_readme_documents_correction_methods_and_parameters(self):
         text = Path("README.md").read_text(encoding="utf-8")
@@ -205,6 +213,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("`alpha` (default: `0.05`)", text)
         self.assertIn("`par.prior` (default: `False`)", text)
         self.assertIn("Exposed parameters: none.", text)
+        self.assertIn("protects the mapped target label through the design matrix", text)
+        self.assertIn("excludes target-label columns from nuisance covariates", text)
 
     def test_user_facing_descriptions_avoid_subjective_method_guidance(self):
         banned_terms = (
@@ -278,6 +288,13 @@ class DashAppTests(unittest.TestCase):
         )
         for term in expected_terms:
             self.assertIn(term, interpretation_text)
+
+        for payload in _DETAILS_INTERPRETATION.values():
+            points = payload.get("points", ())
+            self.assertEqual(len(points), 3)
+            self.assertTrue(str(points[0]).startswith("What it shows:"))
+            self.assertTrue(str(points[1]).startswith("How to read:"))
+            self.assertTrue(str(points[2]).startswith("Caveat:"))
 
     def test_time_header_explains_elapsed_time_source(self):
         text = _component_text(

@@ -764,90 +764,89 @@ _DETAILS_INTERPRETATION: Dict[str, Dict[str, object]] = {
     "alignment": {
         "title": "Alignment score",
         "points": (
-            "The score summarizes local batch mixing in a neighbourhood graph: it reflects how evenly nearby samples are distributed across batch labels.",
-            "Larger values correspond to neighbourhoods with less dominance by one original batch label under the same graph settings.",
-            "This metric describes batch-label composition among neighbours; it does not measure target-label separation or feature-level variance.",
+            "What it shows: Local batch mixing in a neighbourhood graph, measured from how evenly nearby samples are distributed across batch labels.",
+            "How to read: Larger values correspond to neighbourhoods with less dominance by one original batch label under the same graph settings.",
+            "Caveat: This metric describes batch-label composition among neighbours; it does not measure target-label separation or feature-level variance.",
         ),
     },
     "pca": {
         "title": "PCA ordination",
         "points": (
-            "PCA projects the feature matrix onto linear axes that capture the largest variance directions; the axis labels report the variance percentage represented by PC1 and PC2.",
-            "Each point is a sample, colour encodes the selected grouping variable, and ellipses summarize group dispersion in the displayed two-dimensional projection.",
-            "Overlap or separation in PC1/PC2 is a visual summary of the first two axes only; structure outside these axes is not shown in the figure.",
+            "What it shows: Linear feature-matrix axes that capture the largest variance directions; the axis labels report the variance percentage represented by PC1 and PC2.",
+            "How to read: Each point is a sample, colour encodes the selected grouping variable, and ellipses summarize group dispersion in the displayed two-dimensional projection.",
+            "Caveat: Overlap or separation in PC1/PC2 is a visual summary of the first two axes only; structure outside these axes is not shown in the figure.",
         ),
     },
     "pcoa": {
         "title": "PCoA ordination",
         "points": (
-            "PCoA embeds samples from a distance matrix; the Aitchison view uses CLR/Euclidean compositional geometry, while the Bray-Curtis view uses abundance-profile dissimilarity.",
-            "Axis percentages describe how much of the distance-matrix variation is represented by the displayed coordinates.",
-            "Read point positions, ellipses, and density margins within each geometry separately because the two distance definitions encode different sample relationships.",
+            "What it shows: Sample embeddings from distance matrices; the Aitchison view uses CLR/Euclidean compositional geometry, while the Bray-Curtis view uses abundance-profile dissimilarity.",
+            "How to read: Axis percentages describe how much of the distance-matrix variation is represented by the displayed coordinates.",
+            "Caveat: Read point positions, ellipses, and density margins within each geometry separately because the two distance definitions encode different sample relationships.",
         ),
     },
     "nmds": {
         "title": "NMDS ordination",
         "points": (
-            "NMDS places samples in two dimensions while preserving the rank order of pairwise dissimilarities as closely as possible.",
-            "Stress quantifies the mismatch between the displayed configuration and the original dissimilarity ranks; lower stress means less mismatch for that embedding.",
-            "NMDS axes have arbitrary orientation and scale, so relative distances, overlap, and stress are more informative than the numeric axis coordinates.",
+            "What it shows: Two-dimensional sample placement that preserves the rank order of pairwise dissimilarities as closely as possible.",
+            "How to read: Stress quantifies the mismatch between the displayed configuration and the original dissimilarity ranks; lower stress means less mismatch for that embedding.",
+            "Caveat: NMDS axes have arbitrary orientation and scale, so relative distances, overlap, and stress are more informative than the numeric axis coordinates.",
         ),
     },
     "dissimilarity": {
         "title": "Dissimilarity heatmaps",
         "points": (
-            "A heatmap cell represents the pairwise dissimilarity between two samples under the displayed geometry.",
-            "Blocks along the diagonal indicate groups of samples with similar profiles; off-diagonal contrast shows relationships between groups.",
-            "Read colour intensity as distance magnitude, and compare Aitchison and Bray-Curtis panels as separate distance definitions.",
+            "What it shows: Pairwise dissimilarity between samples under the displayed geometry, plus ANOSIM R and ANOSIM p in the raw assessment CSV.",
+            "How to read: Blocks along the diagonal indicate groups of samples with similar profiles; ANOSIM R near 0 indicates little batch-driven distance structure.",
+            "Caveat: Read colour intensity as distance magnitude, and compare Aitchison and Bray-Curtis panels as separate distance definitions.",
         ),
     },
     "permanova": {
         "title": "PERMANOVA",
         "points": (
-            "PERMANOVA partitions distance-matrix variation by metadata terms such as batch or target label.",
-            "R² is the proportion of distance variation associated with the tested term in the model.",
-            "Permutation p-values, when present, describe how often a randomized label assignment produced a statistic at least as large as the observed statistic.",
-            "PERMANOVA is sensitive to both group centroid differences and dispersion differences, so it describes association in distance space rather than a single causal source.",
+            "What it shows: Distance-matrix variation partitioned by metadata terms such as batch or target label, reported as R² and permutation p-values.",
+            "How to read: R² is the proportion of distance variation associated with the tested term; permutation p-values describe how often randomized labels produced a statistic at least as large as the observed statistic.",
+            "Caveat: Invalid or underspecified method/geometry combinations are recorded as NA, and PERMANOVA can reflect centroid differences, dispersion differences, or both.",
         ),
     },
     "r2": {
         "title": "Per-feature ANOVA",
         "points": (
-            "Per-feature ANOVA fits feature-wise models and reports the fraction of variation associated with each metadata term.",
-            "Batch R² describes variation associated with batch labels; Treatment R² describes variation associated with the target or treatment label.",
-            "Median R² summarizes the feature-level distribution, while individual feature behaviour can vary around that summary.",
+            "What it shows: Feature-wise models that report the fraction of variation associated with each metadata term.",
+            "How to read: Batch R² describes variation associated with batch labels; Treatment R² describes variation associated with the target or treatment label.",
+            "Caveat: Median R² summarizes the feature-level distribution, while individual feature behaviour can vary around that summary.",
         ),
     },
     "prda": {
         "title": "Partial RDA",
         "points": (
-            "Partial RDA is a constrained ordination that partitions transformed feature variation across specified model terms.",
-            "Treatment, batch, and intersection fractions describe variation assigned to those components in the fitted model.",
-            "The residual fraction is variation not represented by the included constrained terms.",
+            "What it shows: A constrained ordination that partitions transformed feature variation across specified model terms.",
+            "How to read: Treatment, batch, and intersection fractions describe variation assigned to those components in the fitted model.",
+            "Caveat: The residual fraction is variation not represented by the included constrained terms.",
         ),
     },
     "pvca": {
         "title": "PVCA",
         "points": (
-            "PVCA combines principal components with variance-component modelling to estimate how much overall variation is associated with metadata factors.",
-            "Reported components such as batch, treatment, interaction, and residual are variance fractions from the fitted component model.",
-            "The table is a variance-attribution summary; it does not identify which individual features drive each component.",
+            "What it shows: Principal components combined with variance-component modelling to estimate how much overall variation is associated with metadata factors.",
+            "How to read: Reported components such as batch, treatment, interaction, and residual are variance fractions from the fitted component model.",
+            "Caveat: The table is a variance-attribution summary; it does not identify which individual features drive each component.",
         ),
     },
     "ebm": {
         "title": "Entropy batch mixing",
         "points": (
-            "Entropy is calculated from batch-label composition in local neighbourhoods.",
-            "Larger entropy values correspond to more even representation of batch labels among neighbouring samples.",
-            "The value depends on neighbourhood construction and describes batch-label mixing, not target-label separation.",
+            "What it shows: Batch-label entropy calculated from local neighbourhood composition.",
+            "How to read: Larger entropy values correspond to more even representation of batch labels among neighbouring samples.",
+            "Caveat: The value depends on neighbourhood construction and describes batch-label mixing, not target-label separation.",
         ),
     },
     "silhouette": {
         "title": "UMAP silhouette",
         "points": (
-            "Silhouette width compares each sample's distance to samples with the same label against its distance to samples with other labels in the UMAP embedding.",
-            "Values near 1 indicate tighter same-label neighbourhoods in the displayed embedding; values near 0 indicate overlap; negative values indicate closer proximity to another label.",
-            "Because this summary is computed after UMAP projection, it reflects the chosen embedding parameters as well as the underlying sample relationships.",
+            "What it shows: Silhouette width for each sample, comparing its distance to samples with the same label against its distance to samples with other labels in the UMAP embedding.",
+            "How to read: Values near 1 indicate tighter same-label neighbourhoods in the displayed embedding; values near 0 indicate overlap; negative values indicate closer proximity to another label.",
+            "Caveat: Because this summary is computed after UMAP projection, it reflects the chosen embedding parameters as well as the underlying sample relationships.",
         ),
     },
 }
@@ -860,7 +859,14 @@ def _build_details_help_note(key: str) -> html.Div:
 
     title = str(meta.get("title", "Assessment"))
     points = meta.get("points") or ()
-    point_items = [html.Li(str(point)) for point in points]
+    point_items = []
+    for point in points:
+        point_text = str(point)
+        label, sep, body = point_text.partition(": ")
+        if sep and label in {"What it shows", "How to read", "Caveat"}:
+            point_items.append(html.Li([html.Strong(f"{label}: "), body]))
+        else:
+            point_items.append(html.Li(point_text))
 
     return html.Div(
         [

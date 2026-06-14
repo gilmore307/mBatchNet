@@ -210,7 +210,7 @@ Exposed parameters:
 - `maxiter` (default: `100`): maximum optimization iterations.
 
 ### Limma
-limma provides linear-model methods for expression and omics data analysis, including `removeBatchEffect` for removing batch and covariate components from a numeric matrix. In mBatchNet it receives a log-scale feature matrix with batch labels and optional covariates.
+limma provides linear-model methods for expression and omics data analysis, including `removeBatchEffect` for removing batch and covariate components from a numeric matrix. In mBatchNet it receives a log-scale feature matrix with batch labels, protects the mapped target label through the design matrix, and excludes target-label columns from nuisance covariates.
 
 Exposed parameters: none.
 

@@ -184,6 +184,9 @@ HELP_MODAL_SECTIONS: List = [
                             html.Li(
                                 "The Upload page writes validation_report.json and blocks core input errors before preprocessing."
                             ),
+                            html.Li(
+                                "mBatchNet displays an advisory warning for strong batch-target association when Cramer's V >= 0.60."
+                            ),
                         ]
                     ),
                 ]
@@ -257,6 +260,9 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "Methods lists each available algorithm and opens its package or source reference when one is available."
+                            ),
+                            html.Li(
+                                "Expected time (s) shows reference elapsed seconds from prior successful runs on this server, excluding the current session's completed run."
                             ),
                             html.Li(
                                 "Time (s) shows how long each method took to run in the current session "
@@ -350,10 +356,10 @@ HELP_MODAL_SECTIONS: List = [
                         "update automatically when you re-run assessments after new corrections."
                     ),
                     html.Li(
-                        "Use the detail table to compare pre vs. post assessment values across methods."
+                        "Use the detail table to inspect the current stage's raw assessment CSV values across methods and geometries."
                     ),
                     html.Li(
-                        "Click any detail table column title to filter, sort, and re-rank methods "
+                        "Click any detail table column title to filter and sort methods "
                         "on the fly."
                     ),
                     html.Li(
@@ -546,7 +552,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "ANOSIM R: Quantifies whether within-batch distances are smaller than "
                                 "between-batch distances. Values near 0 mean little batch-driven "
                                 "structure, while values above ~0.5 flag strong residual batch "
-                                "effects. Use the companion p-value column to confirm significance."
+                                "effects. ANOSIM p records the companion permutation p-value in the raw assessment CSV."
                             ),
                         ]
                     ),
@@ -576,7 +582,7 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                             html.Li(
                                 "PERMANOVA R²: Records the proportion of variance explained by batch. "
-                                "Values below ~0.05 typically indicate minimal batch impact."
+                                "Values below ~0.05 typically indicate minimal batch impact. The raw assessment CSV also includes a permutation p-value column; invalid or underspecified method/geometry combinations are recorded as NA rather than failing the whole assessment."
                             ),
                         ]
                     ),
