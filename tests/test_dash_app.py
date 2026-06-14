@@ -139,8 +139,7 @@ class DashAppTests(unittest.TestCase):
 
         self.assertNotIn("Method guide", text)
         self.assertNotIn("Phenotype-aware correction", text)
-        self.assertIn("microbiome-oriented, count-aware, and continuous/transformed matrix frameworks", text)
-        self.assertIn("ComBat-seq, RUV-III-NB", text)
+        self.assertNotIn("Methods span microbiome-oriented", text)
         self.assertIn("Objective method matching", text)
         self.assertIn("official method files", text)
         self.assertIn("mBatchNet preprocessing adaptively derives", text)

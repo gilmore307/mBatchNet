@@ -751,23 +751,6 @@ def correction_layout(active_path: str):
                     html.P(
                         "Review available correction methods along with their runtime for this session and citation details."
                     ),
-                    dbc.Alert(
-                        [
-                            html.Div(
-                                "Methods span microbiome-oriented, count-aware, and continuous/transformed matrix frameworks.",
-                                className="fw-semibold mb-1",
-                            ),
-                            html.Div(
-                                "Microbiome-oriented: ConQuR, MMUPHin, PLSDA-batch, DEBIAS-M, MetaDICT."
-                            ),
-                            html.Div("Count-aware: ComBat-seq, RUV-III-NB."),
-                            html.Div(
-                                "Continuous/transformed matrix frameworks: ComBat, limma, FAbatch, FSQN, BMC."
-                            ),
-                        ],
-                        color="light",
-                        className="border mb-3",
-                    ),
                     _method_questionnaire_card(),
                     html.P(
                         "Click a method name to open its package or source reference."
