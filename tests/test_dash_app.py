@@ -784,13 +784,12 @@ class DashAppTests(unittest.TestCase):
             warning_text = " ".join(report["warnings"])
             self.assertIn("strongly associated", warning_text)
             self.assertIn("Cramer's V = 0.77", warning_text)
-            self.assertIn("strong-confounding threshold = 0.60", warning_text)
-            self.assertIn("Cramer's V >= 0.50 triggers a cautionary warning", warning_text)
-            self.assertIn("Cramer's V >= 0.60 triggers a strong-confounding warning", warning_text)
+            self.assertIn("advisory warning threshold = 0.60", warning_text)
+            self.assertIn("Cramer's V >= 0.60 triggers this batch-target association warning", warning_text)
             self.assertIn("not a formal hypothesis test", warning_text)
             self.assertIn("mosaic plot after study-setting confirmation", warning_text)
 
-    def test_cautionary_batch_target_confounding_is_warned(self):
+    def test_batch_target_association_below_strong_threshold_is_not_warned(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
@@ -809,9 +808,8 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 0.5)
             warning_text = " ".join(report["warnings"])
-            self.assertIn("cautionary threshold = 0.50", warning_text)
-            self.assertIn("Cramer's V >= 0.60 triggers a strong-confounding warning", warning_text)
             self.assertNotIn("strongly associated", warning_text)
+            self.assertNotIn("Batch and target are associated", warning_text)
 
     def test_outlier_detection_warning_is_reported(self):
         with tempfile.TemporaryDirectory() as tmp:

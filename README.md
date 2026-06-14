@@ -110,7 +110,7 @@ The Upload page expects two CSV files:
    - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
    - Extreme sample totals or matrix values trigger an outlier detection warning before correction methods run.
-   - Batch-target association uses Cramer's V: values >= 0.50 trigger a cautionary warning and values >= 0.60 trigger a strong-confounding warning.
+   - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
 
 2. **Metadata (CSV)**
    - Must include at least:

@@ -45,7 +45,6 @@ MAX_MATRIX_CELLS = 150_000
 MAX_METADATA_COLUMNS = 5
 WARN_MATRIX_CELLS = 100_000
 HIGH_SPARSITY_FRACTION = 0.80
-CAUTIONARY_CONFOUNDING_V = 0.50
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_IQR_MULTIPLIER = 3.0
 
@@ -426,21 +425,13 @@ def validate_session_inputs(
             if v >= STRONG_CONFOUNDING_V:
                 warnings.append(
                     f"Batch and target are strongly associated (Cramer's V = {v:.2f}; "
-                    f"strong-confounding threshold = {STRONG_CONFOUNDING_V:.2f}). In the current "
-                    "implementation, Cramer's V >= 0.50 triggers a cautionary warning and "
-                    "Cramer's V >= 0.60 triggers a strong-confounding warning. This is an "
+                    f"advisory warning threshold = {STRONG_CONFOUNDING_V:.2f}). In the current "
+                    "implementation, Cramer's V >= 0.60 triggers this batch-target association "
+                    "warning. This is an "
                     "effect-size warning for study-design imbalance, not a formal hypothesis test. "
                     "Interpret correction results carefully because removing batch-associated structure "
                     "may also affect target-associated signal. Use the mosaic plot after study-setting "
                     "confirmation to inspect the batch-target composition visually."
-                )
-            elif v >= CAUTIONARY_CONFOUNDING_V:
-                warnings.append(
-                    f"Batch and target are associated (Cramer's V = {v:.2f}; cautionary threshold = "
-                    f"{CAUTIONARY_CONFOUNDING_V:.2f}). In the current implementation, Cramer's V >= 0.50 "
-                    "triggers a cautionary warning and Cramer's V >= 0.60 triggers a strong-confounding "
-                    "warning. This is an effect-size warning for study-design imbalance, not a formal "
-                    "hypothesis test. Review the mosaic plot after study-setting confirmation."
                 )
     if matrix and batch_col and batch_col in metadata_header:
         batch_counts = _level_counts(metadata_rows, batch_col)
