@@ -177,12 +177,24 @@ def _build_parameter_layout(code: str) -> object | None:
     return content
 
 
-_METHOD_COLUMN_WIDTH = {"width": "180px", "minWidth": "180px", "maxWidth": "180px"}
-_TIME_COLUMN_WIDTH = {"width": "115px", "minWidth": "115px", "maxWidth": "115px"}
-_STATUS_COLUMN_WIDTH = {"width": "105px", "minWidth": "105px", "maxWidth": "105px"}
-_ACTION_COLUMN_WIDTH = {"width": "125px", "minWidth": "125px", "maxWidth": "125px"}
-_CONFIG_COLUMN_WIDTH = {"width": "95px", "minWidth": "95px", "maxWidth": "95px"}
-_EXPLANATION_COLUMN_WIDTH = {"width": "105px", "minWidth": "105px", "maxWidth": "105px"}
+_METHOD_TABLE_COLUMN_WIDTH = {"width": "12.5%"}
+_METHOD_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_TIME_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_STATUS_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_ACTION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_CONFIG_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_EXPLANATION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+
+METHOD_MATCHING_SOURCE_NOTE = (
+    "Objective method matching uses only information from each method's official method files, "
+    "package/source documentation, and citation records mirrored in mBatchNet."
+)
+
+METHOD_MATCHING_PREPROCESS_NOTE = (
+    "mBatchNet preprocessing converts uploaded matrices into method-ready count, TSS, CLR, "
+    "or log-scale inputs before correction. A count upload can therefore run a log-scale method; "
+    "converted inputs can perform differently from data originally prepared for that method's native scale."
+)
 
 METHOD_CATEGORY_GROUPS = (
     {
@@ -196,6 +208,12 @@ METHOD_CATEGORY_GROUPS = (
         "label": "Count-aware",
         "methods": ("ComBatSeq", "RUV"),
         "basis": "method descriptions cite count matrices, rounded non-negative counts, or negative-binomial count likelihoods.",
+    },
+    {
+        "id": "zero_inflation",
+        "label": "Zero-inflation-aware count modeling",
+        "methods": ("ConQuR", "RUV"),
+        "basis": "official method descriptions cite zero-inflated read-count or zero-inflated negative-binomial modeling.",
     },
     {
         "id": "continuous",
@@ -232,6 +250,7 @@ METHOD_CATEGORY_GROUPS = (
 METHOD_QUESTIONNAIRE_OPTIONS = (
     {"label": "Input is microbiome or microbial-community data", "value": "microbiome"},
     {"label": "Input is raw, rounded, or count-like non-negative data", "value": "count_aware"},
+    {"label": "Input has sparse or zero-inflated count structure", "value": "zero_inflation"},
     {"label": "Input is continuous, log-scale, CLR, or otherwise transformed", "value": "continuous"},
     {"label": "Input is relative abundance or compositional profile data", "value": "relative_abundance"},
     {"label": "Metadata covariates or design terms are part of the run", "value": "covariates"},
@@ -638,7 +657,13 @@ def _method_questionnaire_card() -> object:
             dbc.CardBody(
                 [
                     html.P(
-                        "Select input descriptors that are documented in the method descriptions, wrappers, papers, or manuals. The result is a category match, not a performance ranking.",
+                        METHOD_MATCHING_SOURCE_NOTE
+                        + " Select descriptors that match the study context. The result is a category match, not a performance ranking.",
+                        className="text-muted mb-2",
+                    ),
+                    html.P(
+                        METHOD_MATCHING_PREPROCESS_NOTE
+                        + " Additional documented dimensions can be added to the checklist as the method catalogue grows.",
                         className="text-muted mb-3",
                     ),
                     dcc.Checklist(
@@ -680,7 +705,7 @@ def _render_method_questionnaire_result(selected_traits: List[str] | None) -> ob
             html.Div("Matching methods from selected objective descriptors:", className="fw-semibold mb-2"),
             html.Ul(items, className="mb-2"),
             html.Div(
-                "Open Help -> Batch Effect Correction -> Method categories for the method lists and evidence basis.",
+                "Open Help -> Batch Effect Correction -> Method categories for the method lists, official-source basis, and preprocessing note.",
                 className="small text-muted",
             ),
         ],

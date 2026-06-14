@@ -4,7 +4,12 @@ from typing import Dict, List
 from dash import html
 
 from _2_utils import CODE_TO_DISPLAY, METHOD_REFERENCE_BY_CODE, SUPPORTED_METHODS
-from _6_correction import METHOD_CATEGORY_GROUPS, _PARAMETER_CONFIG
+from _6_correction import (
+    METHOD_CATEGORY_GROUPS,
+    METHOD_MATCHING_PREPROCESS_NOTE,
+    METHOD_MATCHING_SOURCE_NOTE,
+    _PARAMETER_CONFIG,
+)
 
 
 def _format_default_value(value: object) -> str:
@@ -297,7 +302,16 @@ HELP_MODAL_SECTIONS: List = [
                 [
                     html.H5("Method categories", className="mb-2 mt-4", id="help-correction-categories"),
                     html.P(
-                        "The Correction page questionnaire uses these documented method categories as objective matching rules. Categories are not a performance ranking."
+                        "The Correction page questionnaire uses documented method categories as objective matching rules. Categories are not a performance ranking."
+                    ),
+                    html.P(
+                        METHOD_MATCHING_SOURCE_NOTE,
+                        className="text-muted",
+                    ),
+                    html.P(
+                        METHOD_MATCHING_PREPROCESS_NOTE
+                        + " Additional documented dimensions can be added as the method catalogue grows.",
+                        className="text-muted",
                     ),
                     html.Div(_method_category_cards()),
                 ]
@@ -306,7 +320,7 @@ HELP_MODAL_SECTIONS: List = [
                 [
                     html.H5("Methods and parameters", className="mb-2 mt-4", id="help-correction-methods"),
                     html.P(
-                        "These entries mirror the method descriptions and exposed parameter controls in the Correction table. Method descriptions are drawn from the linked method package or citation records used by mBatchNet; parameter descriptions reflect the current wrapper arguments exposed by the app."
+                        "These entries mirror the method descriptions and exposed parameter controls in the Correction table. Method descriptions are drawn from the official method files, linked package/source documentation, and citation records used by mBatchNet; parameter descriptions reflect the current wrapper arguments exposed by the app."
                     ),
                     html.Div(_method_help_cards()),
                 ]

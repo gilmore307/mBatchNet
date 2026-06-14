@@ -246,13 +246,20 @@ body {
 
 .be-method-table-wrapper {
   position: relative;
-  max-width: 1080px;
+  width: 100%;
+  max-width: none;
 }
 
 .be-method-table-wrapper table {
   table-layout: fixed;
-  width: auto;
+  width: 100%;
   max-width: 100%;
+}
+
+.be-method-table-wrapper th,
+.be-method-table-wrapper td {
+  overflow-wrap: anywhere;
+  vertical-align: middle;
 }
 
 .be-run-cell,

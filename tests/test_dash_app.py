@@ -142,6 +142,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("microbiome-oriented, count-aware, and continuous/transformed matrix frameworks", text)
         self.assertIn("ComBat-seq, RUV-III-NB", text)
         self.assertIn("Objective method matching", text)
+        self.assertIn("official method files", text)
+        self.assertIn("mBatchNet preprocessing converts uploaded matrices", text)
+        self.assertIn("count upload can therefore run a log-scale method", text)
+        self.assertIn("converted inputs can perform differently", text)
         self.assertIn("not a performance ranking", text)
         self.assertIn("package or source reference", text)
 
@@ -170,6 +174,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Methods and parameters", text)
         self.assertIn("Microbiome-oriented", text)
         self.assertIn("Count-aware", text)
+        self.assertIn("Zero-inflation-aware count modeling", text)
         self.assertIn("Continuous/transformed matrix frameworks", text)
         self.assertIn("Relative abundance or compositional profiles", text)
         self.assertIn("Covariates or design terms", text)
@@ -181,7 +186,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("par.prior", text)
         self.assertIn("gene.subset.n", text)
         self.assertIn("No method-specific parameters are exposed", text)
-        self.assertIn("method package or citation records", text)
+        self.assertIn("package/source documentation", text)
+        self.assertIn("official method files", text)
+        self.assertIn("method-ready count, TSS, CLR, or log-scale inputs", text)
+        self.assertIn("Additional documented dimensions can be added", text)
 
     def test_readme_documents_correction_methods_and_parameters(self):
         text = Path("README.md").read_text(encoding="utf-8")
@@ -339,14 +347,22 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Johnson WE", text)
         self.assertNotIn("Suggested methods", text)
 
-    def test_correction_table_does_not_repeat_citation_column(self):
+    def test_correction_table_uses_full_width_equal_columns(self):
         source = Path("_6_correction.py").read_text(encoding="utf-8")
+        css = Path("assets/ui.css").read_text(encoding="utf-8")
 
         self.assertNotIn('html.Th("Citation", className="text-center")', source)
         self.assertNotIn('"width": "200px"', source)
+        self.assertIn('"width": "12.5%"', source)
         self.assertIn('"width": "96px"', source)
         self.assertNotIn("citation_cell", source)
         self.assertIn('html.Th("Explanation"', source)
+        self.assertIn(".be-method-table-wrapper", css)
+        self.assertIn("width: 100%;", css)
+        self.assertIn("max-width: none;", css)
+        self.assertIn("table-layout: fixed;", css)
+        self.assertNotIn("max-width: 1080px;", css)
+        self.assertNotIn("width: auto;", css)
 
     def test_method_reference_csv_provides_descriptions(self):
         for method_code, metadata in METHOD_REFERENCE_BY_CODE.items():
