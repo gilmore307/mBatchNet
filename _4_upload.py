@@ -45,7 +45,9 @@ MAX_MATRIX_CELLS = 150_000
 MAX_METADATA_COLUMNS = 5
 WARN_MATRIX_CELLS = 100_000
 HIGH_SPARSITY_FRACTION = 0.80
-STRONG_CONFOUNDING_V = 0.85
+CAUTIONARY_CONFOUNDING_V = 0.50
+STRONG_CONFOUNDING_V = 0.80
+OUTLIER_IQR_MULTIPLIER = 3.0
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -211,6 +213,40 @@ def _fabatch_retained_feature_count(matrix: List[List[float]]) -> Optional[int]:
     return retained
 
 
+def _quantile(sorted_values: List[float], probability: float) -> Optional[float]:
+    if not sorted_values:
+        return None
+    if len(sorted_values) == 1:
+        return sorted_values[0]
+    position = (len(sorted_values) - 1) * probability
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return sorted_values[int(position)]
+    fraction = position - lower
+    return sorted_values[lower] * (1 - fraction) + sorted_values[upper] * fraction
+
+
+def _outlier_count(values: List[float]) -> int:
+    if len(values) < 4:
+        return 0
+    sorted_values = sorted(values)
+    q1 = _quantile(sorted_values, 0.25)
+    q3 = _quantile(sorted_values, 0.75)
+    if q1 is None or q3 is None:
+        return 0
+    iqr = q3 - q1
+    if iqr <= 0:
+        median = _quantile(sorted_values, 0.5)
+        if median is None or median <= 0:
+            return 0
+        upper = median * 10
+        return sum(1 for value in values if value > upper)
+    lower = q1 - OUTLIER_IQR_MULTIPLIER * iqr
+    upper = q3 + OUTLIER_IQR_MULTIPLIER * iqr
+    return sum(1 for value in values if value < lower or value > upper)
+
+
 def _write_validation_report(session_dir: Path, report: Dict[str, object]) -> None:
     try:
         (session_dir / "validation_report.json").write_text(
@@ -319,6 +355,18 @@ def validate_session_inputs(
         negative_values = sum(1 for row in matrix for value in row if value < 0)
         if negative_values:
             warnings.append("Negative values detected; this looks transformed. Count-specific methods may be inappropriate.")
+        sample_totals = [sum(row) for row in matrix]
+        sample_outliers = _outlier_count(sample_totals)
+        value_outliers = _outlier_count([value for row in matrix for value in row])
+        if sample_outliers or value_outliers:
+            dimensions["outlier_sample_total_count"] = sample_outliers
+            dimensions["outlier_matrix_value_count"] = value_outliers
+            warnings.append(
+                "Outlier detection warning: "
+                f"{sample_outliers} sample total(s) and {value_outliers} matrix value(s) exceed the "
+                f"{OUTLIER_IQR_MULTIPLIER:.1f}x IQR screening rule. Review input scaling and extreme samples "
+                "before running correction methods."
+            )
 
     metadata_header: List[str] = []
     metadata_rows: List[Dict[str, str]] = []
@@ -378,11 +426,21 @@ def validate_session_inputs(
             if v >= STRONG_CONFOUNDING_V:
                 warnings.append(
                     f"Batch and target are strongly associated (Cramer's V = {v:.2f}; "
-                    f"advisory threshold = {STRONG_CONFOUNDING_V:.2f}). This is an "
+                    f"strong-confounding threshold = {STRONG_CONFOUNDING_V:.2f}). In the current "
+                    "implementation, Cramer's V >= 0.50 triggers a cautionary warning and "
+                    "Cramer's V >= 0.80 triggers a strong-confounding warning. This is an "
                     "effect-size warning for study-design imbalance, not a formal hypothesis test. "
                     "Interpret correction results carefully because removing batch-associated structure "
                     "may also affect target-associated signal. Use the mosaic plot after study-setting "
                     "confirmation to inspect the batch-target composition visually."
+                )
+            elif v >= CAUTIONARY_CONFOUNDING_V:
+                warnings.append(
+                    f"Batch and target are associated (Cramer's V = {v:.2f}; cautionary threshold = "
+                    f"{CAUTIONARY_CONFOUNDING_V:.2f}). In the current implementation, Cramer's V >= 0.50 "
+                    "triggers a cautionary warning and Cramer's V >= 0.80 triggers a strong-confounding "
+                    "warning. This is an effect-size warning for study-design imbalance, not a formal "
+                    "hypothesis test. Review the mosaic plot after study-setting confirmation."
                 )
     if matrix and batch_col and batch_col in metadata_header:
         batch_counts = _level_counts(metadata_rows, batch_col)
@@ -437,6 +495,7 @@ REPRO_BUNDLE_FILES = {
     "runtime_summary.json",
     "reproducibility_manifest.json",
     "session_summary.json",
+    "execution_commands.sh",
     "run.log",
 }
 

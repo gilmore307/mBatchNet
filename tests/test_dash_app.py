@@ -18,6 +18,7 @@ from _0_main import _build_download_bundle
 from _0_main import _download_bundle_kind_from_click
 from _2_utils import _DETAILS_INTERPRETATION
 from _2_utils import write_session_manifests
+from _2_utils import record_method_parameters
 from _2_utils import METHOD_REFERENCE_BY_CODE
 from _2_utils import archive_assessment_figure_outputs
 from _2_utils import clear_assessment_outputs
@@ -608,9 +609,53 @@ class DashAppTests(unittest.TestCase):
             warning_text = " ".join(report["warnings"])
             self.assertIn("strongly associated", warning_text)
             self.assertIn("Cramer's V = 1.00", warning_text)
-            self.assertIn("advisory threshold = 0.85", warning_text)
+            self.assertIn("strong-confounding threshold = 0.80", warning_text)
+            self.assertIn("Cramer's V >= 0.50 triggers a cautionary warning", warning_text)
+            self.assertIn("Cramer's V >= 0.80 triggers a strong-confounding warning", warning_text)
             self.assertIn("not a formal hypothesis test", warning_text)
             self.assertIn("mosaic plot after study-setting confirmation", warning_text)
+
+    def test_cautionary_batch_target_confounding_is_warned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2\n1,2\n2,3\n3,4\n4,5\n5,6\n6,7\n7,8\n8,9\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\n"
+                "A,case\nA,case\nA,case\nA,control\n"
+                "B,case\nB,control\nB,control\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"].get("batch_target_cramers_v"), 0.5)
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("cautionary threshold = 0.50", warning_text)
+            self.assertIn("Cramer's V >= 0.80 triggers a strong-confounding warning", warning_text)
+            self.assertNotIn("strongly associated", warning_text)
+
+    def test_outlier_detection_warning_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2\n1,1\n1,1\n1,1\n1,1\n100,100\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,control\nB,case\nB,control\nB,case\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("Outlier detection warning", warning_text)
+            self.assertGreater(report["dimensions"].get("outlier_sample_total_count", 0), 0)
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -738,6 +783,7 @@ class DashAppTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (session_dir / "normalized_limma_tss.csv").write_text("1,2\n3,4\n", encoding="utf-8")
+            record_method_parameters(session_dir, "limma", {"preserve": "Phenotype"})
             validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
             write_session_manifests(session_dir)
 
@@ -752,8 +798,15 @@ class DashAppTests(unittest.TestCase):
 
             self.assertIn("normalized_limma_tss.csv", output_names)
             self.assertNotIn("raw.csv", output_names)
+            self.assertIn("execution_commands.sh", output_names)
             self.assertIn("raw.csv", repro_names)
             self.assertIn("reproducibility_manifest.json", repro_names)
+            self.assertIn("execution_commands.sh", repro_names)
+            with zipfile.ZipFile(output_zip) as zf:
+                command_text = zf.read("execution_commands.sh").decode("utf-8")
+            self.assertIn("correction/preprocess.R", command_text)
+            self.assertIn("correction/methods/limma.R", command_text)
+            self.assertIn("--preserve=Phenotype", command_text)
 
 
 if __name__ == "__main__":

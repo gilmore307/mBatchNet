@@ -6,6 +6,7 @@ import csv
 import json
 import os
 import re
+import shlex
 import sys
 import shutil
 import subprocess
@@ -122,6 +123,68 @@ def record_method_parameters(session_dir: Path, method_code: str, params: Dict[s
     _json_write(manifest_path, manifest)
 
 
+def _command_line(command: Sequence[object]) -> str:
+    parts: List[str] = []
+    for part in command:
+        text = str(part)
+        if text.startswith("${SESSION_DIR}"):
+            parts.append(text)
+        else:
+            parts.append(shlex.quote(text))
+    return " ".join(parts)
+
+
+def _repo_relative_path(path: Path) -> Path:
+    try:
+        return path.relative_to(BASE_DIR)
+    except ValueError:
+        return path
+
+
+def write_execution_commands_script(session_dir: Path) -> None:
+    """Write session-specific R execution commands for preprocessing and all correction methods."""
+
+    session_dir = Path(session_dir)
+    parameter_manifest = _json_load(session_dir / "parameter_manifest.json")
+    method_parameters = parameter_manifest.get("methods")
+    if not isinstance(method_parameters, dict):
+        method_parameters = {}
+
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Run from the mBatchNet repository root.",
+        f"SESSION_DIR=${{SESSION_DIR:-{shlex.quote(str(session_dir))}}}",
+        "",
+        "# Preprocess uploaded raw.csv into method-ready inputs.",
+        _command_line(
+            build_rscript_command(_repo_relative_path(PREPROCESS_SCRIPT), "${SESSION_DIR}", "${SESSION_DIR}/raw.csv")
+        ),
+        "",
+        "# Correction method commands. Each command uses the current SESSION_DIR.",
+    ]
+
+    for code, display in SUPPORTED_METHODS:
+        script_path = resolve_method_script(code)
+        lines.append("")
+        lines.append(f"# {display}")
+        if script_path is None:
+            lines.append(f"# No executable R script was found for {display}.")
+            continue
+        params_entry = method_parameters.get(code)
+        params = params_entry.get("parameters") if isinstance(params_entry, dict) else {}
+        param_args = _format_method_params(params if isinstance(params, dict) else {})
+        lines.append(_command_line(build_rscript_command(_repo_relative_path(script_path), "${SESSION_DIR}", *param_args)))
+
+    target = session_dir / "execution_commands.sh"
+    try:
+        target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        target.chmod(0o755)
+    except OSError:
+        pass
+
+
 def write_session_manifests(session_dir: Path) -> None:
     """Write concise output/runtime/reproducibility manifests into a session directory."""
 
@@ -189,6 +252,7 @@ def write_session_manifests(session_dir: Path) -> None:
         "derived_inputs": ["metadata.csv", "raw_tss.csv", "raw_clr.csv"],
     }
     _json_write(session_dir / "reproducibility_manifest.json", reproducibility_manifest)
+    write_execution_commands_script(session_dir)
 
 
 # ---- Dataclasses & config ----

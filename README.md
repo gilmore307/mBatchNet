@@ -108,6 +108,8 @@ The Upload page expects two CSV files:
    - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
    - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
+   - Extreme sample totals or matrix values trigger an outlier detection warning before correction methods run.
+   - Batch-target association uses Cramer's V: values >= 0.50 trigger a cautionary warning and values >= 0.80 trigger a strong-confounding warning.
 
 2. **Metadata (CSV)**
    - Must include at least:
@@ -233,6 +235,7 @@ For each session, intermediate and final outputs are generated under `output/<se
 - runtime summary (`runtime_summary.json`)
 - parameter manifest (`parameter_manifest.json`)
 - reproducibility manifest (`reproducibility_manifest.json`)
+- execution command script (`execution_commands.sh`) with preprocessing and correction-method R commands for the session
 - two download entries:
   - output bundle for corrected matrices, assessment outputs, and summaries
   - reproducibility bundle for inputs, manifests, configuration, and logs

@@ -397,6 +397,7 @@ def _include_in_bundle(relative_path: Path, bundle_kind: str) -> bool:
         "reproducibility_manifest.json",
         "session_config.json",
         "session_summary.json",
+        "execution_commands.sh",
         "run.log",
     }
     input_names = {"raw.csv", "metadata_origin.csv", "metadata.csv"}
