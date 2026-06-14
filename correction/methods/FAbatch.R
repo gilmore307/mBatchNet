@@ -7,18 +7,18 @@ run_method("FAbatch", {
   if (!("target_binary" %in% colnames(metadata))) fail_step("FAbatch", "'target_binary' is required.")
   pheno_vals <- unique(metadata$target_binary)
   if (length(pheno_vals) != 2) fail_step("FAbatch", "'target_binary' must be binary.")
-  X_log <- get_input_for("FAbatch", base_M, base_form)
-  X_log <- t(apply(X_log, 1, function(r){
+  X_clr <- get_input_for("FAbatch", base_M, base_form)
+  X_clr <- t(apply(X_clr, 1, function(r){
     r[!is.finite(r)] <- NA
     r[is.na(r)] <- mean(r, na.rm = TRUE)
     r
   }))
   y     <- factor(metadata$target_binary, levels = sort(pheno_vals))
   batch <- factor(metadata$batch)
-  v  <- apply(X_log, 2, var)
+  v  <- apply(X_clr, 2, var)
   keep_var <- is.finite(v) & v > 1e-12
   if (!any(keep_var)) fail_step("FAbatch", "All features ~zero variance.")
-  Xv <- X_log[, keep_var, drop = FALSE]
+  Xv <- X_clr[, keep_var, drop = FALSE]
   max_nb <- max(table(batch))
   K      <- min(ncol(Xv), max_nb + 5L)
   if (K <= max_nb) {
@@ -50,12 +50,12 @@ run_method("FAbatch", {
       nbf = NULL, minerr = minerr, probcrossbatch = probcrossbatch, maxiter = maxiter, maxnbf = maxnbf
     )
   }
-  Xadj <- X_log
+  Xadj <- X_clr
   m <- attr(Xz, "scaled:center"); s <- attr(Xz, "scaled:scale")
   Xadj_sub <- sweep(fa_out$xadj, 2, s, `*`)
   Xadj_sub <- sweep(Xadj_sub, 2, m, `+`)
   Xadj[, colnames(Xk)] <- Xadj_sub
-  write_tss_clr("FAbatch", Xadj, "log", "normalized_fabatch.csv")
+  write_tss_clr("FAbatch", Xadj, "clr", "normalized_fabatch.csv")
 })
 
 finalize_method()

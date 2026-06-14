@@ -7,10 +7,23 @@ run_method("limma", {
   X_log <- get_input_for("limma", base_M, base_form)
 
   limma_design <- matrix(1, nrow = nrow(metadata), ncol = 1)
-  if (TARGET_BINARY_COL %in% colnames(metadata)) {
-    target_vals <- suppressWarnings(as.numeric(metadata[[TARGET_BINARY_COL]]))
-    if (all(is.finite(target_vals)) && length(unique(target_vals)) > 1) {
-      limma_design <- model.matrix(~ target_vals)
+  design_source <- NULL
+  if (!is.null(label_col) && label_col %in% colnames(metadata)) {
+    design_source <- metadata[[label_col]]
+  } else if (TARGET_BINARY_COL %in% colnames(metadata)) {
+    design_source <- metadata[[TARGET_BINARY_COL]]
+  }
+  if (!is.null(design_source)) {
+    if (is.numeric(design_source) || is.logical(design_source)) {
+      target_vals <- suppressWarnings(as.numeric(design_source))
+      if (all(is.finite(target_vals)) && length(unique(target_vals)) > 1) {
+        limma_design <- model.matrix(~ target_vals)
+      }
+    } else {
+      target_vals <- droplevels(factor(design_source))
+      if (!anyNA(target_vals) && nlevels(target_vals) > 1) {
+        limma_design <- model.matrix(~ target_vals)
+      }
     }
   }
 

@@ -255,7 +255,7 @@ expected_input <- list(
   MMUPHin   = "tss",
   RUV       = "counts",
   MetaDICT  = "tss",
-  FAbatch   = "log",
+  FAbatch   = "clr",
   ComBatSeq = "counts",
   DEBIAS    = "counts"
 )
