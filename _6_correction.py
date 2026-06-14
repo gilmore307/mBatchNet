@@ -177,10 +177,67 @@ def _build_parameter_layout(code: str) -> object | None:
     return content
 
 
-_LABEL_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
-_ACTION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
-_CONFIG_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
-_EXPLANATION_COLUMN_WIDTH = {"width": "250px", "minWidth": "250px"}
+_METHOD_COLUMN_WIDTH = {"width": "180px", "minWidth": "180px", "maxWidth": "180px"}
+_TIME_COLUMN_WIDTH = {"width": "115px", "minWidth": "115px", "maxWidth": "115px"}
+_STATUS_COLUMN_WIDTH = {"width": "105px", "minWidth": "105px", "maxWidth": "105px"}
+_ACTION_COLUMN_WIDTH = {"width": "125px", "minWidth": "125px", "maxWidth": "125px"}
+_CONFIG_COLUMN_WIDTH = {"width": "95px", "minWidth": "95px", "maxWidth": "95px"}
+_EXPLANATION_COLUMN_WIDTH = {"width": "105px", "minWidth": "105px", "maxWidth": "105px"}
+
+METHOD_CATEGORY_GROUPS = (
+    {
+        "id": "microbiome",
+        "label": "Microbiome-oriented",
+        "methods": ("ConQuR", "MMUPHin", "PLSDA", "DEBIAS", "MetaDICT"),
+        "basis": "method descriptions cite microbiome profiles, microbial community studies, or microbiome data.",
+    },
+    {
+        "id": "count_aware",
+        "label": "Count-aware",
+        "methods": ("ComBatSeq", "RUV"),
+        "basis": "method descriptions cite count matrices, rounded non-negative counts, or negative-binomial count likelihoods.",
+    },
+    {
+        "id": "continuous",
+        "label": "Continuous/transformed matrix frameworks",
+        "methods": ("ComBat", "limma", "FAbatch", "FSQN", "BMC"),
+        "basis": "mBatchNet wrapper descriptions cite log-scale, CLR-transformed, TSS, or feature-wise distribution inputs.",
+    },
+    {
+        "id": "relative_abundance",
+        "label": "Relative abundance or compositional profiles",
+        "methods": ("DEBIAS", "MetaDICT", "MMUPHin", "FSQN"),
+        "basis": "method descriptions cite relative abundance, abundance profiles, or TSS feature tables.",
+    },
+    {
+        "id": "covariates",
+        "label": "Covariates or design terms",
+        "methods": ("ConQuR", "MMUPHin", "MetaDICT", "ComBatSeq", "limma"),
+        "basis": "mBatchNet wrapper descriptions cite additional metadata covariates, optional covariates, or design terms.",
+    },
+    {
+        "id": "binary_target",
+        "label": "Binary target required or explicitly used",
+        "methods": ("PLSDA", "FAbatch", "DEBIAS", "ComBatSeq"),
+        "basis": "mBatchNet wrapper descriptions cite binary target labels, target labels, or phenotype-prediction terms.",
+    },
+    {
+        "id": "reference_batch",
+        "label": "Reference-batch or reference-distribution mapping",
+        "methods": ("FSQN",),
+        "basis": "FSQN uses the selected reference batch as the feature-wise reference distribution.",
+    },
+)
+
+METHOD_QUESTIONNAIRE_OPTIONS = (
+    {"label": "Input is microbiome or microbial-community data", "value": "microbiome"},
+    {"label": "Input is raw, rounded, or count-like non-negative data", "value": "count_aware"},
+    {"label": "Input is continuous, log-scale, CLR, or otherwise transformed", "value": "continuous"},
+    {"label": "Input is relative abundance or compositional profile data", "value": "relative_abundance"},
+    {"label": "Metadata covariates or design terms are part of the run", "value": "covariates"},
+    {"label": "A binary target/phenotype is part of the study design", "value": "binary_target"},
+    {"label": "A reference batch or reference distribution is selected", "value": "reference_batch"},
+)
 
 
 _PARAMETER_CONFIG = {
@@ -544,6 +601,94 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     )
 
 
+def _method_category_by_id() -> Dict[str, Dict[str, object]]:
+    return {str(group["id"]): group for group in METHOD_CATEGORY_GROUPS}
+
+
+def _objective_method_matches(selected_traits: List[str] | None) -> List[Dict[str, object]]:
+    selected = [trait for trait in (selected_traits or []) if trait in _method_category_by_id()]
+    if not selected:
+        return []
+    scores: Dict[str, Dict[str, object]] = {}
+    groups = _method_category_by_id()
+    for trait in selected:
+        group = groups[trait]
+        for method_code in group["methods"]:
+            entry = scores.setdefault(
+                str(method_code),
+                {
+                    "code": str(method_code),
+                    "display": CODE_TO_DISPLAY.get(str(method_code), str(method_code)),
+                    "categories": [],
+                    "basis": [],
+                },
+            )
+            entry["categories"].append(str(group["label"]))
+            entry["basis"].append(str(group["basis"]))
+    return sorted(
+        scores.values(),
+        key=lambda item: (-len(item["categories"]), str(item["display"]).lower()),
+    )
+
+
+def _method_questionnaire_card() -> object:
+    return dbc.Card(
+        [
+            dbc.CardHeader(html.Strong("Objective method matching")),
+            dbc.CardBody(
+                [
+                    html.P(
+                        "Select input descriptors that are documented in the method descriptions, wrappers, papers, or manuals. The result is a category match, not a performance ranking.",
+                        className="text-muted mb-3",
+                    ),
+                    dcc.Checklist(
+                        id="method-questionnaire-traits",
+                        options=list(METHOD_QUESTIONNAIRE_OPTIONS),
+                        value=[],
+                        inputClassName="me-2",
+                        labelClassName="d-block mb-2",
+                    ),
+                    html.Div(id="method-questionnaire-result", className="mt-3"),
+                ]
+            ),
+        ],
+        className="mb-3",
+    )
+
+
+def _render_method_questionnaire_result(selected_traits: List[str] | None) -> object:
+    matches = _objective_method_matches(selected_traits)
+    if not matches:
+        return dbc.Alert(
+            "Select one or more documented input descriptors to show the matching method set.",
+            color="secondary",
+            className="mb-0",
+        )
+    items = []
+    for match in matches:
+        items.append(
+            html.Li(
+                [
+                    html.Strong(str(match["display"])),
+                    " - ",
+                    ", ".join(match["categories"]),
+                ]
+            )
+        )
+    return dbc.Alert(
+        [
+            html.Div("Matching methods from selected objective descriptors:", className="fw-semibold mb-2"),
+            html.Ul(items, className="mb-2"),
+            html.Div(
+                "Open Help -> Batch Effect Correction -> Method categories for the method lists and evidence basis.",
+                className="small text-muted",
+            ),
+        ],
+        color="light",
+        className="border mb-0",
+    )
+
+
 def _fabatch_unavailable_reason(session_dir) -> str | None:
     if not session_dir:
         return None
@@ -597,6 +742,7 @@ def correction_layout(active_path: str):
                         color="light",
                         className="border mb-3",
                     ),
+                    _method_questionnaire_card(),
                     html.P(
                         "Click a method name to open its package or source reference."
                     ),
@@ -687,7 +833,7 @@ def register_correction_callbacks(app):
                 [
                     html.Th("Config", className="text-center", style=_CONFIG_COLUMN_WIDTH),
                     html.Th("Explanation", className="text-center", style=_EXPLANATION_COLUMN_WIDTH),
-                    html.Th("Methods", className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Th("Methods", className="text-center", style=_METHOD_COLUMN_WIDTH),
                     html.Th(
                         _header_with_tooltip(
                             "Expected time (s)",
@@ -695,7 +841,7 @@ def register_correction_callbacks(app):
                             "method-expected-time-help",
                         ),
                         className="text-center",
-                        style=_LABEL_COLUMN_WIDTH,
+                        style=_TIME_COLUMN_WIDTH,
                     ),
                     html.Th(
                         _header_with_tooltip(
@@ -704,10 +850,10 @@ def register_correction_callbacks(app):
                             "method-time-help",
                         ),
                         className="text-center",
-                        style=_LABEL_COLUMN_WIDTH,
+                        style=_TIME_COLUMN_WIDTH,
                     ),
-                    html.Th("Status", className="text-center", style=_LABEL_COLUMN_WIDTH),
-                    html.Th("Run Correction", className="text-center", style=_ACTION_COLUMN_WIDTH),
+                    html.Th("Status", className="text-center", style=_STATUS_COLUMN_WIDTH),
+                    html.Th("Run", className="text-center", style=_ACTION_COLUMN_WIDTH),
                     html.Th("Delete", className="text-center", style=_ACTION_COLUMN_WIDTH),
                 ]
             )
@@ -757,14 +903,14 @@ def register_correction_callbacks(app):
                     className="be-cell-loading",
                 ),
                 className="text-center",
-                style=_LABEL_COLUMN_WIDTH,
+                style=_STATUS_COLUMN_WIDTH,
             )
             run_button = dbc.Button(
-                "Run Correction",
+                "Run",
                 id={"type": "method-run-button", "code": code},
                 color=button_color(run_disabled),
                 size="sm",
-                style={"width": "200px"},
+                style={"width": "96px"},
                 disabled=run_disabled,
                 n_clicks=0,
             )
@@ -783,7 +929,7 @@ def register_correction_callbacks(app):
                 id={"type": "method-delete-button", "code": code},
                 color=button_color(delete_disabled),
                 size="sm",
-                style={"width": "200px"},
+                style={"width": "96px"},
                 disabled=delete_disabled,
                 n_clicks=0,
             )
@@ -814,7 +960,7 @@ def register_correction_callbacks(app):
                 id={"type": "method-config-toggle", "code": code},
                 color=button_color(False),
                 size="sm",
-                style={"width": "200px"},
+                style={"width": "72px"},
                 n_clicks=0,
             )
             toggle_cell = html.Td(
@@ -827,7 +973,7 @@ def register_correction_callbacks(app):
                 id={"type": "method-explanation-toggle", "code": code},
                 color=button_color(False),
                 size="sm",
-                style={"width": "200px"},
+                style={"width": "72px"},
                 n_clicks=0,
             )
             explanation_cell = html.Td(
@@ -839,9 +985,9 @@ def register_correction_callbacks(app):
                 [
                     toggle_cell,
                     explanation_cell,
-                    html.Td(method_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
-                    html.Td(expected_time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
-                    html.Td(time_display, className="text-center", style=_LABEL_COLUMN_WIDTH),
+                    html.Td(method_display, className="text-center", style=_METHOD_COLUMN_WIDTH),
+                    html.Td(expected_time_display, className="text-center", style=_TIME_COLUMN_WIDTH),
+                    html.Td(time_display, className="text-center", style=_TIME_COLUMN_WIDTH),
                     status_cell,
                     run_cell,
                     delete_cell,
@@ -903,6 +1049,14 @@ def register_correction_callbacks(app):
             children.extend(row_extras)
         table_wrapper = html.Div(children, className="be-method-table-wrapper")
         return table_wrapper
+
+    @app.callback(
+        Output("method-questionnaire-result", "children"),
+        Input("method-questionnaire-traits", "value"),
+        prevent_initial_call=False,
+    )
+    def render_method_questionnaire(selected_traits: List[str] | None):
+        return _render_method_questionnaire_result(selected_traits)
 
     @app.callback(
         Output({"type": "method-config-collapse", "code": MATCH}, "is_open"),

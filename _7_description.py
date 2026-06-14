@@ -4,7 +4,7 @@ from typing import Dict, List
 from dash import html
 
 from _2_utils import CODE_TO_DISPLAY, METHOD_REFERENCE_BY_CODE, SUPPORTED_METHODS
-from _6_correction import _PARAMETER_CONFIG
+from _6_correction import METHOD_CATEGORY_GROUPS, _PARAMETER_CONFIG
 
 
 def _format_default_value(value: object) -> str:
@@ -79,6 +79,23 @@ def _method_help_cards() -> List:
     return cards
 
 
+def _method_category_cards() -> List:
+    cards: List = []
+    for group in METHOD_CATEGORY_GROUPS:
+        methods = [CODE_TO_DISPLAY.get(str(code), str(code)) for code in group.get("methods", ())]
+        cards.append(
+            html.Details(
+                [
+                    html.Summary(str(group.get("label", "")), className="fw-semibold"),
+                    html.Div("Methods: " + ", ".join(methods), className="mt-2 mb-1"),
+                    html.Div("Basis: " + str(group.get("basis", "")), className="text-muted"),
+                ],
+                className="border rounded p-3 mb-2",
+            )
+        )
+    return cards
+
+
 HELP_SECTION_TOC: List[Dict[str, str]] = [
     {"id": "help-overview", "title": "Overview"},
     {
@@ -97,6 +114,7 @@ HELP_SECTION_TOC: List[Dict[str, str]] = [
         "children": [
             {"id": "help-correction-table", "title": "Table columns"},
             {"id": "help-correction-run", "title": "Running corrections"},
+            {"id": "help-correction-categories", "title": "Method categories"},
             {"id": "help-correction-methods", "title": "Methods and parameters"},
         ],
     },
@@ -273,6 +291,15 @@ HELP_MODAL_SECTIONS: List = [
                             ),
                         ]
                     ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Method categories", className="mb-2 mt-4", id="help-correction-categories"),
+                    html.P(
+                        "The Correction page questionnaire uses these documented method categories as objective matching rules. Categories are not a performance ranking."
+                    ),
+                    html.Div(_method_category_cards()),
                 ]
             ),
             html.Div(

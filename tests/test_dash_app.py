@@ -32,6 +32,7 @@ from _6_correction import _PARAMETER_CONFIG
 from _6_correction import _build_parameter_layout
 from _6_correction import _header_with_tooltip
 from _6_correction import _build_method_explanation_layout
+from _6_correction import _objective_method_matches
 from _6_correction import _parameter_input
 from _6_correction import _fabatch_unavailable_reason
 from _6_correction import correction_layout
@@ -140,6 +141,8 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Phenotype-aware correction", text)
         self.assertIn("microbiome-oriented, count-aware, and continuous/transformed matrix frameworks", text)
         self.assertIn("ComBat-seq, RUV-III-NB", text)
+        self.assertIn("Objective method matching", text)
+        self.assertIn("not a performance ranking", text)
         self.assertIn("package or source reference", text)
 
     def test_help_modal_matches_repro_bundle_download_flow(self):
@@ -163,7 +166,14 @@ class DashAppTests(unittest.TestCase):
         toc_text = " ".join(toc_titles)
 
         self.assertIn("Methods and parameters", toc_text)
+        self.assertIn("Method categories", toc_text)
         self.assertIn("Methods and parameters", text)
+        self.assertIn("Microbiome-oriented", text)
+        self.assertIn("Count-aware", text)
+        self.assertIn("Continuous/transformed matrix frameworks", text)
+        self.assertIn("Relative abundance or compositional profiles", text)
+        self.assertIn("Covariates or design terms", text)
+        self.assertIn("Reference-batch or reference-distribution mapping", text)
         self.assertIn("DEBIAS-M", text)
         self.assertIn("MetaDICT", text)
         self.assertIn("ComBat-seq", text)
@@ -218,6 +228,23 @@ class DashAppTests(unittest.TestCase):
 
         for term in banned_terms:
             self.assertNotIn(term, visible_text)
+
+    def test_objective_method_matching_uses_documented_categories(self):
+        matches = _objective_method_matches(["microbiome", "count_aware"])
+        display_names = [str(item["display"]) for item in matches]
+
+        self.assertIn("ConQuR", display_names)
+        self.assertIn("MMUPHin", display_names)
+        self.assertIn("PLSDA-batch", display_names)
+        self.assertIn("DEBIAS-M", display_names)
+        self.assertIn("MetaDICT", display_names)
+        self.assertIn("ComBat-seq", display_names)
+        self.assertIn("RUV-III-NB", display_names)
+        self.assertNotIn("ComBat", display_names)
+
+        first = matches[0]
+        self.assertIn("categories", first)
+        self.assertIn("basis", first)
 
     def test_details_interpretation_explains_metric_concepts(self):
         interpretation_text = " ".join(
@@ -316,6 +343,8 @@ class DashAppTests(unittest.TestCase):
         source = Path("_6_correction.py").read_text(encoding="utf-8")
 
         self.assertNotIn('html.Th("Citation", className="text-center")', source)
+        self.assertNotIn('"width": "200px"', source)
+        self.assertIn('"width": "96px"', source)
         self.assertNotIn("citation_cell", source)
         self.assertIn('html.Th("Explanation"', source)
 

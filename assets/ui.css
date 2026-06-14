@@ -246,6 +246,13 @@ body {
 
 .be-method-table-wrapper {
   position: relative;
+  max-width: 1080px;
+}
+
+.be-method-table-wrapper table {
+  table-layout: fixed;
+  width: auto;
+  max-width: 100%;
 }
 
 .be-run-cell,
