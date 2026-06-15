@@ -90,7 +90,6 @@ Rscript assets/env/r-packages.R
    - Batch Correction
    - Post-assessment
    - Download outputs or Repro bundle
-   The Batch Correction page includes an objective method-matching questionnaire based on documented input descriptors and method categories; it is not a performance ranking.
 
 The Dash app can also be started directly with:
 

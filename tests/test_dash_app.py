@@ -33,7 +33,6 @@ from _6_correction import _PARAMETER_CONFIG
 from _6_correction import _build_parameter_layout
 from _6_correction import _header_with_tooltip
 from _6_correction import _build_method_explanation_layout
-from _6_correction import _objective_method_matches
 from _6_correction import _parameter_input
 from _6_correction import _fabatch_unavailable_reason
 from _6_correction import _build_method_timing_summary
@@ -143,13 +142,10 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Method guide", text)
         self.assertNotIn("Phenotype-aware correction", text)
         self.assertNotIn("Methods span microbiome-oriented", text)
-        self.assertIn("Objective method matching", text)
-        self.assertIn("official method files", text)
-        self.assertIn("mBatchNet preprocessing adaptively derives", text)
-        self.assertIn("each correction method can run", text)
-        self.assertIn("mismatched uploads runnable", text)
-        self.assertIn("performance can differ", text)
-        self.assertIn("not a performance ranking", text)
+        self.assertNotIn("Objective method matching", text)
+        self.assertNotIn("method-questionnaire", text)
+        self.assertNotIn("matching method set", text)
+        self.assertNotIn("not a performance ranking", text)
         self.assertIn("package or source reference", text)
 
     def test_help_modal_matches_repro_bundle_download_flow(self):
@@ -173,15 +169,11 @@ class DashAppTests(unittest.TestCase):
         toc_text = " ".join(toc_titles)
 
         self.assertIn("Methods and parameters", toc_text)
-        self.assertIn("Method categories", toc_text)
         self.assertIn("Methods and parameters", text)
-        self.assertIn("Microbiome-oriented", text)
-        self.assertIn("Count-aware", text)
-        self.assertIn("Zero-inflation-aware count modeling", text)
-        self.assertIn("Continuous/transformed matrix frameworks", text)
-        self.assertIn("Relative abundance or compositional profiles", text)
-        self.assertIn("Covariates or design terms", text)
-        self.assertIn("Reference-batch or reference-distribution mapping", text)
+        self.assertNotIn("Method categories", toc_text)
+        self.assertNotIn("Correction page questionnaire", text)
+        self.assertNotIn("Objective method matching", text)
+        self.assertNotIn("matching method set", text)
         self.assertIn("DEBIAS-M", text)
         self.assertIn("MetaDICT", text)
         self.assertIn("ComBat-seq", text)
@@ -191,8 +183,6 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("No method-specific parameters are exposed", text)
         self.assertIn("package/source documentation", text)
         self.assertIn("official method files", text)
-        self.assertIn("method-ready count, TSS, CLR, and log-scale inputs", text)
-        self.assertIn("Additional documented dimensions can be added", text)
         self.assertIn("Expected time (s)", text)
         self.assertIn("excluding the current session", text)
         self.assertIn("Cramer's V >= 0.60", text)
@@ -249,23 +239,6 @@ class DashAppTests(unittest.TestCase):
 
         for term in banned_terms:
             self.assertNotIn(term, visible_text)
-
-    def test_objective_method_matching_uses_documented_categories(self):
-        matches = _objective_method_matches(["microbiome", "count_aware"])
-        display_names = [str(item["display"]) for item in matches]
-
-        self.assertIn("ConQuR", display_names)
-        self.assertIn("MMUPHin", display_names)
-        self.assertIn("PLSDA-batch", display_names)
-        self.assertIn("DEBIAS-M", display_names)
-        self.assertIn("MetaDICT", display_names)
-        self.assertIn("ComBat-seq", display_names)
-        self.assertIn("RUV-III-NB", display_names)
-        self.assertNotIn("ComBat", display_names)
-
-        first = matches[0]
-        self.assertIn("categories", first)
-        self.assertIn("basis", first)
 
     def test_details_interpretation_explains_metric_concepts(self):
         interpretation_text = " ".join(

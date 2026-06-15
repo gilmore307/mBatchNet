@@ -185,80 +185,6 @@ _ACTION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 _CONFIG_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 _EXPLANATION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 
-METHOD_MATCHING_SOURCE_NOTE = (
-    "Objective method matching uses only information from each method's official method files, "
-    "package/source documentation, and citation records mirrored in mBatchNet."
-)
-
-METHOD_MATCHING_PREPROCESS_NOTE = (
-    "mBatchNet preprocessing adaptively derives method-ready count, TSS, CLR, and log-scale "
-    "inputs from the uploaded matrix so each correction method can run when its other "
-    "requirements are met. This cross-scale adaptation makes mismatched uploads runnable, "
-    "but performance can differ from data originally prepared for a method's native input scale."
-)
-
-METHOD_CATEGORY_GROUPS = (
-    {
-        "id": "microbiome",
-        "label": "Microbiome-oriented",
-        "methods": ("ConQuR", "MMUPHin", "PLSDA", "DEBIAS", "MetaDICT"),
-        "basis": "method descriptions cite microbiome profiles, microbial community studies, or microbiome data.",
-    },
-    {
-        "id": "count_aware",
-        "label": "Count-aware",
-        "methods": ("ComBatSeq", "RUV"),
-        "basis": "method descriptions cite count matrices, rounded non-negative counts, or negative-binomial count likelihoods.",
-    },
-    {
-        "id": "zero_inflation",
-        "label": "Zero-inflation-aware count modeling",
-        "methods": ("ConQuR", "RUV"),
-        "basis": "official method descriptions cite zero-inflated read-count or zero-inflated negative-binomial modeling.",
-    },
-    {
-        "id": "continuous",
-        "label": "Continuous/transformed matrix frameworks",
-        "methods": ("ComBat", "limma", "FAbatch", "FSQN", "BMC"),
-        "basis": "mBatchNet wrapper descriptions cite log-scale, CLR-transformed, TSS, or feature-wise distribution inputs.",
-    },
-    {
-        "id": "relative_abundance",
-        "label": "Relative abundance or compositional profiles",
-        "methods": ("DEBIAS", "MetaDICT", "MMUPHin", "FSQN"),
-        "basis": "method descriptions cite relative abundance, abundance profiles, or TSS feature tables.",
-    },
-    {
-        "id": "covariates",
-        "label": "Covariates or design terms",
-        "methods": ("ConQuR", "MMUPHin", "MetaDICT", "ComBatSeq", "limma"),
-        "basis": "mBatchNet wrapper descriptions cite additional metadata covariates, optional covariates, or design terms.",
-    },
-    {
-        "id": "binary_target",
-        "label": "Binary target required or explicitly used",
-        "methods": ("PLSDA", "FAbatch", "DEBIAS", "ComBatSeq"),
-        "basis": "mBatchNet wrapper descriptions cite binary target labels, target labels, or phenotype-prediction terms.",
-    },
-    {
-        "id": "reference_batch",
-        "label": "Reference-batch or reference-distribution mapping",
-        "methods": ("FSQN",),
-        "basis": "FSQN uses the selected reference batch as the feature-wise reference distribution.",
-    },
-)
-
-METHOD_QUESTIONNAIRE_OPTIONS = (
-    {"label": "Input is microbiome or microbial-community data", "value": "microbiome"},
-    {"label": "Input is raw, rounded, or count-like non-negative data", "value": "count_aware"},
-    {"label": "Input has sparse or zero-inflated count structure", "value": "zero_inflation"},
-    {"label": "Input is continuous, log-scale, CLR, or otherwise transformed", "value": "continuous"},
-    {"label": "Input is relative abundance or compositional profile data", "value": "relative_abundance"},
-    {"label": "Metadata covariates or design terms are part of the run", "value": "covariates"},
-    {"label": "A binary target/phenotype is part of the study design", "value": "binary_target"},
-    {"label": "A reference batch or reference distribution is selected", "value": "reference_batch"},
-)
-
 
 _PARAMETER_CONFIG = {
     "ComBat": [
@@ -621,100 +547,6 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     )
 
 
-def _method_category_by_id() -> Dict[str, Dict[str, object]]:
-    return {str(group["id"]): group for group in METHOD_CATEGORY_GROUPS}
-
-
-def _objective_method_matches(selected_traits: List[str] | None) -> List[Dict[str, object]]:
-    selected = [trait for trait in (selected_traits or []) if trait in _method_category_by_id()]
-    if not selected:
-        return []
-    scores: Dict[str, Dict[str, object]] = {}
-    groups = _method_category_by_id()
-    for trait in selected:
-        group = groups[trait]
-        for method_code in group["methods"]:
-            entry = scores.setdefault(
-                str(method_code),
-                {
-                    "code": str(method_code),
-                    "display": CODE_TO_DISPLAY.get(str(method_code), str(method_code)),
-                    "categories": [],
-                    "basis": [],
-                },
-            )
-            entry["categories"].append(str(group["label"]))
-            entry["basis"].append(str(group["basis"]))
-    return sorted(
-        scores.values(),
-        key=lambda item: (-len(item["categories"]), str(item["display"]).lower()),
-    )
-
-
-def _method_questionnaire_card() -> object:
-    return dbc.Card(
-        [
-            dbc.CardHeader(html.Strong("Objective method matching")),
-            dbc.CardBody(
-                [
-                    html.P(
-                        METHOD_MATCHING_SOURCE_NOTE
-                        + " Select descriptors that match the study context. The result is a category match, not a performance ranking.",
-                        className="text-muted mb-2",
-                    ),
-                    html.P(
-                        METHOD_MATCHING_PREPROCESS_NOTE
-                        + " Additional documented dimensions can be added to the checklist as the method catalogue grows.",
-                        className="text-muted mb-3",
-                    ),
-                    dcc.Checklist(
-                        id="method-questionnaire-traits",
-                        options=list(METHOD_QUESTIONNAIRE_OPTIONS),
-                        value=[],
-                        inputClassName="me-2",
-                        labelClassName="d-block mb-2",
-                    ),
-                    html.Div(id="method-questionnaire-result", className="mt-3"),
-                ]
-            ),
-        ],
-        className="mb-3",
-    )
-
-
-def _render_method_questionnaire_result(selected_traits: List[str] | None) -> object:
-    matches = _objective_method_matches(selected_traits)
-    if not matches:
-        return dbc.Alert(
-            "Select one or more documented input descriptors to show the matching method set.",
-            color="secondary",
-            className="mb-0",
-        )
-    items = []
-    for match in matches:
-        items.append(
-            html.Li(
-                [
-                    html.Strong(str(match["display"])),
-                    " - ",
-                    ", ".join(match["categories"]),
-                ]
-            )
-        )
-    return dbc.Alert(
-        [
-            html.Div("Matching methods from selected objective descriptors:", className="fw-semibold mb-2"),
-            html.Ul(items, className="mb-2"),
-            html.Div(
-                "Open Help -> Batch Effect Correction -> Method categories for the method lists, official-source basis, and preprocessing note.",
-                className="small text-muted",
-            ),
-        ],
-        color="light",
-        className="border mb-0",
-    )
-
-
 def _fabatch_unavailable_reason(session_dir) -> str | None:
     if not session_dir:
         return None
@@ -831,7 +663,6 @@ def correction_layout(active_path: str):
                     html.P(
                         "Review available correction methods along with their runtime for this session and citation details."
                     ),
-                    _method_questionnaire_card(),
                     html.P(
                         "Click a method name to open its package or source reference."
                     ),
@@ -1108,14 +939,6 @@ def register_correction_callbacks(app):
             children.extend(row_extras)
         table_wrapper = html.Div(children, className="be-method-table-wrapper")
         return table_wrapper
-
-    @app.callback(
-        Output("method-questionnaire-result", "children"),
-        Input("method-questionnaire-traits", "value"),
-        prevent_initial_call=False,
-    )
-    def render_method_questionnaire(selected_traits: List[str] | None):
-        return _render_method_questionnaire_result(selected_traits)
 
     @app.callback(
         Output({"type": "method-config-collapse", "code": MATCH}, "is_open"),
