@@ -180,7 +180,10 @@ HELP_MODAL_SECTIONS: List = [
                                 "Blank, NA, NaN, Inf, or non-numeric matrix cells."
                             ),
                             html.Li(
-                                "All-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, nonnumeric targets with more than two levels, or using the same column for batch and target."
+                                "All-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch levels, or using the same column for batch and target."
+                            ),
+                            html.Li(
+                                "Target column must be binary or numeric continuous; text targets with more than two categories are blocked."
                             ),
                         ]
                     ),

@@ -118,12 +118,18 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Basic requirements", text)
         self.assertIn("Hard blocks", text)
         self.assertIn("Samples in rows", text)
+        self.assertIn("One batch column and one binary or numeric continuous target/phenotype column", text)
+        self.assertNotIn("Required: one batch column", text)
         self.assertIn("Size limits: 500 samples or fewer, 1000 features or fewer, and 10.0 MB CSV or smaller", text)
         self.assertIn("Size limits: 5 columns or fewer including batch, target, and optional covariates", text)
         self.assertNotIn("Matrix cells: 150,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
         self.assertIn("No blank, NA, NaN, Inf, or NA-like metadata values", text)
         self.assertIn("All-zero sample rows are blocked", text)
+        self.assertIn(
+            "Target column must be binary or numeric continuous; text targets with more than two categories are blocked",
+            text,
+        )
         self.assertNotIn("All-zero feature columns trigger a warning", text)
         self.assertNotIn("FAbatch requires retained features", text)
         self.assertNotIn("marked unavailable for the session", text)
@@ -976,7 +982,11 @@ class DashAppTests(unittest.TestCase):
             self.assertFalse(report["valid"], report)
             self.assertEqual(report["dimensions"]["target_type"], "invalid")
             self.assertTrue(
-                any("Target column must be either binary or numeric continuous" in err for err in report["errors"])
+                any(
+                    "Target column must be binary or numeric continuous; text targets with more than two categories are blocked."
+                    in err
+                    for err in report["errors"]
+                )
             )
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):

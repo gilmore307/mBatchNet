@@ -503,7 +503,9 @@ def validate_session_inputs(
                     for code in BINARY_TARGET_METHOD_CODES:
                         _set_method_unavailable(method_availability, code, reason)
             elif target_profile["type"] != "binary":
-                errors.append("Target column must be either binary or numeric continuous for current workflows.")
+                errors.append(
+                    "Target column must be binary or numeric continuous; text targets with more than two categories are blocked."
+                )
     if batch_col and target_col and batch_col == target_col:
         errors.append("Batch and target columns must be different.")
     if (
@@ -920,7 +922,7 @@ def upload_layout(active_path: str):
                                                                     html.Ul(
                                                                         [
                                                                             html.Li("One row per sample, in the same sample order as the matrix."),
-                                                                            html.Li("Required: one batch column and one binary or numeric continuous target/phenotype column."),
+                                                                            html.Li("One batch column and one binary or numeric continuous target/phenotype column."),
                                                                             html.Li(
                                                                                 f"Size limits: {MAX_METADATA_COLUMNS} columns or fewer "
                                                                                 f"including batch, target, and optional covariates; "
@@ -934,7 +936,7 @@ def upload_layout(active_path: str):
                                                                         [
                                                                             html.Li("No blank, NA, NaN, Inf, or NA-like metadata values."),
                                                                             html.Li("Batch and target columns must be different."),
-                                                                            html.Li("Nonnumeric targets with more than two levels are blocked."),
+                                                                            html.Li("Target column must be binary or numeric continuous; text targets with more than two categories are blocked."),
                                                                         ],
                                                                         className="mb-3",
                                                                     ),
