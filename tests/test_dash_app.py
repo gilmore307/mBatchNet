@@ -818,6 +818,7 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             warning_text = " ".join(report["warnings"])
             self.assertIn("Outlier detection warning", warning_text)
+            self.assertIn("Scanpy QC 5.0x MAD screening rule", warning_text)
             self.assertGreater(report["dimensions"].get("outlier_sample_total_count", 0), 0)
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):

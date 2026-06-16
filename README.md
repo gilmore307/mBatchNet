@@ -108,7 +108,7 @@ The Upload page expects two CSV files:
    - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
    - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
-   - Extreme sample totals or matrix values trigger an outlier detection warning before correction methods run.
+   - Extreme sample totals or matrix values trigger a Scanpy QC/MAD outlier detection warning before correction methods run.
    - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
 
 2. **Metadata (CSV)**

@@ -46,7 +46,7 @@ MAX_METADATA_COLUMNS = 5
 WARN_MATRIX_CELLS = 100_000
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.60
-OUTLIER_IQR_MULTIPLIER = 3.0
+OUTLIER_MAD_MULTIPLIER = 5.0
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -212,38 +212,48 @@ def _fabatch_retained_feature_count(matrix: List[List[float]]) -> Optional[int]:
     return retained
 
 
-def _quantile(sorted_values: List[float], probability: float) -> Optional[float]:
-    if not sorted_values:
-        return None
-    if len(sorted_values) == 1:
-        return sorted_values[0]
-    position = (len(sorted_values) - 1) * probability
-    lower = math.floor(position)
-    upper = math.ceil(position)
-    if lower == upper:
-        return sorted_values[int(position)]
-    fraction = position - lower
-    return sorted_values[lower] * (1 - fraction) + sorted_values[upper] * fraction
-
-
-def _outlier_count(values: List[float]) -> int:
+def _mad_outlier_count(values: List[float]) -> int:
     if len(values) < 4:
         return 0
-    sorted_values = sorted(values)
-    q1 = _quantile(sorted_values, 0.25)
-    q3 = _quantile(sorted_values, 0.75)
-    if q1 is None or q3 is None:
+
+    import numpy as np
+
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size < 4:
         return 0
-    iqr = q3 - q1
-    if iqr <= 0:
-        median = _quantile(sorted_values, 0.5)
-        if median is None or median <= 0:
+
+    median = float(np.median(arr))
+    mad = float(np.median(np.abs(arr - median)))
+    if mad <= 0:
+        if median <= 0:
             return 0
         upper = median * 10
-        return sum(1 for value in values if value > upper)
-    lower = q1 - OUTLIER_IQR_MULTIPLIER * iqr
-    upper = q3 + OUTLIER_IQR_MULTIPLIER * iqr
-    return sum(1 for value in values if value < lower or value > upper)
+        return int(np.sum(arr > upper))
+
+    lower = median - OUTLIER_MAD_MULTIPLIER * mad
+    upper = median + OUTLIER_MAD_MULTIPLIER * mad
+    return int(np.sum((arr < lower) | (arr > upper)))
+
+
+def _scanpy_outlier_counts(matrix: List[List[float]]) -> Tuple[int, int]:
+    import numpy as np
+    import scanpy as sc
+    from anndata import AnnData
+
+    adata = AnnData(X=np.asarray(matrix, dtype=float))
+    obs_metrics, _ = sc.pp.calculate_qc_metrics(
+        adata,
+        expr_type="abundance",
+        var_type="features",
+        qc_vars=(),
+        percent_top=None,
+        inplace=False,
+        log1p=False,
+    )
+    sample_outliers = _mad_outlier_count(obs_metrics["total_abundance"].tolist())
+    value_outliers = _mad_outlier_count([value for row in matrix for value in row])
+    return sample_outliers, value_outliers
 
 
 def _write_validation_report(session_dir: Path, report: Dict[str, object]) -> None:
@@ -354,16 +364,14 @@ def validate_session_inputs(
         negative_values = sum(1 for row in matrix for value in row if value < 0)
         if negative_values:
             warnings.append("Negative values detected; this looks transformed. Count-specific methods may be inappropriate.")
-        sample_totals = [sum(row) for row in matrix]
-        sample_outliers = _outlier_count(sample_totals)
-        value_outliers = _outlier_count([value for row in matrix for value in row])
+        sample_outliers, value_outliers = _scanpy_outlier_counts(matrix)
         if sample_outliers or value_outliers:
             dimensions["outlier_sample_total_count"] = sample_outliers
             dimensions["outlier_matrix_value_count"] = value_outliers
             warnings.append(
                 "Outlier detection warning: "
                 f"{sample_outliers} sample total(s) and {value_outliers} matrix value(s) exceed the "
-                f"{OUTLIER_IQR_MULTIPLIER:.1f}x IQR screening rule. Review input scaling and extreme samples "
+                f"Scanpy QC {OUTLIER_MAD_MULTIPLIER:.1f}x MAD screening rule. Review input scaling and extreme samples "
                 "before running correction methods."
             )
 
