@@ -1,7 +1,7 @@
 # mBatchNet
 
 ## Project Overview
-mBatchNet is a browser-based application for batch-effect correction and post-correction evaluation in microbiome/omics count or abundance analysis workflows.
+mBatchNet is a browser-based application for batch-effect correction and post-correction evaluation in microbiome/omics feature-table workflows.
 
 The app supports an end-to-end pipeline:
 1. Upload feature table and metadata
@@ -110,7 +110,7 @@ The Upload page expects two CSV files:
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
    - Extreme sample totals or matrix values trigger a Scanpy QC/MAD outlier detection warning before correction methods run.
    - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
-   - Matrix input form does not by itself disable correction methods; mBatchNet preprocessing converts supported numeric inputs into method-ready TSS, CLR, log, or count-like representations.
+   - Matrix input form does not by itself disable correction methods; mBatchNet preprocessing prepares supported numeric inputs for each correction method.
    - Binary target labels are encoded internally as 0/1. Numeric continuous targets are preserved as continuous values, and binary-target-only methods are disabled for that session.
    - FAbatch is disabled when retained features after low-variance filtering are not greater than the largest batch size.
 
@@ -139,12 +139,12 @@ Method descriptions in the app are loaded from `assets/methods.csv`, which also 
 Methods without method-specific controls still use the uploaded matrix, metadata mapping, additional metadata covariates, reference batch, and target/control settings from the session.
 
 ### DEBIAS-M
-DEBIAS-M treats processing protocols, studies, or batches as domains for microbiome count or relative-abundance profiles. It learns taxon- and batch-specific multiplicative coefficients together with phenotype-prediction parameters and returns corrected count-derived TSS and CLR outputs.
+DEBIAS-M treats processing protocols, studies, or batches as domains for microbiome profiles. It learns taxon- and batch-specific multiplicative coefficients together with phenotype-prediction parameters. In mBatchNet, uploaded numeric inputs are preprocessed internally before DEBIAS-M runs and corrected matrices are written back to the session.
 
 Exposed parameters: none.
 
 ### MetaDICT
-MetaDICT performs microbiome data integration through initial batch-effect estimation by covariate balancing and refinement by shared dictionary learning. In mBatchNet it receives non-negative feature counts or abundances, metadata batch labels, optional covariates, and returns a corrected feature table aligned to the uploaded samples and features.
+MetaDICT performs microbiome data integration through initial batch-effect estimation by covariate balancing and refinement by shared dictionary learning. In mBatchNet, uploaded numeric inputs are preprocessed internally before MetaDICT runs, with metadata batch labels and optional covariates aligned to the uploaded samples and features.
 
 Exposed parameters:
 - `alpha` (default: `0.05`): significance threshold for detecting batch-driven structure.
@@ -163,7 +163,7 @@ Exposed parameters:
 - `balance` (default: `False`): class balancing during model fitting.
 
 ### ConQuR
-ConQuR removes microbiome batch effects with conditional quantile regression for zero-inflated read-count data. Its cited model separates zero occurrence from non-zero abundance and generates batch-removed zero-inflated counts.
+ConQuR removes microbiome batch effects with conditional quantile regression. Its cited model separates zero occurrence from non-zero abundance and generates batch-adjusted feature profiles.
 
 Exposed parameters:
 - `logistic_lasso` (default: `False`): lasso logistic regression in the batch-modeling step.
@@ -181,7 +181,7 @@ Exposed parameters:
 - `conv` (default: `0.000001`): convergence tolerance.
 
 ### RUV-III-NB
-RUV-III-NB normalizes sequencing count data by modeling counts with negative binomial or zero-inflated negative binomial distributions while estimating unwanted factors. In mBatchNet it receives rounded non-negative count data with a batch design matrix.
+RUV-III-NB normalizes sequencing data with negative binomial or zero-inflated negative binomial models while estimating unwanted factors. In mBatchNet, uploaded numeric inputs are preprocessed internally before RUV-III-NB runs with the batch design matrix.
 
 Exposed parameters:
 - `k` (default: `2`): number of unwanted factors estimated.
@@ -190,7 +190,7 @@ Exposed parameters:
 - `zeroinf` (default: `False`): zero-inflation handling.
 
 ### ComBat-seq
-ComBat-seq uses negative binomial regression to adjust batch effects in count matrices while retaining integer count structure. It estimates batch effects from count data and returns batch-adjusted counts.
+ComBat-seq uses negative binomial regression to adjust batch effects while preserving the model structure expected by the method. In mBatchNet, uploaded numeric inputs are preprocessed internally before ComBat-seq runs with batch labels, target labels, and optional covariates.
 
 Exposed parameters:
 - `full_mod` (default: `True`): inclusion of the biological group term in the model.
@@ -199,12 +199,12 @@ Exposed parameters:
 - `gene.subset.n` (default: `1000`): feature subset size for shrinkage estimation when shrinkage is enabled.
 
 ### FSQN
-FSQN applies feature-specific quantile normalization by mapping each feature distribution to a reference distribution. In mBatchNet it uses the selected reference batch as the feature-wise reference distribution for the TSS feature table.
+FSQN applies feature-specific quantile normalization by mapping each feature distribution to a reference distribution. In mBatchNet it uses the selected reference batch as the feature-wise reference distribution after preprocessing.
 
 Exposed parameters: none.
 
 ### FAbatch
-FAbatch performs model-based batch-effect adjustment for high-dimensional data analyses involving a binary target variable. In mBatchNet it receives CLR-transformed data with binary target and batch labels.
+FAbatch performs model-based batch-effect adjustment for high-dimensional data analyses involving a binary target variable. In mBatchNet, uploaded numeric inputs are preprocessed internally before FAbatch runs with binary target and batch labels.
 
 Exposed parameters:
 - `minerr` (default: `0.000001`): convergence tolerance.
@@ -213,12 +213,12 @@ Exposed parameters:
 - `maxiter` (default: `100`): maximum optimization iterations.
 
 ### Limma
-limma provides linear-model methods for expression and omics data analysis, including `removeBatchEffect` for removing batch and covariate components from a numeric matrix. In mBatchNet it receives a log-scale feature matrix with batch labels, protects the mapped target label through the design matrix, and excludes target-label columns from nuisance covariates.
+limma provides linear-model methods for expression and omics data analysis, including `removeBatchEffect` for removing batch and covariate components from a numeric matrix. In mBatchNet, uploaded numeric inputs are preprocessed internally before limma runs with batch labels, protects the mapped target label through the design matrix, and excludes target-label columns from nuisance covariates.
 
 Exposed parameters: none.
 
 ### BMC
-The cited BMC method addresses dataset-specific multiplicative systematic bias so gene-expression datasets can be combined for meta-analysis and prognosis modeling. In mBatchNet it calls `pamr` batch adjustment on a log-scale feature matrix with batch labels.
+The cited BMC method addresses dataset-specific multiplicative systematic bias so gene-expression datasets can be combined for meta-analysis and prognosis modeling. In mBatchNet, uploaded numeric inputs are preprocessed internally before BMC runs with batch labels.
 
 Exposed parameters: none.
 

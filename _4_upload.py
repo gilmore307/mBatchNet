@@ -881,8 +881,8 @@ def upload_layout(active_path: str):
                                                                             html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
                                                                             html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
                                                                             html.Li(
-                                                                                "mBatchNet preprocesses supported numeric input forms into method-ready "
-                                                                                "TSS, CLR, log, or count-like representations before correction."
+                                                                                "mBatchNet preprocesses supported numeric matrices into each method's "
+                                                                                "internal representation before correction."
                                                                             ),
                                                                             html.Li(
                                                                                 "FAbatch requires retained features after low-variance filtering "

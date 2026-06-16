@@ -232,8 +232,9 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("ANOSIM p", text)
         self.assertIn("permutation p-value column", text)
         self.assertIn("recorded as NA rather than failing the whole assessment", text)
-        self.assertIn("receives CLR-transformed data", text)
-        self.assertIn("protects the mapped target label through the design matrix", text)
+        self.assertIn("uploaded numeric inputs are preprocessed internally", text)
+        self.assertIn("mapped target label", text)
+        self.assertIn("design matrix", text)
 
     def test_readme_documents_correction_methods_and_parameters(self):
         text = Path("README.md").read_text(encoding="utf-8")
@@ -246,7 +247,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("`alpha` (default: `0.05`)", text)
         self.assertIn("`par.prior` (default: `False`)", text)
         self.assertIn("Exposed parameters: none.", text)
-        self.assertIn("protects the mapped target label through the design matrix", text)
+        self.assertIn("mapped target label", text)
+        self.assertIn("design matrix", text)
         self.assertIn("excludes target-label columns from nuisance covariates", text)
 
     def test_user_facing_descriptions_avoid_subjective_method_guidance(self):

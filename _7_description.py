@@ -180,7 +180,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Warnings: all-zero feature columns, high sparsity, large files or matrices, strong batch-target association, continuous target method limits, outliers, and method-specific availability limits."
                             ),
                             html.Li(
-                                "Input forms such as count-like, TSS-like, CLR-like, log-like, or other supported numeric tables are handled by mBatchNet's preprocessing converters before correction; these forms do not by themselves disable correction methods."
+                                "Supported numeric matrix inputs are handled by mBatchNet's preprocessing converters before correction; the uploaded matrix form does not by itself disable correction methods."
                             ),
                             html.Li(
                                 "Target handling: binary targets are encoded internally as 0/1, while numeric continuous targets are preserved as continuous values. Methods that require a binary target, including PLSDA-batch, FAbatch, and ComBat-seq, are disabled for continuous-target sessions."
