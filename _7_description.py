@@ -177,7 +177,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Hard blocks: missing required files, oversize files, invalid matrix shape, blank/NA/NaN/Inf/non-numeric matrix cells, all-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, nonnumeric targets with more than two levels, or using the same column for batch and target."
                             ),
                             html.Li(
-                                "Warnings: all-zero feature columns, high sparsity, transformed-looking numeric values, large files or matrices, strong batch-target association, continuous target method limits, outliers, and method-specific availability limits."
+                                "Warnings: all-zero feature columns, high sparsity, large files or matrices, strong batch-target association, continuous target method limits, outliers, and method-specific availability limits."
                             ),
                             html.Li(
                                 "Input forms such as count-like, TSS-like, CLR-like, log-like, or other supported numeric tables are handled by mBatchNet's preprocessing converters before correction; these forms do not by themselves disable correction methods."

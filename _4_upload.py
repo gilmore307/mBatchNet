@@ -434,9 +434,6 @@ def validate_session_inputs(
         zero_values = sum(1 for row in matrix for value in row if value == 0)
         if total_values and zero_values / total_values >= HIGH_SPARSITY_FRACTION:
             warnings.append("Matrix is highly sparse; review whether this sparsity is expected before running correction methods.")
-        negative_values = sum(1 for row in matrix for value in row if value < 0)
-        if negative_values:
-            warnings.append("Negative values detected; input appears transformed. mBatchNet will preserve the numeric matrix and use preprocessing converters before correction.")
         sample_outliers, value_outliers = _scanpy_outlier_counts(matrix)
         if sample_outliers or value_outliers:
             dimensions["outlier_sample_total_count"] = sample_outliers

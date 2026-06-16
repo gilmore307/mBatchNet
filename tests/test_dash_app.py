@@ -906,7 +906,7 @@ class DashAppTests(unittest.TestCase):
                 self.assertTrue(availability[code]["available"], availability[code])
                 self.assertIsNone(_method_unavailable_reason(session_dir, code))
 
-    def test_transformed_negative_matrix_warns_without_disabling_methods(self):
+    def test_transformed_negative_matrix_does_not_warn_or_disable_methods(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
@@ -922,8 +922,8 @@ class DashAppTests(unittest.TestCase):
 
             self.assertTrue(report["valid"], report)
             warning_text = " ".join(report["warnings"])
-            self.assertIn("Negative values detected", warning_text)
-            self.assertIn("preprocessing converters", warning_text)
+            self.assertNotIn("Negative values detected", warning_text)
+            self.assertNotIn("transformed", warning_text)
             self.assertNotIn("Method availability warning", warning_text)
             self.assertTrue(report["method_availability"]["ComBatSeq"]["available"])
             self.assertTrue(report["method_availability"]["PLSDA"]["available"])
