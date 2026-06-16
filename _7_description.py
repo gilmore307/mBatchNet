@@ -88,6 +88,7 @@ HELP_SECTION_TOC: List[Dict[str, str]] = [
         "title": "Upload Files",
         "children": [
             {"id": "help-upload-manual", "title": "Manual upload"},
+            {"id": "help-upload-validation", "title": "Preprocess validation"},
             {"id": "help-upload-example", "title": "Example dataset"},
             {"id": "help-upload-repro", "title": "Repro bundle"},
             {"id": "help-upload-mosaic", "title": "Mosaic plot"},
@@ -157,14 +158,41 @@ HELP_MODAL_SECTIONS: List = [
                             html.Li(
                                 "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariate columns (keep the count modest to avoid slow runs)."
                             ),
+                        ]
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.H5("Preprocess validation", className="mb-2 mt-4", id="help-upload-validation"),
+                    html.P(
+                        "Before preprocessing, mBatchNet validates the upload contract and writes validation_report.json for the session."
+                    ),
+                    html.Ul(
+                        [
                             html.Li(
-                                "Metadata values are checked for blank, NA, NaN, Inf, and NA-like entries before preprocessing."
+                                "File and shape checks: required raw.csv and metadata_origin.csv files, public-server file-size limits, sample/feature/cell limits, at least two samples and two features, and matching metadata row count."
                             ),
                             html.Li(
-                                "The Upload page writes validation_report.json and blocks core input errors before preprocessing."
+                                "Matrix checks: numeric finite values only, no blank/NA/NaN/Inf cells, no all-zero sample rows, warnings for all-zero feature columns, high sparsity, negative values, and large matrices."
                             ),
                             html.Li(
-                                "mBatchNet displays an advisory warning for strong batch-target association when Cramer's V >= 0.60."
+                                "Metadata checks: header and data rows, metadata-column limit, no blank/NA-like values, selected batch and target columns present and distinct, at least two batch levels, and exactly two target levels for current binary assessments."
+                            ),
+                            html.Li(
+                                "Study-design warnings: strong batch-target association is reported when Cramer's V >= 0.60, and FAbatch availability is checked against retained feature count and largest batch size."
+                            ),
+                            html.Li(
+                                [
+                                    "Outlier screening uses Scanpy's ",
+                                    html.A(
+                                        "sc.pp.calculate_qc_metrics",
+                                        href="https://scanpy.readthedocs.io/en/stable/api/scanpy.pp.calculate_qc_metrics.html",
+                                        target="_blank",
+                                        rel="noopener noreferrer",
+                                    ),
+                                    " to compute sample-level QC totals, then mBatchNet applies a 5x MAD screening rule to sample totals and matrix values. This produces an advisory warning only; it does not delete samples or alter the matrix.",
+                                ]
                             ),
                         ]
                     ),

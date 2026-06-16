@@ -62,6 +62,20 @@ def _component_text(component):
     return _component_text(children)
 
 
+def _component_hrefs(component):
+    hrefs = []
+    href = getattr(component, "href", None)
+    if href:
+        hrefs.append(href)
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            hrefs.extend(_component_hrefs(child))
+    elif children is not None and not isinstance(children, str):
+        hrefs.extend(_component_hrefs(children))
+    return hrefs
+
+
 def _read_csv_records_for_test(path):
     with Path(path).open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
@@ -159,6 +173,29 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Download results", text)
         self.assertNotIn("recommended Batch", text)
         self.assertNotIn("best balances", text)
+
+    def test_help_modal_documents_preprocess_validation(self):
+        help_root = html.Div(HELP_MODAL_SECTIONS)
+        text = _component_text(help_root)
+        toc_titles = []
+        for item in HELP_SECTION_TOC:
+            toc_titles.append(item["title"])
+            toc_titles.extend(child["title"] for child in item.get("children", []))
+        toc_text = " ".join(toc_titles)
+
+        self.assertIn("Preprocess validation", toc_text)
+        self.assertIn("Preprocess validation", text)
+        self.assertIn("validation_report.json", text)
+        self.assertIn("sample/feature/cell limits", text)
+        self.assertIn("no blank/NA-like values", text)
+        self.assertIn("Cramer's V >= 0.60", text)
+        self.assertIn("FAbatch availability", text)
+        self.assertIn("sc.pp.calculate_qc_metrics", text)
+        self.assertIn("5x MAD screening rule", text)
+        self.assertIn(
+            "https://scanpy.readthedocs.io/en/stable/api/scanpy.pp.calculate_qc_metrics.html",
+            _component_hrefs(help_root),
+        )
 
     def test_help_modal_lists_correction_methods_and_parameters(self):
         text = _component_text(html.Div(HELP_MODAL_SECTIONS))
