@@ -191,7 +191,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("validation_report.json", text)
         self.assertIn("sample/feature/cell limits", text)
         self.assertIn("blank/NA/NaN/Inf/non-numeric matrix cells", text)
-        self.assertIn("ConQuR, RUV-III-NB, ComBat-seq, and DEBIAS-M", text)
+        self.assertIn("preprocessing converters", text)
         self.assertIn("Cramer's V >= 0.60", text)
         self.assertIn("FAbatch availability", text)
         self.assertIn("sc.pp.calculate_qc_metrics", text)
@@ -862,7 +862,7 @@ class DashAppTests(unittest.TestCase):
             self.assertIn("Scanpy QC 5.0x MAD screening rule", warning_text)
             self.assertGreater(report["dimensions"].get("outlier_sample_total_count", 0), 0)
 
-    def test_count_based_methods_are_available_for_integer_counts(self):
+    def test_method_availability_allows_numeric_input_forms(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
@@ -877,13 +877,12 @@ class DashAppTests(unittest.TestCase):
             report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
 
             self.assertTrue(report["valid"], report)
-            self.assertTrue(report["dimensions"].get("count_like_matrix"))
             availability = report["method_availability"]
-            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS"):
+            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS", "limma", "ComBat"):
                 self.assertTrue(availability[code]["available"], availability[code])
                 self.assertIsNone(_method_unavailable_reason(session_dir, code))
 
-    def test_count_based_methods_are_disabled_for_continuous_matrix(self):
+    def test_continuous_matrix_does_not_disable_methods(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
@@ -898,20 +897,14 @@ class DashAppTests(unittest.TestCase):
             report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
 
             self.assertTrue(report["valid"], report)
-            self.assertFalse(report["dimensions"].get("count_like_matrix"))
             warning_text = " ".join(report["warnings"])
-            self.assertIn("Method availability warning", warning_text)
-            self.assertIn("ConQuR", warning_text)
-            self.assertIn("DEBIAS-M", warning_text)
+            self.assertNotIn("Method availability warning", warning_text)
             availability = report["method_availability"]
-            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS"):
-                self.assertFalse(availability[code]["available"], availability[code])
-                self.assertIn("nonnegative integer count input", availability[code]["reason"])
-                self.assertIn("unavailable", _method_unavailable_reason(session_dir, code))
-            self.assertTrue(availability["limma"]["available"])
-            self.assertTrue(availability["ComBat"]["available"])
+            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS", "limma", "ComBat"):
+                self.assertTrue(availability[code]["available"], availability[code])
+                self.assertIsNone(_method_unavailable_reason(session_dir, code))
 
-    def test_count_based_methods_are_disabled_for_transformed_negative_matrix(self):
+    def test_transformed_negative_matrix_warns_without_disabling_methods(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
             (session_dir / "raw.csv").write_text(
@@ -928,8 +921,8 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             warning_text = " ".join(report["warnings"])
             self.assertIn("Negative values detected", warning_text)
-            self.assertIn("Method availability warning", warning_text)
-            self.assertFalse(report["method_availability"]["ComBatSeq"]["available"])
+            self.assertNotIn("Method availability warning", warning_text)
+            self.assertTrue(report["method_availability"]["ComBatSeq"]["available"])
             self.assertTrue(report["method_availability"]["PLSDA"]["available"])
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):

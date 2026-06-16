@@ -31,8 +31,6 @@ from _2_utils import (
     _encode_image_source,
     clear_session_derived_outputs,
     CODE_TO_DISPLAY,
-    COUNT_REQUIRED_METHOD_CODES,
-    METHOD_INPUT_REQUIREMENT_BY_CODE,
     SUPPORTED_METHODS,
 )
 
@@ -51,7 +49,6 @@ WARN_MATRIX_CELLS = 500 * 500
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_MAD_MULTIPLIER = 5.0
-COUNT_INTEGER_TOLERANCE = 1e-6
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -217,37 +214,15 @@ def _fabatch_retained_feature_count(matrix: List[List[float]]) -> Optional[int]:
     return retained
 
 
-def _is_count_like_matrix(matrix: List[List[float]]) -> bool:
-    values = [value for row in matrix for value in row]
-    if not values:
-        return False
-    return all(
-        math.isfinite(value)
-        and value >= 0
-        and abs(value - round(value)) <= COUNT_INTEGER_TOLERANCE
-        for value in values
-    )
-
-
 def _build_method_availability(matrix: List[List[float]]) -> Dict[str, Dict[str, object]]:
-    count_like = _is_count_like_matrix(matrix)
     availability: Dict[str, Dict[str, object]] = {}
-    count_reason = (
-        "Requires nonnegative integer count input; this upload contains continuous, transformed, "
-        "negative, or otherwise non-count matrix values."
-    )
     for code, display in SUPPORTED_METHODS:
-        requirement = METHOD_INPUT_REQUIREMENT_BY_CODE.get(code, {})
-        requires_counts = code in COUNT_REQUIRED_METHOD_CODES
-        entry: Dict[str, object] = {
+        availability[code] = {
             "display_name": display,
-            "available": bool(count_like or not requires_counts),
-            "requirement": requirement.get("requirement", "continuous_or_discrete"),
-            "requirement_label": requirement.get("label", "Accepts numeric input"),
+            "available": True,
+            "requirement": "converted_numeric_matrix",
+            "requirement_label": "Runs after mBatchNet preprocessing conversion",
         }
-        if requires_counts and not count_like:
-            entry["reason"] = count_reason
-        availability[code] = entry
     return availability
 
 
@@ -256,26 +231,16 @@ def _set_method_unavailable(
     code: str,
     reason: str,
 ) -> None:
-    requirement = METHOD_INPUT_REQUIREMENT_BY_CODE.get(code, {})
     entry = availability.setdefault(
         code,
         {
             "display_name": CODE_TO_DISPLAY.get(code, code),
-            "requirement": requirement.get("requirement", "method_specific"),
-            "requirement_label": requirement.get("label", "Method-specific requirement"),
+            "requirement": "method_specific",
+            "requirement_label": "Method-specific requirement",
         },
     )
     entry["available"] = False
     entry["reason"] = reason
-
-
-def _unavailable_method_names(availability: Dict[str, Dict[str, object]], codes: List[str]) -> List[str]:
-    names = []
-    for code in codes:
-        entry = availability.get(code, {})
-        if entry.get("available") is False:
-            names.append(str(entry.get("display_name") or CODE_TO_DISPLAY.get(code, code)))
-    return names
 
 
 def _mad_outlier_count(values: List[float]) -> int:
@@ -404,15 +369,6 @@ def validate_session_inputs(
         sample_count = len(matrix)
         feature_count = len(matrix[0]) if matrix else 0
         method_availability = _build_method_availability(matrix)
-        dimensions["count_like_matrix"] = _is_count_like_matrix(matrix)
-        unavailable_count_methods = _unavailable_method_names(method_availability, list(COUNT_REQUIRED_METHOD_CODES))
-        if unavailable_count_methods:
-            warnings.append(
-                "Method availability warning: "
-                f"{', '.join(unavailable_count_methods)} disabled for this session because they require "
-                "nonnegative integer count input; continuous, transformed, negative, or non-count matrices "
-                "can still use methods that accept continuous numeric input."
-            )
         dimensions.update(
             {
                 "samples": sample_count,
@@ -880,8 +836,8 @@ def upload_layout(active_path: str):
                                                                             html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
                                                                             html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
                                                                             html.Li(
-                                                                                "Count-based correction methods require nonnegative integer counts; "
-                                                                                "continuous or transformed matrices disable those methods with a warning."
+                                                                                "mBatchNet preprocesses supported numeric input forms into method-ready "
+                                                                                "TSS, CLR, log, or count-like representations before correction."
                                                                             ),
                                                                             html.Li(
                                                                                 "FAbatch requires retained features after low-variance filtering "

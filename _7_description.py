@@ -180,7 +180,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Warnings: all-zero feature columns, high sparsity, negative/transformed-looking values, large files or matrices, strong batch-target association, outliers, and method-specific availability limits."
                             ),
                             html.Li(
-                                "Method availability: count-based methods ConQuR, RUV-III-NB, ComBat-seq, and DEBIAS-M require nonnegative integer count input. Continuous, transformed, negative, or otherwise non-count matrices disable these methods in the Correction table while leaving continuous-compatible methods available."
+                                "Input forms such as count-like, TSS-like, CLR-like, log-like, or other supported numeric tables are handled by mBatchNet's preprocessing converters before correction; these forms do not by themselves disable correction methods."
                             ),
                             html.Li(
                                 "FAbatch availability is checked after low-variance filtering; FAbatch is disabled when retained features are not greater than the largest batch size."
