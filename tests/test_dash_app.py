@@ -201,7 +201,7 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Missing required files", text)
         self.assertIn("Blank, NA, NaN, Inf, or non-numeric matrix cells", text)
         self.assertIn("All-zero feature columns are reported as warnings", text)
-        self.assertIn("High sparsity is reported when 80% or more of matrix cells are zero", text)
+        self.assertIn("mBatchNet reports high sparsity when 80% or more of matrix cells are zero", text)
         self.assertIn("greater than 500 x 500", text)
         self.assertIn("numeric continuous targets are preserved", text)
         self.assertIn("Methods that require a binary target", text)

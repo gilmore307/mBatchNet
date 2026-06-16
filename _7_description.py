@@ -194,7 +194,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "All-zero feature columns are reported as warnings; they do not block preprocessing."
                             ),
                             html.Li(
-                                "High sparsity is reported when 80% or more of matrix cells are zero."
+                                "mBatchNet reports high sparsity when 80% or more of matrix cells are zero."
                             ),
                             html.Li(
                                 "Large matrices are reported when sample count x feature count is greater than 500 x 500."
