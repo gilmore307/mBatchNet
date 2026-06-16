@@ -191,13 +191,22 @@ HELP_MODAL_SECTIONS: List = [
                     html.Ul(
                         [
                             html.Li(
-                                "All-zero feature columns, high sparsity, large files or matrices, strong batch-target association, outliers, and method-specific availability limits are reported as warnings."
+                                "All-zero feature columns are reported as warnings; they do not block preprocessing."
+                            ),
+                            html.Li(
+                                "High sparsity is reported when 80% or more of matrix cells are zero."
+                            ),
+                            html.Li(
+                                "Large matrices are reported when sample count x feature count is greater than 500 x 500."
                             ),
                             html.Li(
                                 "Target handling: binary targets are encoded internally as 0/1, while numeric continuous targets are preserved as continuous values. Methods that require a binary target, including PLSDA-batch, FAbatch, and ComBat-seq, are disabled for continuous-target sessions."
                             ),
                             html.Li(
                                 "Study-design warnings: strong batch-target association is reported when Cramer's V >= 0.60."
+                            ),
+                            html.Li(
+                                "Method availability warnings are reported when a method is disabled for the current session by validation."
                             ),
                             html.Li(
                                 [
