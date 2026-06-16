@@ -116,15 +116,19 @@ convert_target_to_binary <- function(metadata, label_col) {
       mapping <- data.frame(label = uniq, binary = c(0L, 1L), stringsAsFactors = FALSE)
       bin <- as.integer(factor(vals, levels = uniq)) - 1L
       metadata[[TARGET_BINARY_COL]] <- bin
-      return(list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "numeric labels coerced to 0/1"))
+      return(list(metadata = metadata, mapping = mapping, changed = TRUE, target_type = "binary", reason = "numeric labels coerced to 0/1"))
     }
-    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "numeric labels need exactly 2 unique values"))
+    if (length(uniq) >= 2) {
+      metadata[[TARGET_BINARY_COL]] <- as.numeric(vals)
+      return(list(metadata = metadata, mapping = NULL, changed = TRUE, target_type = "continuous", reason = "numeric target retained as continuous"))
+    }
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, target_type = "invalid", reason = "numeric target needs at least 2 unique values"))
   }
 
   vals_chr <- trimws(as.character(vals))
   uniq <- unique(vals_chr[!is.na(vals_chr) & nzchar(vals_chr)])
   if (length(uniq) != 2) {
-    return(list(metadata = metadata, mapping = NULL, changed = FALSE, reason = "label column needs exactly 2 unique text levels"))
+    return(list(metadata = metadata, mapping = NULL, changed = FALSE, target_type = "invalid", reason = "text label column needs exactly 2 unique levels"))
   }
 
   uniq <- sort(uniq)
@@ -137,7 +141,7 @@ convert_target_to_binary <- function(metadata, label_col) {
     stringsAsFactors = FALSE
   )
 
-  list(metadata = metadata, mapping = mapping, changed = TRUE, reason = "converted labels to target_binary")
+  list(metadata = metadata, mapping = mapping, changed = TRUE, target_type = "binary", reason = "converted labels to target_binary")
 }
 
 record_methods <- c(
@@ -335,7 +339,7 @@ if (!(TARGET_BINARY_COL %in% colnames(metadata))) {
   if (isTRUE(conv_target$changed)) {
     metadata <- conv_target$metadata
     if (!is.null(conv_target$mapping)) target_mapping <- conv_target$mapping
-    say("ℹ️ Converted target to binary for correction use")
+    say("ℹ️ Prepared target column for correction use: ", conv_target$reason)
   } else if (!is.null(conv_target$reason)) {
     say("ℹ️ Target left unchanged: ", conv_target$reason)
   }

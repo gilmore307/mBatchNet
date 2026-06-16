@@ -111,12 +111,13 @@ The Upload page expects two CSV files:
    - Extreme sample totals or matrix values trigger a Scanpy QC/MAD outlier detection warning before correction methods run.
    - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
    - Matrix input form does not by itself disable correction methods; mBatchNet preprocessing converts supported numeric inputs into method-ready TSS, CLR, log, or count-like representations.
+   - Binary target labels are encoded internally as 0/1. Numeric continuous targets are preserved as continuous values, and binary-target-only methods are disabled for that session.
    - FAbatch is disabled when retained features after low-variance filtering are not greater than the largest batch size.
 
 2. **Metadata (CSV)**
    - Must include at least:
      - batch column (Batch)
-     - target column (target/phenotype/group)
+     - binary or numeric continuous target column (target/phenotype/group/outcome)
    - Optional:
      - covariate columns
 
@@ -127,7 +128,7 @@ Public server limits:
 - Samples: 500
 - Features: 1,000
 - Matrix cells: 500,000
-- Matrix cells above 250,000 trigger a large-matrix warning because correction methods may run slowly
+- Matrix cells above 500 x 500 trigger a large-matrix warning because correction methods may run slowly
 - Metadata columns: 5 or fewer, including batch, target, and optional covariates
 - Metadata values: blank, NA, NaN, Inf, and NA-like entries are blocked before preprocessing
 

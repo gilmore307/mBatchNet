@@ -156,7 +156,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "Raw sequencing files such as FASTQ are not accepted. Upload a processed sample-by-feature numeric table, such as a 16S-derived OTU/ASV table or a shotgun-derived taxonomic/functional profile after upstream profiling."
                             ),
                             html.Li(
-                                "Metadata CSVs must include: a Batch column (batch IDs), a target column (target label such as phenotype/group), and optional covariate columns (keep the count modest to avoid slow runs)."
+                                "Metadata CSVs must include: a Batch column (batch IDs), a binary or numeric continuous target column (phenotype/group/outcome), and optional covariate columns (keep the count modest to avoid slow runs)."
                             ),
                         ]
                     ),
@@ -174,13 +174,16 @@ HELP_MODAL_SECTIONS: List = [
                                 "File and shape checks: required raw.csv and metadata_origin.csv files, public-server file-size limits, sample/feature/cell limits, at least two samples and two features, and matching metadata row count."
                             ),
                             html.Li(
-                                "Hard blocks: missing required files, oversize files, invalid matrix shape, blank/NA/NaN/Inf/non-numeric matrix cells, all-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, or using the same column for batch and target."
+                                "Hard blocks: missing required files, oversize files, invalid matrix shape, blank/NA/NaN/Inf/non-numeric matrix cells, all-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, nonnumeric targets with more than two levels, or using the same column for batch and target."
                             ),
                             html.Li(
-                                "Warnings: all-zero feature columns, high sparsity, negative/transformed-looking values, large files or matrices, strong batch-target association, outliers, and method-specific availability limits."
+                                "Warnings: all-zero feature columns, high sparsity, transformed-looking numeric values, large files or matrices, strong batch-target association, continuous target method limits, outliers, and method-specific availability limits."
                             ),
                             html.Li(
                                 "Input forms such as count-like, TSS-like, CLR-like, log-like, or other supported numeric tables are handled by mBatchNet's preprocessing converters before correction; these forms do not by themselves disable correction methods."
+                            ),
+                            html.Li(
+                                "Target handling: binary targets are encoded internally as 0/1, while numeric continuous targets are preserved as continuous values. Methods that require a binary target, including PLSDA-batch, FAbatch, and ComBat-seq, are disabled for continuous-target sessions."
                             ),
                             html.Li(
                                 "FAbatch availability is checked after low-variance filtering; FAbatch is disabled when retained features are not greater than the largest batch size."

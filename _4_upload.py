@@ -49,6 +49,7 @@ WARN_MATRIX_CELLS = 500 * 500
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_MAD_MULTIPLIER = 5.0
+BINARY_TARGET_METHOD_CODES = ("PLSDA", "FAbatch", "ComBatSeq")
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -240,7 +241,38 @@ def _set_method_unavailable(
         },
     )
     entry["available"] = False
-    entry["reason"] = reason
+    previous = str(entry.get("reason") or "")
+    if previous and reason not in previous:
+        entry["reason"] = f"{previous} Also: {reason}"
+    else:
+        entry["reason"] = reason
+
+
+def _target_values_profile(rows: List[Dict[str, str]], column: str) -> Dict[str, object]:
+    values = [str(row.get(column, "")).strip() for row in rows if not _metadata_missing(row.get(column))]
+    unique_values = sorted(set(values))
+    numeric_values = []
+    numeric = True
+    for value in values:
+        parsed = _as_float(value)
+        if parsed is None:
+            numeric = False
+            break
+        numeric_values.append(parsed)
+    unique_numeric = sorted(set(numeric_values)) if numeric else []
+    if numeric and len(unique_numeric) == 2:
+        target_type = "binary"
+    elif numeric and len(unique_numeric) > 2:
+        target_type = "continuous"
+    elif len(unique_values) == 2:
+        target_type = "binary"
+    else:
+        target_type = "invalid"
+    return {
+        "type": target_type,
+        "levels": len(unique_values),
+        "numeric_levels": len(unique_numeric),
+    }
 
 
 def _mad_outlier_count(values: List[float]) -> int:
@@ -401,10 +433,10 @@ def validate_session_inputs(
         total_values = sample_count * feature_count
         zero_values = sum(1 for row in matrix for value in row if value == 0)
         if total_values and zero_values / total_values >= HIGH_SPARSITY_FRACTION:
-            warnings.append("Matrix is highly sparse; review count assumptions and transformed-data assumptions before selecting correction methods.")
+            warnings.append("Matrix is highly sparse; review whether this sparsity is expected before running correction methods.")
         negative_values = sum(1 for row in matrix for value in row if value < 0)
         if negative_values:
-            warnings.append("Negative values detected; this looks transformed. Count-specific methods may be inappropriate.")
+            warnings.append("Negative values detected; input appears transformed. mBatchNet will preserve the numeric matrix and use preprocessing converters before correction.")
         sample_outliers, value_outliers = _scanpy_outlier_counts(matrix)
         if sample_outliers or value_outliers:
             dimensions["outlier_sample_total_count"] = sample_outliers
@@ -461,13 +493,29 @@ def validate_session_inputs(
         if target_col not in metadata_header:
             errors.append(f"Selected target column '{target_col}' is missing from metadata.")
         else:
-            target_counts = _level_counts(metadata_rows, target_col)
-            dimensions["target_levels"] = len(target_counts)
-            if len(target_counts) != 2:
-                errors.append("Target column must contain exactly two non-empty levels for current binary assessments.")
+            target_profile = _target_values_profile(metadata_rows, target_col)
+            dimensions["target_type"] = target_profile["type"]
+            dimensions["target_levels"] = target_profile["levels"]
+            if target_profile["type"] == "continuous":
+                warnings.append(
+                    "Target column appears numeric continuous; mBatchNet will preserve it as a numeric target "
+                    "instead of converting it to binary. Binary-target-only methods are disabled for this session."
+                )
+                if method_availability is not None:
+                    reason = "Requires a binary target; selected target is numeric continuous."
+                    for code in BINARY_TARGET_METHOD_CODES:
+                        _set_method_unavailable(method_availability, code, reason)
+            elif target_profile["type"] != "binary":
+                errors.append("Target column must be either binary or numeric continuous for current workflows.")
     if batch_col and target_col and batch_col == target_col:
         errors.append("Batch and target columns must be different.")
-    if batch_col and target_col and batch_col in metadata_header and target_col in metadata_header:
+    if (
+        batch_col
+        and target_col
+        and batch_col in metadata_header
+        and target_col in metadata_header
+        and dimensions.get("target_type") == "binary"
+    ):
         v = _cramers_v(metadata_rows, batch_col, target_col)
         if v is not None:
             dimensions["batch_target_cramers_v"] = round(v, 4)
@@ -874,7 +922,7 @@ def upload_layout(active_path: str):
                                                                     html.Ul(
                                                                         [
                                                                             html.Li("One row per sample, in the same sample order as the matrix."),
-                                                                            html.Li("Required: one batch column and one binary target/phenotype column."),
+                                                                            html.Li("Required: one batch column and one binary or numeric continuous target/phenotype column."),
                                                                             html.Li(
                                                                                 f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
                                                                             ),
@@ -1580,7 +1628,7 @@ def register_upload_callbacks(app):
                                     html.Li(
                                         [
                                             html.Code(target_label),
-                                            " column -> target_binary (binary copy written for correction)",
+                                            " column -> target for correction",
                                         ]
                                     ),
                                     html.Li(
@@ -1632,12 +1680,12 @@ def register_upload_callbacks(app):
                                 ),
                                 dbc.Col(
                                     [
-                                        dbc.Label("Target (binary) column"),
+                                        dbc.Label("Target column"),
                                         dcc.Dropdown(
                                             id="map-target-binary",
                                             options=opts,
                                             value=None,
-                                            placeholder="Select column to convert to target_binary (e.g., positive/negative)",
+                                            placeholder="Select binary or numeric continuous target column",
                                             clearable=True,
                                         ),
                                     ],

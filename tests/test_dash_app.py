@@ -192,6 +192,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("sample/feature/cell limits", text)
         self.assertIn("blank/NA/NaN/Inf/non-numeric matrix cells", text)
         self.assertIn("preprocessing converters", text)
+        self.assertIn("numeric continuous targets are preserved", text)
+        self.assertIn("Methods that require a binary target", text)
         self.assertIn("Cramer's V >= 0.60", text)
         self.assertIn("FAbatch availability", text)
         self.assertIn("sc.pp.calculate_qc_metrics", text)
@@ -921,9 +923,57 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             warning_text = " ".join(report["warnings"])
             self.assertIn("Negative values detected", warning_text)
+            self.assertIn("preprocessing converters", warning_text)
             self.assertNotIn("Method availability warning", warning_text)
             self.assertTrue(report["method_availability"]["ComBatSeq"]["available"])
             self.assertTrue(report["method_availability"]["PLSDA"]["available"])
+
+    def test_continuous_target_warns_and_disables_binary_target_methods(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2,f3,f4\n1,0,2,4\n0,3,1,5\n2,1,0,6\n4,2,3,7\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,1.2\nA,2.5\nB,3.1\nB,4.4\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"]["target_type"], "continuous")
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("numeric continuous", warning_text)
+            self.assertIn("Binary-target-only methods are disabled", warning_text)
+            availability = report["method_availability"]
+            for code in ("PLSDA", "FAbatch", "ComBatSeq"):
+                self.assertFalse(availability[code]["available"], availability[code])
+                self.assertIn("Requires a binary target", _method_unavailable_reason(session_dir, code))
+            for code in ("ConQuR", "RUV", "DEBIAS", "limma", "ComBat"):
+                self.assertTrue(availability[code]["available"], availability[code])
+                self.assertIsNone(_method_unavailable_reason(session_dir, code))
+
+    def test_multilevel_text_target_blocks_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2\n1,2\n2,3\n3,4\n4,5\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,control\nB,other\nB,case\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertFalse(report["valid"], report)
+            self.assertEqual(report["dimensions"]["target_type"], "invalid")
+            self.assertTrue(
+                any("Target column must be either binary or numeric continuous" in err for err in report["errors"])
+            )
 
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):
         with tempfile.TemporaryDirectory() as tmp:
