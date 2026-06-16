@@ -89,6 +89,8 @@ HELP_SECTION_TOC: List[Dict[str, str]] = [
         "children": [
             {"id": "help-upload-manual", "title": "Manual upload"},
             {"id": "help-upload-validation", "title": "Preprocess validation"},
+            {"id": "help-upload-validation-blocks", "title": "Blocks"},
+            {"id": "help-upload-validation-warnings", "title": "Warnings"},
             {"id": "help-upload-example", "title": "Example dataset"},
             {"id": "help-upload-repro", "title": "Repro bundle"},
             {"id": "help-upload-mosaic", "title": "Mosaic plot"},
@@ -168,25 +170,28 @@ HELP_MODAL_SECTIONS: List = [
                     html.P(
                         "Before preprocessing, mBatchNet validates the upload contract and writes validation_report.json for the session."
                     ),
+                    html.H6("Blocks", className="mb-2 mt-3", id="help-upload-validation-blocks"),
                     html.Ul(
                         [
                             html.Li(
-                                "File and shape checks: required raw.csv and metadata_origin.csv files, public-server file-size limits, sample/feature/cell limits, at least two samples and two features, and matching metadata row count."
+                                "Missing required files, oversize files, invalid matrix shape, or fewer than two samples or two features."
                             ),
                             html.Li(
-                                "Hard blocks: missing required files, oversize files, invalid matrix shape, blank/NA/NaN/Inf/non-numeric matrix cells, all-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, nonnumeric targets with more than two levels, or using the same column for batch and target."
+                                "Blank, NA, NaN, Inf, or non-numeric matrix cells."
                             ),
                             html.Li(
-                                "Warnings: all-zero feature columns, high sparsity, large files or matrices, strong batch-target association, continuous target method limits, outliers, and method-specific availability limits."
+                                "All-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, nonnumeric targets with more than two levels, or using the same column for batch and target."
                             ),
+                        ]
+                    ),
+                    html.H6("Warnings", className="mb-2 mt-3", id="help-upload-validation-warnings"),
+                    html.Ul(
+                        [
                             html.Li(
-                                "Supported numeric matrix inputs are handled by mBatchNet's preprocessing converters before correction; the uploaded matrix form does not by itself disable correction methods."
+                                "All-zero feature columns, high sparsity, large files or matrices, strong batch-target association, outliers, and method-specific availability limits are reported as warnings."
                             ),
                             html.Li(
                                 "Target handling: binary targets are encoded internally as 0/1, while numeric continuous targets are preserved as continuous values. Methods that require a binary target, including PLSDA-batch, FAbatch, and ComBat-seq, are disabled for continuous-target sessions."
-                            ),
-                            html.Li(
-                                "FAbatch availability is checked after low-variance filtering; FAbatch is disabled when retained features are not greater than the largest batch size."
                             ),
                             html.Li(
                                 "Study-design warnings: strong batch-target association is reported when Cramer's V >= 0.60."

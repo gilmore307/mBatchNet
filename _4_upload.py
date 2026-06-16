@@ -866,6 +866,7 @@ def upload_layout(active_path: str):
                                                             dbc.CardHeader(html.Strong("Microbiome feature table (CSV)")),
                                                             dbc.CardBody(
                                                                 [
+                                                                    html.Div("Basic requirements", className="fw-semibold mb-1"),
                                                                     html.Ul(
                                                                         [
                                                                             html.Li(
@@ -873,22 +874,21 @@ def upload_layout(active_path: str):
                                                                                 "16S-derived OTU/ASV tables or shotgun-derived "
                                                                                 "taxonomic/functional profiles after upstream profiling."
                                                                             ),
-                                                                            html.Li("Raw sequencing files such as FASTQ are not accepted."),
                                                                             html.Li("Samples in rows and profiled features in columns."),
-                                                                            html.Li(f"Samples: {MAX_SAMPLES} or fewer."),
-                                                                            html.Li(f"Features: {MAX_FEATURES} or fewer."),
-                                                                            html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                            html.Li(
+                                                                                f"Size limits: {MAX_SAMPLES} samples or fewer, "
+                                                                                f"{MAX_FEATURES} features or fewer, and "
+                                                                                f"{human_size(MAX_UPLOAD_BYTES)} CSV or smaller."
+                                                                            ),
+                                                                        ],
+                                                                        className="mb-2",
+                                                                    ),
+                                                                    html.Div("Hard blocks", className="fw-semibold mb-1"),
+                                                                    html.Ul(
+                                                                        [
+                                                                            html.Li("Raw sequencing files such as FASTQ are not accepted."),
                                                                             html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
-                                                                            html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
-                                                                            html.Li(
-                                                                                "mBatchNet preprocesses supported numeric matrices into each method's "
-                                                                                "internal representation before correction."
-                                                                            ),
-                                                                            html.Li(
-                                                                                "FAbatch requires retained features after low-variance filtering "
-                                                                                "to be greater than the largest batch size; otherwise FAbatch is "
-                                                                                "marked unavailable for the session."
-                                                                            ),
+                                                                            html.Li("All-zero sample rows are blocked."),
                                                                         ],
                                                                         className="mb-3",
                                                                     ),
@@ -916,18 +916,25 @@ def upload_layout(active_path: str):
                                                             dbc.CardHeader(html.Strong("Metadata (CSV)")),
                                                             dbc.CardBody(
                                                                 [
+                                                                    html.Div("Basic requirements", className="fw-semibold mb-1"),
                                                                     html.Ul(
                                                                         [
                                                                             html.Li("One row per sample, in the same sample order as the matrix."),
                                                                             html.Li("Required: one batch column and one binary or numeric continuous target/phenotype column."),
                                                                             html.Li(
-                                                                                f"Columns: {MAX_METADATA_COLUMNS} or fewer, including batch, target, and optional covariates."
+                                                                                f"Size limits: {MAX_METADATA_COLUMNS} columns or fewer "
+                                                                                f"including batch, target, and optional covariates; "
+                                                                                f"{human_size(MAX_UPLOAD_BYTES)} CSV or smaller."
                                                                             ),
-                                                                            html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
+                                                                        ],
+                                                                        className="mb-2",
+                                                                    ),
+                                                                    html.Div("Hard blocks", className="fw-semibold mb-1"),
+                                                                    html.Ul(
+                                                                        [
                                                                             html.Li("No blank, NA, NaN, Inf, or NA-like metadata values."),
-                                                                            html.Li(
-                                                                                "mBatchNet reports a warning when batch and target are strongly associated."
-                                                                            ),
+                                                                            html.Li("Batch and target columns must be different."),
+                                                                            html.Li("Nonnumeric targets with more than two levels are blocked."),
                                                                         ],
                                                                         className="mb-3",
                                                                     ),

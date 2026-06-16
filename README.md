@@ -107,12 +107,7 @@ The Upload page expects two CSV files:
    - Columns: profiled features, including 16S-derived OTU/ASV tables or shotgun-derived taxonomic/functional profiles after upstream profiling
    - Raw sequencing files such as FASTQ are not accepted; upload a processed sample-by-feature numeric table.
    - Matrix values must be numeric; blank, NA, NaN, Inf, and non-numeric values are blocked.
-   - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
-   - Extreme sample totals or matrix values trigger a Scanpy QC/MAD outlier detection warning before correction methods run.
-   - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
-   - Matrix input form does not by itself disable correction methods; mBatchNet preprocessing prepares supported numeric inputs for each correction method.
-   - Binary target labels are encoded internally as 0/1. Numeric continuous targets are preserved as continuous values, and binary-target-only methods are disabled for that session.
-   - FAbatch is disabled when retained features after low-variance filtering are not greater than the largest batch size.
+   - All-zero sample rows are blocked.
 
 2. **Metadata (CSV)**
    - Must include at least:
@@ -124,11 +119,7 @@ The Upload page expects two CSV files:
 After upload, map batch/target columns in the UI. Additional metadata columns are treated as covariates by methods that support covariates or design matrices.
 
 Public server limits:
-- CSV size: 10.0 MB per uploaded CSV
-- Samples: 500
-- Features: 1,000
-- Matrix cells: 500,000
-- Matrix cells above 500 x 500 trigger a large-matrix warning because correction methods may run slowly
+- Size limits: 500 samples or fewer, 1,000 features or fewer, 500,000 matrix cells or fewer, and 10.0 MB or smaller per uploaded CSV
 - Metadata columns: 5 or fewer, including batch, target, and optional covariates
 - Metadata values: blank, NA, NaN, Inf, and NA-like entries are blocked before preprocessing
 
