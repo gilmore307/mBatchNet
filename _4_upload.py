@@ -44,10 +44,10 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_REPRO_BUNDLE_BYTES = 25 * 1024 * 1024
 WARN_UPLOAD_BYTES = 3 * 1024 * 1024
 MAX_SAMPLES = 500
-MAX_FEATURES = 300
-MAX_MATRIX_CELLS = 150_000
+MAX_FEATURES = 1000
+MAX_MATRIX_CELLS = MAX_SAMPLES * MAX_FEATURES
 MAX_METADATA_COLUMNS = 5
-WARN_MATRIX_CELLS = 100_000
+WARN_MATRIX_CELLS = 500 * 500
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_MAD_MULTIPLIER = 5.0
@@ -429,7 +429,11 @@ def validate_session_inputs(
                 f"{MAX_FEATURES} features, or {MAX_MATRIX_CELLS:,} cells."
             )
         elif sample_count * feature_count > WARN_MATRIX_CELLS:
-            warnings.append("Large matrix detected; run a smaller method set first and download results frequently.")
+            warnings.append(
+                f"Large matrix detected (> {WARN_MATRIX_CELLS:,} cells, about 500 x 500); "
+                "correction methods may run slowly. Consider running a smaller method set first "
+                "and downloading results frequently."
+            )
         zero_rows = sum(1 for row in matrix if all(value == 0 for value in row))
         zero_cols = 0
         if feature_count:

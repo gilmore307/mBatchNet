@@ -125,8 +125,9 @@ After upload, map batch/target columns in the UI. Additional metadata columns ar
 Public server limits:
 - CSV size: 10.0 MB per uploaded CSV
 - Samples: 500
-- Features: 300
-- Matrix cells: 150,000
+- Features: 1,000
+- Matrix cells: 500,000
+- Matrix cells above 250,000 trigger a large-matrix warning because correction methods may run slowly
 - Metadata columns: 5 or fewer, including batch, target, and optional covariates
 - Metadata values: blank, NA, NaN, Inf, and NA-like entries are blocked before preprocessing
 

@@ -50,6 +50,7 @@ from _4_upload import MAX_MATRIX_CELLS
 from _4_upload import MAX_METADATA_COLUMNS
 from _4_upload import MAX_SAMPLES
 from _4_upload import MAX_UPLOAD_BYTES
+from _4_upload import WARN_MATRIX_CELLS
 
 
 def _component_text(component):
@@ -116,7 +117,7 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("shotgun metagenomics raw data", text)
         self.assertIn("Samples in rows", text)
         self.assertIn("Samples: 500 or fewer", text)
-        self.assertIn("Features: 300 or fewer", text)
+        self.assertIn("Features: 1000 or fewer", text)
         self.assertIn("CSV size: 10.0 MB or smaller", text)
         self.assertNotIn("Matrix cells: 150,000 or fewer", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
@@ -129,9 +130,10 @@ class DashAppTests(unittest.TestCase):
 
     def test_public_upload_limits_match_server_contract(self):
         self.assertEqual(MAX_SAMPLES, 500)
-        self.assertEqual(MAX_FEATURES, 300)
+        self.assertEqual(MAX_FEATURES, 1000)
         self.assertEqual(MAX_UPLOAD_BYTES, 10 * 1024 * 1024)
-        self.assertEqual(MAX_MATRIX_CELLS, 150_000)
+        self.assertEqual(MAX_MATRIX_CELLS, 500_000)
+        self.assertEqual(WARN_MATRIX_CELLS, 250_000)
         self.assertEqual(MAX_METADATA_COLUMNS, 5)
 
     def test_navbar_exposes_two_download_entries(self):
@@ -1008,6 +1010,31 @@ class DashAppTests(unittest.TestCase):
                 validation_report["input_contract"],
                 "sample-feature numeric matrix: rows are samples and columns are profiled features",
             )
+
+    def test_public_server_warns_above_large_matrix_threshold(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            feature_count = 501
+            with (session_dir / "raw.csv").open("w", encoding="utf-8", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow([f"feature_{idx}" for idx in range(feature_count)])
+                for sample_idx in range(MAX_SAMPLES):
+                    writer.writerow([1 + ((sample_idx + feature_idx) % 7) for feature_idx in range(feature_count)])
+            with (session_dir / "metadata_origin.csv").open("w", encoding="utf-8", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Batch", "Phenotype"])
+                for sample_idx in range(MAX_SAMPLES):
+                    writer.writerow([f"B{sample_idx % 4}", "case" if sample_idx % 2 else "control"])
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["dimensions"]["matrix_cells"], MAX_SAMPLES * feature_count)
+            self.assertGreater(report["dimensions"]["matrix_cells"], WARN_MATRIX_CELLS)
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("Large matrix detected", warning_text)
+            self.assertIn("500 x 500", warning_text)
+            self.assertIn("may run slowly", warning_text)
 
     def test_public_server_blocks_matrix_above_sample_limit(self):
         with tempfile.TemporaryDirectory() as tmp:
