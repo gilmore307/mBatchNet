@@ -110,6 +110,8 @@ The Upload page expects two CSV files:
    - All-zero sample rows are blocked; all-zero feature columns trigger a validation warning.
    - Extreme sample totals or matrix values trigger a Scanpy QC/MAD outlier detection warning before correction methods run.
    - Batch-target association uses Cramer's V: values >= 0.60 trigger an advisory warning for strong batch-target association.
+   - Method availability is recorded in `validation_report.json`: ConQuR, RUV-III-NB, ComBat-seq, and DEBIAS-M require nonnegative integer count input, while continuous/transformed matrices leave continuous-compatible methods available and disable count-based methods in the Correction table.
+   - FAbatch is disabled when retained features after low-variance filtering are not greater than the largest batch size.
 
 2. **Metadata (CSV)**
    - Must include at least:

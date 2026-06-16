@@ -35,6 +35,7 @@ from _6_correction import _header_with_tooltip
 from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
 from _6_correction import _fabatch_unavailable_reason
+from _6_correction import _method_unavailable_reason
 from _6_correction import _build_method_timing_summary
 from _6_correction import correction_layout
 import _6_correction
@@ -187,7 +188,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Preprocess validation", text)
         self.assertIn("validation_report.json", text)
         self.assertIn("sample/feature/cell limits", text)
-        self.assertIn("no blank/NA-like values", text)
+        self.assertIn("blank/NA/NaN/Inf/non-numeric matrix cells", text)
+        self.assertIn("ConQuR, RUV-III-NB, ComBat-seq, and DEBIAS-M", text)
         self.assertIn("Cramer's V >= 0.60", text)
         self.assertIn("FAbatch availability", text)
         self.assertIn("sc.pp.calculate_qc_metrics", text)
@@ -858,6 +860,76 @@ class DashAppTests(unittest.TestCase):
             self.assertIn("Scanpy QC 5.0x MAD screening rule", warning_text)
             self.assertGreater(report["dimensions"].get("outlier_sample_total_count", 0), 0)
 
+    def test_count_based_methods_are_available_for_integer_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2,f3,f4\n1,0,2,4\n0,3,1,5\n2,1,0,6\n4,2,3,7\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,control\nB,case\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertTrue(report["dimensions"].get("count_like_matrix"))
+            availability = report["method_availability"]
+            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS"):
+                self.assertTrue(availability[code]["available"], availability[code])
+                self.assertIsNone(_method_unavailable_reason(session_dir, code))
+
+    def test_count_based_methods_are_disabled_for_continuous_matrix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2,f3,f4\n0.10,0.20,0.30,0.40\n0.15,0.25,0.35,0.25\n0.40,0.30,0.20,0.10\n0.25,0.35,0.15,0.25\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,control\nB,case\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            self.assertFalse(report["dimensions"].get("count_like_matrix"))
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("Method availability warning", warning_text)
+            self.assertIn("ConQuR", warning_text)
+            self.assertIn("DEBIAS-M", warning_text)
+            availability = report["method_availability"]
+            for code in ("ConQuR", "RUV", "ComBatSeq", "DEBIAS"):
+                self.assertFalse(availability[code]["available"], availability[code])
+                self.assertIn("nonnegative integer count input", availability[code]["reason"])
+                self.assertIn("unavailable", _method_unavailable_reason(session_dir, code))
+            self.assertTrue(availability["limma"]["available"])
+            self.assertTrue(availability["ComBat"]["available"])
+
+    def test_count_based_methods_are_disabled_for_transformed_negative_matrix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2,f3,f4\n-1.2,0.1,0.4,0.7\n-0.8,0.3,0.2,0.9\n-1.0,0.2,0.5,0.3\n-0.7,0.4,0.1,0.6\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,case\nA,control\nB,case\nB,control\n",
+                encoding="utf-8",
+            )
+
+            report = validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            self.assertTrue(report["valid"], report)
+            warning_text = " ".join(report["warnings"])
+            self.assertIn("Negative values detected", warning_text)
+            self.assertIn("Method availability warning", warning_text)
+            self.assertFalse(report["method_availability"]["ComBatSeq"]["available"])
+            self.assertTrue(report["method_availability"]["PLSDA"]["available"])
+
     def test_fabatch_is_unavailable_when_features_do_not_exceed_largest_batch(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
@@ -877,7 +949,9 @@ class DashAppTests(unittest.TestCase):
             self.assertEqual(report["dimensions"].get("fabatch_max_batch_size"), 2)
             self.assertFalse(report["dimensions"].get("fabatch_available"))
             self.assertTrue(any("FAbatch is unavailable" in warning for warning in report["warnings"]))
+            self.assertFalse(report["method_availability"]["FAbatch"]["available"])
             self.assertIn("retained feature count", _fabatch_unavailable_reason(session_dir))
+            self.assertIn("retained feature count", _method_unavailable_reason(session_dir, "FAbatch"))
 
     def test_profile_table_contract_is_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -948,6 +948,24 @@ CODE_TO_DISPLAY: Dict[str, str] = {code: display for code, display in SUPPORTED_
 DISPLAY_TO_CODE: Dict[str, str] = {display: code for code, display in SUPPORTED_METHODS}
 DISPLAY_TO_CODE_LOWER: Dict[str, str] = {display.lower(): code for code, display in SUPPORTED_METHODS}
 
+COUNT_REQUIRED_METHOD_CODES: Sequence[str] = ("ConQuR", "RUV", "ComBatSeq", "DEBIAS")
+
+METHOD_INPUT_REQUIREMENT_BY_CODE: Dict[str, Dict[str, str]] = {
+    code: {
+        "requirement": "nonnegative_integer_counts",
+        "label": "Requires nonnegative integer count input",
+    }
+    for code in COUNT_REQUIRED_METHOD_CODES
+}
+for _code, _display in SUPPORTED_METHODS:
+    METHOD_INPUT_REQUIREMENT_BY_CODE.setdefault(
+        _code,
+        {
+            "requirement": "continuous_or_discrete",
+            "label": "Accepts continuous/transformed or discrete numeric input",
+        },
+    )
+
 METHOD_OUTPUT_BASENAMES: Dict[str, str] = {
     _normalize_method_code("BMC"): "normalized_bmc",
     _normalize_method_code("limma"): "normalized_limma",

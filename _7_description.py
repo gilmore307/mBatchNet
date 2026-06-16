@@ -174,13 +174,19 @@ HELP_MODAL_SECTIONS: List = [
                                 "File and shape checks: required raw.csv and metadata_origin.csv files, public-server file-size limits, sample/feature/cell limits, at least two samples and two features, and matching metadata row count."
                             ),
                             html.Li(
-                                "Matrix checks: numeric finite values only, no blank/NA/NaN/Inf cells, no all-zero sample rows, warnings for all-zero feature columns, high sparsity, negative values, and large matrices."
+                                "Hard blocks: missing required files, oversize files, invalid matrix shape, blank/NA/NaN/Inf/non-numeric matrix cells, all-zero sample rows, metadata row-count mismatch, missing selected metadata columns, invalid batch/target levels, or using the same column for batch and target."
                             ),
                             html.Li(
-                                "Metadata checks: header and data rows, metadata-column limit, no blank/NA-like values, selected batch and target columns present and distinct, at least two batch levels, and exactly two target levels for current binary assessments."
+                                "Warnings: all-zero feature columns, high sparsity, negative/transformed-looking values, large files or matrices, strong batch-target association, outliers, and method-specific availability limits."
                             ),
                             html.Li(
-                                "Study-design warnings: strong batch-target association is reported when Cramer's V >= 0.60, and FAbatch availability is checked against retained feature count and largest batch size."
+                                "Method availability: count-based methods ConQuR, RUV-III-NB, ComBat-seq, and DEBIAS-M require nonnegative integer count input. Continuous, transformed, negative, or otherwise non-count matrices disable these methods in the Correction table while leaving continuous-compatible methods available."
+                            ),
+                            html.Li(
+                                "FAbatch availability is checked after low-variance filtering; FAbatch is disabled when retained features are not greater than the largest batch size."
+                            ),
+                            html.Li(
+                                "Study-design warnings: strong batch-target association is reported when Cramer's V >= 0.60."
                             ),
                             html.Li(
                                 [

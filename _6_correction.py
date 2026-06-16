@@ -547,7 +547,7 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     )
 
 
-def _fabatch_unavailable_reason(session_dir) -> str | None:
+def _validation_report_payload(session_dir) -> Dict[str, object] | None:
     if not session_dir:
         return None
     report_path = session_dir / "validation_report.json"
@@ -556,6 +556,36 @@ def _fabatch_unavailable_reason(session_dir) -> str | None:
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _method_unavailable_reason(session_dir, method_code: str) -> str | None:
+    payload = _validation_report_payload(session_dir)
+    if not payload:
+        return None
+    availability = payload.get("method_availability")
+    if not isinstance(availability, dict):
+        return None
+    entry = availability.get(method_code)
+    if not isinstance(entry, dict) or entry.get("available") is not False:
+        return None
+    reason = entry.get("reason")
+    if reason:
+        display_name = entry.get("display_name") or CODE_TO_DISPLAY.get(method_code, method_code)
+        reason_text = str(reason)
+        if "unavailable" in reason_text.lower():
+            return reason_text
+        return f"{display_name} unavailable: {reason_text}"
+    return f"{CODE_TO_DISPLAY.get(method_code, method_code)} unavailable for this input."
+
+
+def _fabatch_unavailable_reason(session_dir) -> str | None:
+    generic_reason = _method_unavailable_reason(session_dir, "FAbatch")
+    if generic_reason:
+        return generic_reason
+    payload = _validation_report_payload(session_dir)
+    if not payload:
         return None
     dimensions = payload.get("dimensions")
     if not isinstance(dimensions, dict):
@@ -774,16 +804,16 @@ def register_correction_callbacks(app):
             time_display = "-" if elapsed in (None, "") else f"{float(elapsed):.2f}"
             outputs_present = bool(session_dir and method_output_exists(session_dir, code))
             failed_state = bool(session_dir and method_failed_last_run(session_dir, code))
-            fabatch_reason = _fabatch_unavailable_reason(session_dir) if code == "FAbatch" else None
+            unavailable_reason = _method_unavailable_reason(session_dir, code)
             if outputs_present:
                 status_text = "Selected"
-            elif fabatch_reason:
+            elif unavailable_reason:
                 status_text = "Unavailable"
             elif failed_state:
                 status_text = "Failed"
             else:
                 status_text = "Not selected"
-            run_disabled = not session_ready or outputs_present or bool(fabatch_reason)
+            run_disabled = not session_ready or outputs_present or bool(unavailable_reason)
             delete_disabled = not outputs_present
             status_cell = html.Td(
                 dcc.Loading(
@@ -899,11 +929,11 @@ def register_correction_callbacks(app):
                         )
                     )
                 )
-            if fabatch_reason:
+            if unavailable_reason:
                 body_rows.append(
                     html.Tr(
                         html.Td(
-                            dbc.Alert(fabatch_reason, color="warning", className="mb-0"),
+                            dbc.Alert(unavailable_reason, color="warning", className="mb-0"),
                             colSpan=8,
                             className="p-2",
                         )
@@ -1051,18 +1081,17 @@ def register_correction_callbacks(app):
                 "secondary",
                 payload,
             )
-        if method_code == "FAbatch":
-            reason = _fabatch_unavailable_reason(session_dir)
-            if reason:
-                payload = {"message": reason}
-                return (
-                    "Unavailable",
-                    True,
-                    "secondary",
-                    True,
-                    "secondary",
-                    payload,
-                )
+        reason = _method_unavailable_reason(session_dir, method_code)
+        if reason:
+            payload = {"message": reason}
+            return (
+                "Unavailable",
+                True,
+                "secondary",
+                True,
+                "secondary",
+                payload,
+            )
         log_path = session_dir / "run.log"
         record_method_parameters(session_dir, method_code, params)
         success, _ = run_single_method(session_dir, method_code, log_path=log_path, params=params)
@@ -1197,8 +1226,9 @@ def register_correction_callbacks(app):
             clear_assessment_outputs(session_dir, stage="post")
         clear_method_failure(session_dir, method_code)
         session_ready = (session_dir / "raw.csv").exists() and (session_dir / "metadata.csv").exists()
-        status_text = "Not selected"
-        run_disabled = not session_ready
+        reason = _method_unavailable_reason(session_dir, method_code)
+        status_text = "Unavailable" if reason else "Not selected"
+        run_disabled = not session_ready or bool(reason)
         delete_disabled = True
         message = f"Removed outputs for {display_name}." if removed else f"No outputs found for {display_name}."
         complete_flag = any_method_outputs(session_dir)

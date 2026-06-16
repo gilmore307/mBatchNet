@@ -30,6 +30,10 @@ from _2_utils import (
     _make_ag_grid,
     _encode_image_source,
     clear_session_derived_outputs,
+    CODE_TO_DISPLAY,
+    COUNT_REQUIRED_METHOD_CODES,
+    METHOD_INPUT_REQUIREMENT_BY_CODE,
+    SUPPORTED_METHODS,
 )
 
 
@@ -47,6 +51,7 @@ WARN_MATRIX_CELLS = 100_000
 HIGH_SPARSITY_FRACTION = 0.80
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_MAD_MULTIPLIER = 5.0
+COUNT_INTEGER_TOLERANCE = 1e-6
 
 # Mapping presets for example datasets (case-insensitive keys)
 EXAMPLE_COLUMN_MAP: Dict[str, Dict[str, object]] = {
@@ -212,6 +217,67 @@ def _fabatch_retained_feature_count(matrix: List[List[float]]) -> Optional[int]:
     return retained
 
 
+def _is_count_like_matrix(matrix: List[List[float]]) -> bool:
+    values = [value for row in matrix for value in row]
+    if not values:
+        return False
+    return all(
+        math.isfinite(value)
+        and value >= 0
+        and abs(value - round(value)) <= COUNT_INTEGER_TOLERANCE
+        for value in values
+    )
+
+
+def _build_method_availability(matrix: List[List[float]]) -> Dict[str, Dict[str, object]]:
+    count_like = _is_count_like_matrix(matrix)
+    availability: Dict[str, Dict[str, object]] = {}
+    count_reason = (
+        "Requires nonnegative integer count input; this upload contains continuous, transformed, "
+        "negative, or otherwise non-count matrix values."
+    )
+    for code, display in SUPPORTED_METHODS:
+        requirement = METHOD_INPUT_REQUIREMENT_BY_CODE.get(code, {})
+        requires_counts = code in COUNT_REQUIRED_METHOD_CODES
+        entry: Dict[str, object] = {
+            "display_name": display,
+            "available": bool(count_like or not requires_counts),
+            "requirement": requirement.get("requirement", "continuous_or_discrete"),
+            "requirement_label": requirement.get("label", "Accepts numeric input"),
+        }
+        if requires_counts and not count_like:
+            entry["reason"] = count_reason
+        availability[code] = entry
+    return availability
+
+
+def _set_method_unavailable(
+    availability: Dict[str, Dict[str, object]],
+    code: str,
+    reason: str,
+) -> None:
+    requirement = METHOD_INPUT_REQUIREMENT_BY_CODE.get(code, {})
+    entry = availability.setdefault(
+        code,
+        {
+            "display_name": CODE_TO_DISPLAY.get(code, code),
+            "requirement": requirement.get("requirement", "method_specific"),
+            "requirement_label": requirement.get("label", "Method-specific requirement"),
+        },
+    )
+    entry["available"] = False
+    entry["reason"] = reason
+
+
+def _unavailable_method_names(availability: Dict[str, Dict[str, object]], codes: List[str]) -> List[str]:
+    names = []
+    for code in codes:
+        entry = availability.get(code, {})
+        if entry.get("available") is False:
+            names.append(str(entry.get("display_name") or CODE_TO_DISPLAY.get(code, code)))
+    return names
+
+
 def _mad_outlier_count(values: List[float]) -> int:
     if len(values) < 4:
         return 0
@@ -271,8 +337,9 @@ def _build_validation_report(
     warnings: List[str],
     dimensions: Dict[str, object],
     started_at: float,
+    method_availability: Optional[Dict[str, Dict[str, object]]] = None,
 ) -> Dict[str, object]:
-    return {
+    report = {
         "valid": not errors,
         "validated_at": datetime.now().isoformat(timespec="seconds"),
         "validation_elapsed_sec": round(time.perf_counter() - started_at, 6),
@@ -288,6 +355,9 @@ def _build_validation_report(
         },
         "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
     }
+    if method_availability is not None:
+        report["method_availability"] = method_availability
+    return report
 
 
 def validate_session_inputs(
@@ -304,6 +374,7 @@ def validate_session_inputs(
     errors: List[str] = []
     warnings: List[str] = []
     dimensions: Dict[str, object] = {}
+    method_availability: Optional[Dict[str, Dict[str, object]]] = None
 
     if not raw_path.exists():
         errors.append("Missing raw.csv.")
@@ -332,6 +403,16 @@ def validate_session_inputs(
     if matrix:
         sample_count = len(matrix)
         feature_count = len(matrix[0]) if matrix else 0
+        method_availability = _build_method_availability(matrix)
+        dimensions["count_like_matrix"] = _is_count_like_matrix(matrix)
+        unavailable_count_methods = _unavailable_method_names(method_availability, list(COUNT_REQUIRED_METHOD_CODES))
+        if unavailable_count_methods:
+            warnings.append(
+                "Method availability warning: "
+                f"{', '.join(unavailable_count_methods)} disabled for this session because they require "
+                "nonnegative integer count input; continuous, transformed, negative, or non-count matrices "
+                "can still use methods that accept continuous numeric input."
+            )
         dimensions.update(
             {
                 "samples": sample_count,
@@ -450,12 +531,15 @@ def validate_session_inputs(
             dimensions["fabatch_max_batch_size"] = max_batch_size
             dimensions["fabatch_available"] = retained > max_batch_size
             if retained <= max_batch_size:
-                warnings.append(
+                reason = (
                     "FAbatch is unavailable for this input because retained feature count after low-variance filtering "
                     f"({retained}) is not greater than the largest batch size ({max_batch_size})."
                 )
+                warnings.append(reason)
+                if method_availability is not None:
+                    _set_method_unavailable(method_availability, "FAbatch", reason)
 
-    report = _build_validation_report(errors, warnings, dimensions, started_at)
+    report = _build_validation_report(errors, warnings, dimensions, started_at, method_availability)
     _write_validation_report(session_dir, report)
     return report
 
@@ -791,6 +875,10 @@ def upload_layout(active_path: str):
                                                                             html.Li(f"CSV size: {human_size(MAX_UPLOAD_BYTES)} or smaller."),
                                                                             html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
                                                                             html.Li("All-zero sample rows are blocked; all-zero feature columns trigger a warning."),
+                                                                            html.Li(
+                                                                                "Count-based correction methods require nonnegative integer counts; "
+                                                                                "continuous or transformed matrices disable those methods with a warning."
+                                                                            ),
                                                                             html.Li(
                                                                                 "FAbatch requires retained features after low-variance filtering "
                                                                                 "to be greater than the largest batch size; otherwise FAbatch is "
