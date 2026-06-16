@@ -36,6 +36,8 @@ from _6_correction import _build_method_explanation_layout
 from _6_correction import _parameter_input
 from _6_correction import _fabatch_unavailable_reason
 from _6_correction import _method_unavailable_reason
+from _6_correction import _method_unavailability_items
+from _6_correction import _render_method_unavailability_summary
 from _6_correction import _build_method_timing_summary
 from _6_correction import correction_layout
 import _6_correction
@@ -967,6 +969,31 @@ class DashAppTests(unittest.TestCase):
             for code in ("ConQuR", "RUV", "DEBIAS", "limma", "ComBat"):
                 self.assertTrue(availability[code]["available"], availability[code])
                 self.assertIsNone(_method_unavailable_reason(session_dir, code))
+
+    def test_unavailable_method_summary_lists_each_blocked_method(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "f1,f2,f3,f4\n1,0,2,4\n0,3,1,5\n2,1,0,6\n4,2,3,7\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "Batch,Phenotype\nA,1.2\nA,2.5\nB,3.1\nB,4.4\n",
+                encoding="utf-8",
+            )
+            validate_session_inputs(session_dir, batch_col="Batch", target_col="Phenotype")
+
+            items = _method_unavailability_items(session_dir)
+            summary = _render_method_unavailability_summary(session_dir)
+            text = _component_text(summary)
+
+            self.assertEqual([display for display, _ in items], ["PLSDA-batch", "ComBat-seq", "FAbatch"])
+            self.assertIn("Unavailable methods", text)
+            self.assertIn("PLSDA-batch", text)
+            self.assertIn("ComBat-seq", text)
+            self.assertIn("FAbatch", text)
+            self.assertEqual(text.count("Requires a binary target"), 3)
+            self.assertIn("text-danger", str(summary))
 
     def test_multilevel_text_target_blocks_validation(self):
         with tempfile.TemporaryDirectory() as tmp:

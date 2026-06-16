@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import json
 import re
@@ -580,6 +580,49 @@ def _method_unavailable_reason(session_dir, method_code: str) -> str | None:
     return f"{CODE_TO_DISPLAY.get(method_code, method_code)} unavailable for this input."
 
 
+def _method_unavailability_items(session_dir) -> List[Tuple[str, str]]:
+    payload = _validation_report_payload(session_dir)
+    if not payload:
+        return []
+    availability = payload.get("method_availability")
+    if not isinstance(availability, dict):
+        return []
+    items: List[Tuple[str, str]] = []
+    for code, display in SUPPORTED_METHODS:
+        entry = availability.get(code)
+        if not isinstance(entry, dict) or entry.get("available") is not False:
+            continue
+        display_name = str(entry.get("display_name") or CODE_TO_DISPLAY.get(code, display))
+        reason_text = str(entry.get("reason") or "Unavailable for this input.").strip()
+        prefix = f"{display_name} unavailable:"
+        if reason_text.lower().startswith(prefix.lower()):
+            reason_text = reason_text[len(prefix):].strip()
+        items.append((display_name, reason_text))
+    return items
+
+
+def _render_method_unavailability_summary(session_dir) -> object:
+    items = _method_unavailability_items(session_dir)
+    if not items:
+        return html.Div()
+    return html.Div(
+        [
+            html.Div("Unavailable methods", className="fw-semibold text-danger mb-1"),
+            html.Ul(
+                [
+                    html.Li(
+                        [html.Strong(f"{display}: "), reason],
+                        className="text-danger",
+                    )
+                    for display, reason in items
+                ],
+                className="mb-2 ps-3",
+            ),
+        ],
+        className="mb-2",
+    )
+
+
 def _fabatch_unavailable_reason(session_dir) -> str | None:
     generic_reason = _method_unavailable_reason(session_dir, "FAbatch")
     if generic_reason:
@@ -929,16 +972,6 @@ def register_correction_callbacks(app):
                         )
                     )
                 )
-            if unavailable_reason:
-                body_rows.append(
-                    html.Tr(
-                        html.Td(
-                            dbc.Alert(unavailable_reason, color="warning", className="mb-0"),
-                            colSpan=8,
-                            className="p-2",
-                        )
-                    )
-                )
             explanation_layout = _build_method_explanation_layout(display, metadata)
             body_rows.append(
                 html.Tr(
@@ -964,7 +997,7 @@ def register_correction_callbacks(app):
             striped=True,
             className="align-middle",
         )
-        children: List[object] = [table]
+        children: List[object] = [_render_method_unavailability_summary(session_dir), table]
         if row_extras:
             children.extend(row_extras)
         table_wrapper = html.Div(children, className="be-method-table-wrapper")
