@@ -119,7 +119,7 @@ The Upload page expects two CSV files:
 After upload, map batch/target columns in the UI. Additional metadata columns are treated as covariates by methods that support covariates or design matrices.
 
 Public server limits:
-- Size limits: 500 samples or fewer, 1,000 features or fewer, 500,000 matrix cells or fewer, and 10.0 MB or smaller per uploaded CSV
+- Size limits: 500 samples or fewer and 1,000 features or fewer
 - Metadata columns: 5 or fewer, including batch, target, and optional covariates
 - Metadata values: blank, NA, NaN, Inf, and NA-like entries are blocked before preprocessing
 

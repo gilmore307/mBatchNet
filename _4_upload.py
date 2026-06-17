@@ -43,10 +43,9 @@ MAX_REPRO_BUNDLE_BYTES = 25 * 1024 * 1024
 WARN_UPLOAD_BYTES = 3 * 1024 * 1024
 MAX_SAMPLES = 500
 MAX_FEATURES = 1000
-MAX_MATRIX_CELLS = MAX_SAMPLES * MAX_FEATURES
 MAX_METADATA_COLUMNS = 5
-WARN_MATRIX_CELLS = 500 * 500
-HIGH_SPARSITY_FRACTION = 0.80
+WARN_SAMPLES = 500
+WARN_FEATURES = 500
 STRONG_CONFOUNDING_V = 0.60
 OUTLIER_MAD_MULTIPLIER = 5.0
 BINARY_TARGET_METHOD_CODES = ("PLSDA", "FAbatch", "ComBatSeq")
@@ -347,7 +346,8 @@ def _build_validation_report(
             "max_upload_bytes": MAX_UPLOAD_BYTES,
             "max_samples": MAX_SAMPLES,
             "max_features": MAX_FEATURES,
-            "max_matrix_cells": MAX_MATRIX_CELLS,
+            "warn_samples": WARN_SAMPLES,
+            "warn_features": WARN_FEATURES,
             "max_metadata_columns": MAX_METADATA_COLUMNS,
         },
         "input_contract": "sample-feature numeric matrix: rows are samples and columns are profiled features",
@@ -411,14 +411,13 @@ def validate_session_inputs(
         )
         if sample_count < 2 or feature_count < 2:
             errors.append("Matrix must contain at least 2 samples and 2 features.")
-        if sample_count > MAX_SAMPLES or feature_count > MAX_FEATURES or sample_count * feature_count > MAX_MATRIX_CELLS:
+        if sample_count > MAX_SAMPLES or feature_count > MAX_FEATURES:
             errors.append(
-                f"Matrix exceeds public-server limits: {MAX_SAMPLES} samples, "
-                f"{MAX_FEATURES} features, or {MAX_MATRIX_CELLS:,} cells."
+                f"Matrix exceeds public-server limits: {MAX_SAMPLES} samples and {MAX_FEATURES} features."
             )
-        elif sample_count * feature_count > WARN_MATRIX_CELLS:
+        elif sample_count >= WARN_SAMPLES and feature_count >= WARN_FEATURES:
             warnings.append(
-                f"Large matrix detected (> {WARN_MATRIX_CELLS:,} cells, about 500 x 500); "
+                f"Large matrix detected ({WARN_SAMPLES} samples and {WARN_FEATURES} features); "
                 "correction methods may run slowly. Consider running a smaller method set first "
                 "and downloading results frequently."
             )
@@ -430,10 +429,6 @@ def validate_session_inputs(
             errors.append(f"Matrix contains {zero_rows} all-zero sample row(s).")
         if zero_cols:
             warnings.append(f"Matrix contains {zero_cols} all-zero feature column(s); these features add runtime only.")
-        total_values = sample_count * feature_count
-        zero_values = sum(1 for row in matrix for value in row if value == 0)
-        if total_values and zero_values / total_values >= HIGH_SPARSITY_FRACTION:
-            warnings.append("Matrix is highly sparse; review whether this sparsity is expected before running correction methods.")
         sample_outliers, value_outliers = _scanpy_outlier_counts(matrix)
         if sample_outliers or value_outliers:
             dimensions["outlier_sample_total_count"] = sample_outliers
@@ -879,8 +874,7 @@ def upload_layout(active_path: str):
                                                                             html.Li("Samples in rows and profiled features in columns."),
                                                                             html.Li(
                                                                                 f"Size limits: {MAX_SAMPLES} samples or fewer, "
-                                                                                f"{MAX_FEATURES} features or fewer, and "
-                                                                                f"{human_size(MAX_UPLOAD_BYTES)} CSV or smaller."
+                                                                                f"and {MAX_FEATURES} features or fewer."
                                                                             ),
                                                                         ],
                                                                         className="mb-2",
@@ -925,8 +919,7 @@ def upload_layout(active_path: str):
                                                                             html.Li("One batch column and one binary or numeric continuous target/phenotype column."),
                                                                             html.Li(
                                                                                 f"Size limits: {MAX_METADATA_COLUMNS} columns or fewer "
-                                                                                f"including batch, target, and optional covariates; "
-                                                                                f"{human_size(MAX_UPLOAD_BYTES)} CSV or smaller."
+                                                                                f"including batch, target, and optional covariates."
                                                                             ),
                                                                         ],
                                                                         className="mb-2",

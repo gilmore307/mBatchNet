@@ -48,11 +48,11 @@ from _4_upload import validate_session_inputs
 from _4_upload import _restore_repro_bundle
 from _4_upload import _first_non_empty_level
 from _4_upload import MAX_FEATURES
-from _4_upload import MAX_MATRIX_CELLS
 from _4_upload import MAX_METADATA_COLUMNS
 from _4_upload import MAX_SAMPLES
 from _4_upload import MAX_UPLOAD_BYTES
-from _4_upload import WARN_MATRIX_CELLS
+from _4_upload import WARN_FEATURES
+from _4_upload import WARN_SAMPLES
 
 
 def _component_text(component):
@@ -122,9 +122,10 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Samples in rows", text)
         self.assertIn("One batch column and one binary or numeric continuous target/phenotype column", text)
         self.assertNotIn("Required: one batch column", text)
-        self.assertIn("Size limits: 500 samples or fewer, 1000 features or fewer, and 10.0 MB CSV or smaller", text)
+        self.assertIn("Size limits: 500 samples or fewer, and 1000 features or fewer", text)
         self.assertIn("Size limits: 5 columns or fewer including batch, target, and optional covariates", text)
         self.assertNotIn("Matrix cells: 150,000 or fewer", text)
+        self.assertNotIn("10.0 MB CSV or smaller", text)
         self.assertIn("No blank, NA, NaN, Inf, or non-numeric matrix values", text)
         self.assertIn("No blank, NA, NaN, Inf, or NA-like metadata values", text)
         self.assertIn("All-zero sample rows are blocked", text)
@@ -141,8 +142,8 @@ class DashAppTests(unittest.TestCase):
         self.assertEqual(MAX_SAMPLES, 500)
         self.assertEqual(MAX_FEATURES, 1000)
         self.assertEqual(MAX_UPLOAD_BYTES, 10 * 1024 * 1024)
-        self.assertEqual(MAX_MATRIX_CELLS, 500_000)
-        self.assertEqual(WARN_MATRIX_CELLS, 250_000)
+        self.assertEqual(WARN_SAMPLES, 500)
+        self.assertEqual(WARN_FEATURES, 500)
         self.assertEqual(MAX_METADATA_COLUMNS, 5)
 
     def test_navbar_exposes_two_download_entries(self):
@@ -203,8 +204,8 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Missing required files", text)
         self.assertIn("Blank, NA, NaN, Inf, or non-numeric matrix cells", text)
         self.assertIn("All-zero feature columns are reported as warnings", text)
-        self.assertIn("mBatchNet reports high sparsity when 80% or more of matrix cells are zero", text)
-        self.assertIn("greater than 500 x 500", text)
+        self.assertNotIn("high sparsity", text)
+        self.assertIn("500 samples and 500 features", text)
         self.assertIn("numeric continuous targets are preserved", text)
         self.assertIn("Methods that require a binary target", text)
         self.assertIn("Cramer's V >= 0.60", text)
@@ -1081,7 +1082,7 @@ class DashAppTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"]["samples"], MAX_SAMPLES)
             self.assertEqual(report["dimensions"]["features"], MAX_FEATURES)
-            self.assertEqual(report["dimensions"]["matrix_cells"], MAX_MATRIX_CELLS)
+            self.assertEqual(report["dimensions"]["matrix_cells"], MAX_SAMPLES * MAX_FEATURES)
             self.assertFalse(
                 any("exceeds public-server limits" in err for err in report["errors"]),
                 report["errors"],
@@ -1092,7 +1093,8 @@ class DashAppTests(unittest.TestCase):
             self.assertGreaterEqual(validation_report["validation_elapsed_sec"], 0)
             self.assertEqual(validation_report["dimensions"]["samples"], MAX_SAMPLES)
             self.assertEqual(validation_report["dimensions"]["features"], MAX_FEATURES)
-            self.assertEqual(validation_report["limits"]["max_matrix_cells"], MAX_MATRIX_CELLS)
+            self.assertEqual(validation_report["limits"]["warn_samples"], WARN_SAMPLES)
+            self.assertEqual(validation_report["limits"]["warn_features"], WARN_FEATURES)
             self.assertEqual(
                 validation_report["input_contract"],
                 "sample-feature numeric matrix: rows are samples and columns are profiled features",
@@ -1117,10 +1119,11 @@ class DashAppTests(unittest.TestCase):
 
             self.assertTrue(report["valid"], report)
             self.assertEqual(report["dimensions"]["matrix_cells"], MAX_SAMPLES * feature_count)
-            self.assertGreater(report["dimensions"]["matrix_cells"], WARN_MATRIX_CELLS)
+            self.assertEqual(report["dimensions"]["samples"], WARN_SAMPLES)
+            self.assertGreaterEqual(report["dimensions"]["features"], WARN_FEATURES)
             warning_text = " ".join(report["warnings"])
             self.assertIn("Large matrix detected", warning_text)
-            self.assertIn("500 x 500", warning_text)
+            self.assertIn("500 samples and 500 features", warning_text)
             self.assertIn("may run slowly", warning_text)
 
     def test_public_server_blocks_matrix_above_sample_limit(self):

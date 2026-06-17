@@ -194,10 +194,7 @@ HELP_MODAL_SECTIONS: List = [
                                 "All-zero feature columns are reported as warnings; they do not block preprocessing."
                             ),
                             html.Li(
-                                "mBatchNet reports high sparsity when 80% or more of matrix cells are zero."
-                            ),
-                            html.Li(
-                                "Large matrices are reported when sample count x feature count is greater than 500 x 500."
+                                "Large matrices are reported when inputs reach 500 samples and 500 features."
                             ),
                             html.Li(
                                 "Target handling: binary targets are encoded internally as 0/1, while numeric continuous targets are preserved as continuous values. Methods that require a binary target, including PLSDA-batch, FAbatch, and ComBat-seq, are disabled for continuous-target sessions."
