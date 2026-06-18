@@ -100,20 +100,34 @@ primary_file <- if (file.exists(raw_path)) {
 file_list <- c(Raw = raw_path, setNames(file_paths, gsub("^normalized_|\\.csv$", "", basename(file_paths))))
 
 # ==== Merge feature data with metadata (df_merged) ====
-df_raw <- if (basename(primary_file) == "raw.csv") {
-  read_csv(primary_file, show_col_types = FALSE, col_names = FALSE)
-} else {
-  read_csv(primary_file, show_col_types = FALSE)
+read_feature_table <- function(path, metadata) {
+  candidates <- list(
+    header = tryCatch(read_csv(path, show_col_types = FALSE), error = function(e) NULL),
+    no_header = tryCatch(read_csv(path, show_col_types = FALSE, col_names = FALSE), error = function(e) NULL)
+  )
+
+  for (nm in names(candidates)) {
+    df <- candidates[[nm]]
+    if (is.null(df)) next
+
+    if ("sample_id" %in% names(df)) {
+      return(df)
+    }
+
+    if (nrow(df) == nrow(metadata)) {
+      df$sample_id <- metadata$sample_id
+      return(df)
+    }
+  }
+
+  stop(sprintf(
+    "File %s has no sample_id and cannot be aligned by row count to metadata (%d rows).",
+    path,
+    nrow(metadata)
+  ))
 }
 
-# Ensure sample_id is included and matches metadata
-if (!"sample_id" %in% names(df_raw)) {
-  if (nrow(df_raw) == nrow(metadata)) {
-    df_raw <- df_raw %>% mutate(sample_id = metadata$sample_id)
-  } else {
-    warning(sprintf("File %s has no sample_id and row count doesn't match metadata; skipping.", primary_file))
-  }
-}
+df_raw <- read_feature_table(primary_file, metadata)
 
 # Merge metadata and feature data
 batch_levels <- sort(unique(metadata$batch))

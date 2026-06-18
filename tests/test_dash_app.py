@@ -860,6 +860,58 @@ class DashAppTests(unittest.TestCase):
             self.assertNotIn("strongly associated", warning_text)
             self.assertNotIn("Batch and target are associated", warning_text)
 
+    def test_mosaic_accepts_headered_raw_without_sample_id(self):
+        if shutil.which("Rscript") is None:
+            self.skipTest("Rscript is not available")
+
+        project_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            session_dir = Path(tmp)
+            (session_dir / "raw.csv").write_text(
+                "OTU1,OTU2,OTU_zero,OTU4\n"
+                "10,5,0,1\n"
+                "11,6,0,1\n"
+                "12,7,0,1\n"
+                "40,20,0,8\n"
+                "41,21,0,9\n"
+                "42,22,0,10\n",
+                encoding="utf-8",
+            )
+            (session_dir / "metadata_origin.csv").write_text(
+                "batch,target,covariate\n"
+                "B1,case,low\n"
+                "B1,case,low\n"
+                "B1,case,low\n"
+                "B2,control,high\n"
+                "B2,control,high\n"
+                "B2,control,high\n",
+                encoding="utf-8",
+            )
+            (session_dir / "session_config.json").write_text(
+                json.dumps({"label_column": "target", "control_label": "control"}),
+                encoding="utf-8",
+            )
+
+            proc = subprocess.run(
+                [
+                    "Rscript",
+                    "--no-save",
+                    "--no-restore",
+                    "--no-site-file",
+                    "plots/Mosaic.R",
+                    str(session_dir),
+                ],
+                cwd=project_root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=60,
+                check=False,
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stdout)
+            self.assertTrue((session_dir / "mosaic_plot.tif").exists(), proc.stdout)
+
     def test_outlier_detection_warning_is_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             session_dir = Path(tmp)
