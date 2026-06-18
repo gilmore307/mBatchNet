@@ -883,7 +883,7 @@ def upload_layout(active_path: str):
                                                                     html.Ul(
                                                                         [
                                                                             html.Li("Raw sequencing files such as FASTQ are not accepted."),
-                                                                            html.Li("No blank, NA, NaN, Inf, or non-numeric matrix values."),
+                                                                            html.Li("The feature matrix must not contain blank, NA, NaN, Inf, or non-numeric values."),
                                                                             html.Li("All-zero sample rows are blocked."),
                                                                         ],
                                                                         className="mb-3",
