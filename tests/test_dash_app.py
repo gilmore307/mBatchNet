@@ -543,6 +543,13 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("Johnson WE", text)
         self.assertNotIn("Suggested methods", text)
 
+    def test_method_explanation_table_uses_narrow_label_column(self):
+        source = Path("_6_correction.py").read_text(encoding="utf-8")
+
+        self.assertIn("_METHOD_EXPLANATION_LABEL_COLUMN_WIDTH = {\"width\": \"180px\"}", source)
+        self.assertIn("html.Colgroup", source)
+        self.assertIn("method-explanation-table", source)
+
     def test_correction_table_uses_full_width_equal_columns(self):
         source = Path("_6_correction.py").read_text(encoding="utf-8")
         css = Path("assets/ui.css").read_text(encoding="utf-8")

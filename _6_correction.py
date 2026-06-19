@@ -184,6 +184,7 @@ _STATUS_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 _ACTION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 _CONFIG_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
 _EXPLANATION_COLUMN_WIDTH = dict(_METHOD_TABLE_COLUMN_WIDTH)
+_METHOD_EXPLANATION_LABEL_COLUMN_WIDTH = {"width": "180px"}
 
 
 _PARAMETER_CONFIG = {
@@ -534,11 +535,19 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
             html.Div([html.H6("Method Explanation", className="mb-0 p-3 bg-light border-bottom")]),
             html.Div(
                 dbc.Table(
-                    html.Tbody(rows),
+                    [
+                        html.Colgroup(
+                            [
+                                html.Col(style=_METHOD_EXPLANATION_LABEL_COLUMN_WIDTH),
+                                html.Col(),
+                            ]
+                        ),
+                        html.Tbody(rows),
+                    ],
                     bordered=True,
                     responsive=True,
                     size="sm",
-                    className="mb-0",
+                    className="mb-0 method-explanation-table",
                 ),
                 className="p-3",
             ),
