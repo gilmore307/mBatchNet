@@ -739,21 +739,8 @@ def correction_layout(active_path: str):
                     html.P(
                         "Click a method name to open its package or source reference."
                     ),
-                    dbc.Alert(
-                        [
-                            html.Span(
-                                "For practical guidance and parameter explanations, open the Help page before selecting or running correction methods."
-                            ),
-                            dbc.Button(
-                                [html.I(className="bi bi-question-circle me-1"), "Open Help"],
-                                id={"type": "help-open-trigger", "source": "correction"},
-                                color="link",
-                                size="sm",
-                                className="p-0 ms-2 align-baseline",
-                            ),
-                        ],
-                        color="info",
-                        className="py-2",
+                    html.P(
+                        "Open the Help page for practical guidance and parameter explanations before selecting or running correction methods."
                     ),
                     html.Div(id="method-table-container", className="mb-3"),
                     html.Div(id="correction-status", className="text-muted"),

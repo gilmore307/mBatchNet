@@ -174,9 +174,9 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("matching method set", text)
         self.assertNotIn("not a performance ranking", text)
         self.assertIn("package or source reference", text)
-        self.assertIn("For practical guidance and parameter explanations", text)
-        self.assertIn("open the Help page before selecting or running correction methods", text)
-        self.assertIn("Open Help", text)
+        self.assertIn("Open the Help page for practical guidance and parameter explanations", text)
+        self.assertIn("before selecting or running correction methods", text)
+        self.assertNotIn("Open Help", text)
 
     def test_help_modal_matches_repro_bundle_download_flow(self):
         text = _component_text(html.Div(HELP_MODAL_SECTIONS))
