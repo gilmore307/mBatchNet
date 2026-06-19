@@ -712,6 +712,57 @@ METHOD_REFERENCE_BY_CODE: Dict[str, Dict[str, str]] = {
     for code, display in SUPPORTED_METHODS
 }
 
+PRACTICAL_GUIDANCE_BY_CODE: Dict[str, Dict[str, str]] = {
+    "ConQuR": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful when quantile-based adjustment of microbiome profiles is desired. Covariate/target settings should be chosen to preserve biological covariates where supported.",
+    },
+    "MMUPHin": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful for microbiome population-structure and cross-study adjustment. Users should inspect both residual batch association and target preservation after correction.",
+    },
+    "PLSDA": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Component and tuning choices can affect the balance between batch attenuation and target separation.",
+    },
+    "DEBIAS": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful for processing-bias correction and cross-study generalization. Runtime and memory can be higher than simple linear methods.",
+    },
+    "MetaDICT": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful when dictionary-learning-based integration is appropriate. Iteration and model-size parameters can influence runtime.",
+    },
+    "ComBat": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Empirical-Bayes adjustment is fast and widely used, but users should check that transformed inputs and covariate design match assumptions.",
+    },
+    "limma": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful as a fast linear-model baseline. Design metadata columns should be specified carefully to avoid removing target-associated signal.",
+    },
+    "ComBatSeq": {
+        "grouping": "General-purpose / count-oriented",
+        "guidance": "Appropriate for count data rather than CLR-transformed values. Users should inspect downstream relative-abundance and compositional diagnostics.",
+    },
+    "FAbatch": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful when latent-factor adjustment is plausible. Overcorrection should be assessed using target-preservation diagnostics.",
+    },
+    "RUV": {
+        "grouping": "General-purpose / count-oriented",
+        "guidance": "Requires attention to unwanted-factor settings and data assumptions. Diagnostics should be used to verify that biological structure is retained.",
+    },
+    "FSQN": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Fast baseline method for distributional normalization. Users should verify whether its expression-derived assumptions are suitable for their microbiome table.",
+    },
+    "BMC": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful as a computationally inexpensive baseline. Because it is simple, users should examine whether residual batch effects remain.",
+    },
+}
+
 
 _DETAIL_METRIC_TRENDS: Dict[str, Sequence[tuple[str, str]]] = {
     "nmds": (

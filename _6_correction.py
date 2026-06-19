@@ -12,6 +12,7 @@ from _1_components import build_navbar
 from _2_utils import (
     CODE_TO_DISPLAY,
     METHOD_REFERENCE_BY_CODE,
+    PRACTICAL_GUIDANCE_BY_CODE,
     SUPPORTED_METHODS,
     _method_code_from_display,
     _load_session_summary,
@@ -490,12 +491,20 @@ def _build_method_explanation_layout(display: str, metadata: Dict[str, str]) -> 
     package_url = (metadata.get("package") or "").strip()
     citation_text = (metadata.get("citation") or "").strip()
     citation_url = (metadata.get("url") or "").strip()
+    method_code = _method_code_from_display(display) or display
+    practical = PRACTICAL_GUIDANCE_BY_CODE.get(method_code, {})
+    practical_grouping = (practical.get("grouping") or "").strip()
+    practical_guidance = (practical.get("guidance") or "").strip()
 
     rows: List[html.Tr] = [
         html.Tr([html.Th("Method"), html.Td(display)]),
     ]
     if description:
         rows.append(html.Tr([html.Th("Description"), html.Td(description)]))
+    if practical_grouping:
+        rows.append(html.Tr([html.Th("Practical grouping"), html.Td(practical_grouping)]))
+    if practical_guidance:
+        rows.append(html.Tr([html.Th("Practical guidance"), html.Td(practical_guidance)]))
     if package_url:
         rows.append(
             html.Tr(
