@@ -127,7 +127,7 @@ class DashAppTests(unittest.TestCase):
         self.assertNotIn("Matrix cells: 150,000 or fewer", text)
         self.assertNotIn("10.0 MB CSV or smaller", text)
         self.assertIn("The feature matrix must not contain blank, NA, NaN, Inf, or non-numeric values", text)
-        self.assertIn("No blank, NA, NaN, Inf, or NA-like metadata values", text)
+        self.assertNotIn("No blank, NA, NaN, Inf, or NA-like metadata values", text)
         self.assertIn("All-zero sample rows are blocked", text)
         self.assertIn(
             "Target column must be binary or numeric continuous; text targets with more than two categories are blocked",

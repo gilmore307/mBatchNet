@@ -927,7 +927,7 @@ def upload_layout(active_path: str):
                                                                     html.Div("Hard blocks", className="fw-semibold mb-1"),
                                                                     html.Ul(
                                                                         [
-                                                                            html.Li("No blank, NA, NaN, Inf, or NA-like metadata values."),
+                                                                            html.Li("The feature matrix must not contain blank, NA, NaN, Inf, or non-numeric values."),
                                                                             html.Li("Batch and target columns must be different."),
                                                                             html.Li("Target column must be binary or numeric continuous; text targets with more than two categories are blocked."),
                                                                         ],
