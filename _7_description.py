@@ -8,6 +8,57 @@ from _6_correction import (
     _PARAMETER_CONFIG,
 )
 
+PRACTICAL_GUIDANCE_BY_CODE: Dict[str, Dict[str, str]] = {
+    "ConQuR": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful when quantile-based adjustment of microbiome profiles is desired. Covariate/target settings should be chosen to preserve biological covariates where supported.",
+    },
+    "MMUPHin": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful for microbiome population-structure and cross-study adjustment. Users should inspect both residual batch association and target preservation after correction.",
+    },
+    "PLSDA": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Component and tuning choices can affect the balance between batch attenuation and target separation.",
+    },
+    "DEBIAS": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful for processing-bias correction and cross-study generalization. Runtime and memory can be higher than simple linear methods.",
+    },
+    "MetaDICT": {
+        "grouping": "Microbiome-oriented",
+        "guidance": "Useful when dictionary-learning-based integration is appropriate. Iteration and model-size parameters can influence runtime.",
+    },
+    "ComBat": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Empirical-Bayes adjustment is fast and widely used, but users should check that transformed inputs and covariate design match assumptions.",
+    },
+    "limma": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful as a fast linear-model baseline. Design metadata columns should be specified carefully to avoid removing target-associated signal.",
+    },
+    "ComBatSeq": {
+        "grouping": "General-purpose / count-oriented",
+        "guidance": "Appropriate for count data rather than CLR-transformed values. Users should inspect downstream relative-abundance and compositional diagnostics.",
+    },
+    "FAbatch": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful when latent-factor adjustment is plausible. Overcorrection should be assessed using target-preservation diagnostics.",
+    },
+    "RUV": {
+        "grouping": "General-purpose / count-oriented",
+        "guidance": "Requires attention to unwanted-factor settings and data assumptions. Diagnostics should be used to verify that biological structure is retained.",
+    },
+    "FSQN": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Fast baseline method for distributional normalization. Users should verify whether its expression-derived assumptions are suitable for their microbiome table.",
+    },
+    "BMC": {
+        "grouping": "General-purpose / expression-derived",
+        "guidance": "Useful as a computationally inexpensive baseline. Because it is simple, users should examine whether residual batch effects remain.",
+    },
+}
+
 
 def _format_default_value(value: object) -> str:
     if value is True:
@@ -26,6 +77,7 @@ def _method_help_cards() -> List:
         description = (metadata.get("description") or "").strip()
         package_url = (metadata.get("package") or "").strip()
         reference_url = (metadata.get("url") or "").strip()
+        practical = PRACTICAL_GUIDANCE_BY_CODE.get(code, {})
         params = _PARAMETER_CONFIG.get(code, [])
         parameter_items = []
         if params:
@@ -71,6 +123,24 @@ def _method_help_cards() -> List:
                 [
                     html.Summary(CODE_TO_DISPLAY.get(code, display), className="fw-semibold"),
                     html.P(description or "No method description available.", className="mt-2 mb-2"),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Strong("Practical grouping: "),
+                                    practical.get("grouping", "Not specified."),
+                                ],
+                                className="mb-1",
+                            ),
+                            html.Div(
+                                [
+                                    html.Strong("Practical guidance: "),
+                                    practical.get("guidance", "No practical guidance available."),
+                                ]
+                            ),
+                        ],
+                        className="mb-2",
+                    ),
                     html.Div(links, className="mb-2") if links else html.Div(),
                     html.Div("Exposed parameters", className="fw-semibold mb-1"),
                     html.Ul(parameter_items, className="mb-0"),

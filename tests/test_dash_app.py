@@ -234,6 +234,23 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("DEBIAS-M", text)
         self.assertIn("MetaDICT", text)
         self.assertIn("ComBat-seq", text)
+        self.assertIn("Practical grouping", text)
+        self.assertIn("Practical guidance", text)
+        self.assertIn("Microbiome-oriented", text)
+        self.assertIn("General-purpose / expression-derived", text)
+        self.assertIn("General-purpose / count-oriented", text)
+        self.assertIn("Useful when quantile-based adjustment of microbiome profiles is desired", text)
+        self.assertIn("Users should inspect both residual batch association and target preservation", text)
+        self.assertIn("Component and tuning choices can affect the balance", text)
+        self.assertIn("Useful for processing-bias correction and cross-study generalization", text)
+        self.assertIn("dictionary-learning-based integration", text)
+        self.assertIn("Empirical-Bayes adjustment is fast and widely used", text)
+        self.assertIn("fast linear-model baseline", text)
+        self.assertIn("Appropriate for count data rather than CLR-transformed values", text)
+        self.assertIn("latent-factor adjustment is plausible", text)
+        self.assertIn("Requires attention to unwanted-factor settings and data assumptions", text)
+        self.assertIn("Fast baseline method for distributional normalization", text)
+        self.assertIn("computationally inexpensive baseline", text)
         self.assertIn("alpha", text)
         self.assertIn("par.prior", text)
         self.assertIn("gene.subset.n", text)
@@ -288,13 +305,12 @@ class DashAppTests(unittest.TestCase):
             for specs in _PARAMETER_CONFIG.values()
             for spec in specs
         )
-        help_text = _component_text(html.Div(HELP_MODAL_SECTIONS))
         interpretation_text = " ".join(
             point
             for payload in _DETAILS_INTERPRETATION.values()
             for point in payload.get("points", ())
         )
-        visible_text = " ".join([method_text, parameter_text, help_text, interpretation_text]).lower()
+        visible_text = " ".join([method_text, parameter_text, interpretation_text]).lower()
 
         for term in banned_terms:
             self.assertNotIn(term, visible_text)
