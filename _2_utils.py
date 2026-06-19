@@ -72,6 +72,23 @@ def append_run_log(log_path: Path, message: str, icon: str = "ℹ️") -> str:
     return line
 
 
+_NAME_REPAIR_DETAIL_PATTERN = re.compile(r"^[•*-]\s+`[^`]*`\s*->\s*`[^`]*`\s*$")
+
+
+def _skip_streamed_log_line(line: str, state: Dict[str, bool]) -> bool:
+    """Suppress verbose R/tidyverse column name-repair output from run.log."""
+
+    text = str(line).strip()
+    if text == "New names:":
+        state["skip_name_repair"] = True
+        return True
+    if state.get("skip_name_repair"):
+        if not text or _NAME_REPAIR_DETAIL_PATTERN.match(text):
+            return True
+        state["skip_name_repair"] = False
+    return False
+
+
 def log_file_meta(log_path: Path | None) -> Optional[Dict[str, Any]]:
     """Return basic metadata for a log file if it exists."""
 
@@ -1243,8 +1260,11 @@ def run_command_streaming(command: Sequence[str], cwd: Path, log_path: Path) -> 
                 env=env,
             )
             assert proc.stdout is not None
+            log_filter_state: Dict[str, bool] = {}
             try:
                 for line in proc.stdout:
+                    if _skip_streamed_log_line(line, log_filter_state):
+                        continue
                     formatted = _stamp(line, icon="📝")
                     logf.write(formatted)
                     logf.flush()

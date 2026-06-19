@@ -4,6 +4,7 @@ import csv
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import shutil
 import re
@@ -27,6 +28,7 @@ from _2_utils import clear_session_derived_outputs
 from _2_utils import PREVIEW_SENTINEL
 from _2_utils import load_method_runtime_averages
 from _2_utils import record_method_runtime
+from _2_utils import run_command_streaming
 from _1_components import build_navbar
 from _5_assessment import _expected_figure_files
 from _6_correction import _PARAMETER_CONFIG
@@ -430,6 +432,36 @@ class DashAppTests(unittest.TestCase):
         self.assertIn("combat", stats)
         self.assertEqual(stats["combat"]["count"], 2)
         self.assertAlmostEqual(stats["combat"]["mean_sec"], 15.0)
+
+    def test_streaming_log_suppresses_r_name_repair_noise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "run.log"
+            command = [
+                sys.executable,
+                "-c",
+                (
+                    "bullet = chr(8226)\n"
+                    "tick = chr(96)\n"
+                    "print('before')\n"
+                    "print('New' + ' names:')\n"
+                    "print(f'{bullet} {tick}70{tick} -> {tick}70...1{tick}')\n"
+                    "print(f'{bullet} {tick}3{tick} -> {tick}3...3{tick}')\n"
+                    "print('after')\n"
+                ),
+            ]
+
+            success, log_text = run_command_streaming(command, Path(__file__).resolve().parents[1], log_path)
+            file_text = log_path.read_text(encoding="utf-8")
+
+        self.assertTrue(success)
+        self.assertIn("before", file_text)
+        self.assertIn("after", file_text)
+        self.assertIn("before", log_text)
+        self.assertIn("after", log_text)
+        self.assertNotIn("New names:", file_text)
+        self.assertNotIn("New names:", log_text)
+        self.assertNotIn("`70` -> `70...1`", file_text)
+        self.assertNotIn("`70` -> `70...1`", log_text)
 
     def test_permanova_script_handles_insufficient_data_without_failing(self):
         rscript = shutil.which("Rscript")
